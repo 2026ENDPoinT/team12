@@ -1,0 +1,622 @@
+import { shortestPath } from "./routing.mjs";
+import {
+  edgeId,
+  reportLocation,
+  readReports,
+  writeReports,
+  availableEdges,
+} from "./reports.mjs";
+import catalog from "./schools.json";
+import {
+  CAMPUS,
+  CAMPUS_GEOMETRY,
+  BUILDINGS,
+  NODES,
+  EDGES,
+  PLACES,
+} from "./data.mjs";
+import { createCampusMap } from "./map.js";
+import { gpsToCampus } from "./geo.mjs";
+const $ = (s) => document.querySelector(s),
+  $$ = (s) => document.querySelectorAll(s);
+let region = "전체",
+  showAll = false,
+  mode = "shortest",
+  activeStart = "gate",
+  activeDestination = "future",
+  currentRoute = null,
+  toastTimer,
+  gpsWatchId = null,
+  gpsPosition = null,
+  gpsStartNode = null;
+// TODO(백엔드 연동): 안전하게 접근 가능한 브라우저 저장소만 사용합니다.
+let reportStorage = null;
+try {
+  reportStorage = window.localStorage;
+} catch {}
+let reports = readReports(reportStorage),
+  reporting = false,
+  selectedReport = null;
+const normalize = (s) => s.toLowerCase().replace(/\s/g, "");
+const schoolData = [
+  catalog.find((s) => s[0] === CAMPUS.name),
+  ...catalog.filter((s) => s[0] !== CAMPUS.name),
+];
+function renderSchools() {
+  const q = normalize($("#school-search").value),
+    all = schoolData.filter(
+      (s) =>
+        (region === "전체" || s[3] === region) &&
+        normalize(s.join(" ")).includes(q),
+    );
+  const displayed = q || showAll ? all : all.slice(0, 6);
+  $("#school-count").textContent = `${all.length}개 캠퍼스`;
+  $("#show-all").hidden = !!q || all.length <= 6;
+  $("#show-all").firstChild.textContent = showAll
+    ? "학교 접기 "
+    : "학교 더 보기 ";
+  const container = $("#school-results");
+  container.replaceChildren();
+  if (!all.length) {
+    const e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = "찾는 학교가 없어요. 학교 이름 일부로 다시 검색해보세요.";
+    container.append(e);
+    return;
+  }
+  for (const s of displayed) {
+    const supported = s[0] === CAMPUS.name,
+      b = document.createElement("button");
+    b.className = "school-card" + (supported ? " featured" : "");
+    b.innerHTML =
+      '<span class="school-state"><i></i></span><span class="school-logo"></span><span class="school-copy"><b></b><small></small></span><span class="school-arrow">↗</span>';
+    b.querySelector(".school-logo").textContent = supported
+      ? "ST"
+      : s[0].slice(0, 1);
+    b.querySelector("b").textContent = s[0];
+    b.querySelector("small").textContent = `${s[2]} · ${s[1]}`;
+    const state = b.querySelector(".school-state");
+    state.append(
+      document.createTextNode(supported ? "3D 지도 OPEN" : "지도 준비 중"),
+    );
+    state.classList.toggle("soon", !supported);
+    b.onclick = () => {
+      if (supported) location.hash = "campus/seoultech";
+      else
+        toast(
+          `${s[0]} 지도는 준비 중이에요. 서울과기대에서 먼저 체험해보세요.`,
+        );
+    };
+    container.append(b);
+  }
+}
+$("#school-search").addEventListener("input", renderSchools);
+$("#school-search-form").onsubmit = (e) => {
+  e.preventDefault();
+  renderSchools();
+  $("#school-results button")?.focus();
+};
+$$("[data-region]").forEach(
+  (b) =>
+    (b.onclick = () => {
+      region = b.dataset.region;
+      $$("[data-region]").forEach((x) => {
+        x.classList.toggle("active", x === b);
+        x.setAttribute("aria-pressed", String(x === b));
+      });
+      renderSchools();
+    }),
+);
+$("#show-all").onclick = () => {
+  showAll = !showAll;
+  renderSchools();
+};
+const gpsOptions = [];
+for (const select of [$("#origin"), $("#destination")]) {
+  const gpsOption = document.createElement("option");
+  gpsOption.value = "gps";
+  gpsOption.textContent = "내 현재 위치 · GPS 필요";
+  gpsOption.disabled = true;
+  select.append(gpsOption);
+  gpsOptions.push(gpsOption);
+  for (const place of PLACES) {
+    const option = document.createElement("option");
+    option.value = place.id;
+    option.textContent = place.name;
+    select.append(option);
+  }
+}
+$("#origin").value = activeStart;
+$("#destination").value = activeDestination;
+function selectedPlace(selector) {
+  const id = $(selector).value;
+  return id === "gps" && gpsStartNode
+    ? { id: "gps", name: "현재 위치", entry: gpsStartNode }
+    : PLACES.find((place) => place.id === id);
+}
+function updateRoute({ announce = false } = {}) {
+  activeStart = $("#origin").value;
+  activeDestination = $("#destination").value;
+  const start = selectedPlace("#origin"),
+    destination = selectedPlace("#destination");
+  if (!start || !destination) {
+    toast("현재 위치를 먼저 확인해주세요.");
+    return;
+  }
+  // [팀 알고리즘 호출 지점]
+  // 신고된 차단 edge를 제외한 그래프를 routing.mjs의 임시 알고리즘에 전달합니다.
+  currentRoute = shortestPath(
+    start.entry,
+    destination.entry,
+    mode,
+    NODES,
+    availableEdges(reports),
+  );
+  if (!currentRoute) {
+    $("#route-result").hidden = true;
+    $("#no-route-message").hidden = false;
+    $("#no-route-message p").textContent =
+      mode === "stepfree"
+        ? "공개 도로망에서 계단을 제외하면 연결된 길을 찾지 못했습니다. 실제 무계단 통로와 입구 정보는 현장 확인이 필요해요."
+        : `신고된 길을 제외하면 ${start.name}에서 ${destination.name}까지 연결되는 경로가 없습니다. 다른 장소나 신고 목록을 확인해주세요.`;
+    map?.setRoute(null);
+    return;
+  }
+  $("#no-route-message").hidden = true;
+  $("#route-result").hidden = false;
+  $("#route-minutes").textContent = currentRoute.minutes;
+  $("#route-distance").textContent = Math.round(currentRoute.meters);
+  $(".result-heading>div>small").textContent =
+    mode === "stepfree" ? "계단 제외 시연 경로" : "시연 최단 경로";
+  $("#route-type").textContent = currentRoute.stairs ? "계단 포함" : "도보";
+  $("#route-summary").textContent =
+    `${start.name} → ${destination.name} · ${mode === "stepfree" ? "등록된 계단 구간을 제외한 경로예요." : "등록된 시연 보행망에서 가장 짧은 경로예요."} 거리·시간은 시연 추정치입니다.`;
+  $("#route-steps").replaceChildren();
+  const stride = Math.max(1, Math.ceil((currentRoute.path.length - 1) / 5));
+  const visible = currentRoute.path.filter(
+    (_, i) => i === 0 || i === currentRoute.path.length - 1 || i % stride === 0,
+  );
+  visible.forEach((id, i) => {
+    const li = document.createElement("li");
+    const point = NODES[id];
+    const nearestBuilding = BUILDINGS.filter(
+      (b) => b.name !== "교내 건물",
+    ).reduce(
+      (best, b) =>
+        !best ||
+        Math.hypot(point.x - b.x, point.z - b.z) <
+          Math.hypot(point.x - best.x, point.z - best.z)
+          ? b
+          : best,
+      null,
+    );
+    li.textContent =
+      visible.length === 1
+        ? `${start.name}와 ${destination.name}의 등록 연결 지점이 같습니다`
+        : i === 0
+          ? `${start.name}에서 출발`
+          : i === visible.length - 1
+            ? `${destination.name} 도착`
+            : `${nearestBuilding?.name || "캠퍼스"} 인근 길`;
+    const small = document.createElement("small");
+    small.textContent =
+      i === 0
+        ? "3D 지도에서 출발지 확인"
+        : i === visible.length - 1
+          ? "선택한 도착지의 연결 지점"
+          : "보행로를 따라 이동";
+    li.append(small);
+    $("#route-steps").append(li);
+  });
+  $("#indoor-open").hidden = destination.id !== "future";
+  map?.setRoute(currentRoute, start.id, destination.id);
+  if (announce)
+    toast(`${start.name}에서 ${destination.name}까지 경로를 표시했어요.`);
+}
+function buildingSelect(id) {
+  const place = PLACES.find((item) => item.id === id);
+  if (place)
+    showPopover(
+      place.name,
+      "출발지나 도착지로 선택할 수 있어요.",
+      place,
+      id === "future",
+    );
+}
+function showPopover(title, description, place = null, indoor = false) {
+  const el = $("#building-popover");
+  el.replaceChildren();
+  const b = document.createElement("b");
+  b.textContent = title;
+  const p = document.createElement("p");
+  p.textContent = description;
+  el.append(b, p);
+  if (place) {
+    for (const [selector, text] of [
+      ["#origin", "출발지로"],
+      ["#destination", "도착지로"],
+    ]) {
+      const button = document.createElement("button");
+      button.textContent = text;
+      button.onclick = () => {
+        $(selector).value = place.id;
+        updateRoute();
+        el.hidden = true;
+      };
+      el.append(button);
+    }
+  }
+  if (indoor) {
+    const button = document.createElement("button");
+    button.textContent = "미래관 실내 연동 보기 ↗";
+    button.onclick = () => $("#indoor-dialog").showModal();
+    el.append(button);
+  }
+  const close = document.createElement("button");
+  close.textContent = "닫기";
+  close.style.marginLeft = "5px";
+  close.onclick = () => (el.hidden = true);
+  el.append(close);
+  el.hidden = false;
+}
+let map = createCampusMap($("#hero-map"), buildingSelect, openRoadReport);
+if (!map) {
+  $("#hero-map").innerHTML =
+    '<div class="hero-fallback"><span>✦</span><b>사이로 이어지는 캠퍼스.</b><p>WebGL을 지원하는 브라우저에서<br>3D 미리보기를 볼 수 있어요.</p></div>';
+  $("#map-error").hidden = false;
+} else {
+  map.setReports(reports);
+  map.setRoute(
+    shortestPath(
+      "gate",
+      "futureDoor",
+      "shortest",
+      NODES,
+      availableEdges(reports),
+    ),
+    "gate",
+    "future",
+  );
+}
+$("#origin").onchange = () => {
+  updateRoute();
+  $("#building-popover").hidden = true;
+};
+$("#destination").onchange = () => {
+  updateRoute();
+  $("#building-popover").hidden = true;
+};
+$("#find-route").onclick = () => {
+  updateRoute({ announce: true });
+  $("#building-popover").hidden = true;
+};
+$$("[data-mode]").forEach(
+  (b) =>
+    (b.onclick = () => {
+      mode = b.dataset.mode;
+      $$("[data-mode]").forEach((x) => {
+        x.classList.toggle("active", x === b);
+        x.setAttribute("aria-pressed", String(x === b));
+      });
+      updateRoute();
+    }),
+);
+$("#map-plus").onclick = () => map?.zoom(1.18);
+$("#map-minus").onclick = () => map?.zoom(1 / 1.18);
+$("#map-reset").onclick = () => map?.reset();
+$("#map-north").onclick = () => map?.reset();
+$("#map-top").onclick = () => map?.top();
+function setPanelClosed(closed) {
+  $("#map-view").classList.toggle("panel-closed", closed);
+  $("#panel-toggle").setAttribute("aria-expanded", String(!closed));
+  $("#panel-toggle").textContent = closed ? "길찾기 열기" : "길찾기 접기";
+}
+$("#panel-toggle").onclick = () =>
+  setPanelClosed(!$("#map-view").classList.contains("panel-closed"));
+
+// ===== GPS 현재 위치 추적 =====
+// 공개 데이터의 중심 위·경도를 로컬 미터 좌표로 변환합니다.
+// 실서비스 전에는 학교에서 기준점을 실측해 좌표 오차를 보정해야 합니다.
+function nearestGraphNode(point) {
+  return Object.entries(NODES).reduce((best, [id, node]) => {
+    const distance = Math.hypot(point.x - node.x, point.z - node.z);
+    return !best || distance < best.distance ? { id, distance } : best;
+  }, null);
+}
+function setGpsStatus(message, visible = true) {
+  $("#gps-status").textContent = message;
+  $("#gps-status").hidden = !visible;
+}
+function stopGps({ keepStatus = false } = {}) {
+  if (gpsWatchId !== null) navigator.geolocation?.clearWatch(gpsWatchId);
+  gpsWatchId = null;
+  gpsPosition = null;
+  gpsStartNode = null;
+  for (const option of gpsOptions) {
+    option.disabled = true;
+    option.textContent = "내 현재 위치 · GPS 필요";
+  }
+  let changed = false;
+  if ($("#origin").value === "gps") {
+    $("#origin").value = "gate";
+    changed = true;
+  }
+  if ($("#destination").value === "gps") {
+    $("#destination").value = "future";
+    changed = true;
+  }
+  if (changed) updateRoute();
+  map?.setUserLocation(null);
+  $("#gps-toggle").setAttribute("aria-pressed", "false");
+  $("#gps-toggle span:last-child").textContent = "내 위치";
+  if (!keepStatus) setGpsStatus("", false);
+}
+$("#gps-toggle").onclick = () => {
+  if (gpsWatchId !== null) {
+    stopGps();
+    toast("현재 위치 추적을 종료했어요.");
+    return;
+  }
+  if (!navigator.geolocation) {
+    setGpsStatus("이 브라우저에서는 위치 기능을 사용할 수 없어요.");
+    return;
+  }
+  setGpsStatus("현재 위치 권한을 확인하고 있어요…");
+  $("#gps-toggle").setAttribute("aria-pressed", "true");
+  $("#gps-toggle span:last-child").textContent = "추적 중";
+  let firstFix = true;
+  gpsWatchId = navigator.geolocation.watchPosition(
+    ({ coords }) => {
+      const point = gpsToCampus(
+        coords.latitude,
+        coords.longitude,
+        CAMPUS_GEOMETRY.meta,
+      );
+      const nearest = nearestGraphNode(point);
+      gpsPosition = { ...point, accuracy: coords.accuracy };
+      if (!nearest || nearest.distance > 350) {
+        gpsStartNode = null;
+        gpsOptions.forEach((option) => (option.disabled = true));
+        map?.setUserLocation(null);
+        setGpsStatus(
+          `현재 위치가 서울과기대 지도 범위 밖이에요. 캠퍼스에 들어오면 자동으로 표시됩니다.`,
+        );
+        firstFix = false;
+        return;
+      }
+      gpsStartNode = nearest.id;
+      for (const option of gpsOptions) {
+        option.disabled = false;
+        option.textContent = "내 현재 위치";
+      }
+      map?.setUserLocation(gpsPosition, { follow: true });
+      setGpsStatus(
+        `현재 위치 추적 중 · 정확도 약 ${Math.round(coords.accuracy)}m`,
+      );
+      if (firstFix) {
+        $("#origin").value = "gps";
+        updateRoute();
+        toast("현재 위치를 출발지로 설정했어요.");
+      } else if (
+        $("#origin").value === "gps" ||
+        $("#destination").value === "gps"
+      )
+        updateRoute();
+      firstFix = false;
+    },
+    (error) => {
+      const message =
+        error.code === 1
+          ? "위치 권한이 꺼져 있어요. 브라우저 주소창의 위치 권한을 허용해주세요."
+          : "현재 위치를 확인하지 못했어요. 잠시 후 다시 시도해주세요.";
+      stopGps({ keepStatus: true });
+      setGpsStatus(message);
+    },
+    { enableHighAccuracy: true, maximumAge: 3000, timeout: 12000 },
+  );
+};
+window.addEventListener("pagehide", () => {
+  if (gpsWatchId !== null) navigator.geolocation?.clearWatch(gpsWatchId);
+});
+function routeView() {
+  setReporting(false);
+  const isMap = location.hash.startsWith("#campus/");
+  if (isMap && location.hash !== "#campus/seoultech") {
+    history.replaceState(
+      null,
+      "",
+      location.pathname + location.search + "#campuses",
+    );
+    toast("현재 서울과기대 지도만 제공하고 있어요.");
+  }
+  const exploring = location.hash === "#campus/seoultech";
+  $("#home-view").hidden = exploring;
+  $("#map-view").hidden = !exploring;
+  document.body.classList.toggle("exploring", exploring);
+  if (exploring) {
+    if (!$("#map-view").dataset.opened) {
+      setPanelClosed(false);
+      $("#map-view").dataset.opened = "true";
+    }
+    map?.moveTo($("#campus-map"), false);
+    updateRoute();
+    document.title = "서울과기대 길찾기 | 사이";
+    $("#back-home").focus({ preventScroll: true });
+  } else {
+    map?.moveTo($("#hero-map"), true);
+    map?.setRoute(
+      shortestPath(
+        "gate",
+        "futureDoor",
+        "shortest",
+        NODES,
+        availableEdges(reports),
+      ),
+      "gate",
+      "future",
+    );
+    document.title = "사이 · 길을 아는 건, 우리니까.";
+    if (location.hash === "#campuses")
+      requestAnimationFrame(() => $("#campuses").scrollIntoView());
+  }
+}
+window.addEventListener("hashchange", routeView);
+$("#back-home").onclick = () => (location.hash = "campuses");
+$("#brand-home").onclick = (e) => {
+  e.preventDefault();
+  location.hash = "";
+  window.scrollTo({ top: 0 });
+};
+$("#find-school").onclick = (e) => {
+  e.preventDefault();
+  location.hash = "campuses";
+  if (!document.body.classList.contains("exploring"))
+    $("#campuses").scrollIntoView();
+};
+$("#intro-button").onclick = () => $("#info-dialog").showModal();
+$("#indoor-open").onclick = () => $("#indoor-dialog").showModal();
+$$(".dialog-close").forEach(
+  (b) => (b.onclick = () => b.closest("dialog").close()),
+);
+$$("dialog").forEach((d) =>
+  d.addEventListener("click", (e) => {
+    if (e.target === d) {
+      const r = d.getBoundingClientRect();
+      if (
+        e.clientX < r.left ||
+        e.clientX > r.right ||
+        e.clientY < r.top ||
+        e.clientY > r.bottom
+      )
+        d.close();
+    }
+  }),
+);
+for (const [key, selector] of [
+  ["gaussianUrl", "#gaussian-link"],
+  ["arUrl", "#ar-link"],
+]) {
+  const url = CAMPUS.interior[key];
+  if (url) {
+    try {
+      const parsed = new URL(url, location.href);
+      if (["https:", "http:"].includes(parsed.protocol)) {
+        $(selector).href = parsed.href;
+        $(selector).hidden = false;
+      }
+    } catch {}
+  }
+}
+function toast(message) {
+  clearTimeout(toastTimer);
+  $("#toast").replaceChildren(document.createTextNode(message));
+  $("#toast").hidden = false;
+  toastTimer = setTimeout(() => ($("#toast").hidden = true), 4500);
+}
+document.addEventListener("keydown", (e) => {
+  if (
+    e.key === "/" &&
+    !document.body.classList.contains("exploring") &&
+    !["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName) &&
+    !document.querySelector("dialog[open]")
+  ) {
+    e.preventDefault();
+    $("#school-search").focus();
+  }
+});
+renderSchools();
+renderReportList();
+routeView();
+
+// ===== 지도 위치를 직접 누르는 공사 신고 시연 =====
+// TODO(백엔드): 사용자 입력은 point{x,z}. 경로 연결 edge는 지도 내부에서 자동 계산합니다.
+function setReporting(value) {
+  reporting = value;
+  $("#report-start").classList.toggle("active", value);
+  $("#report-start").setAttribute("aria-pressed", String(value));
+  $("#report-start").textContent = value
+    ? "× 구간 선택 취소"
+    : "⚠ 공사 구간 신고";
+  $("#report-picker").hidden = !value;
+  map?.setReporting(value);
+  if (!value) map?.clearReportSelection();
+  if (value) {
+    $("#building-popover").hidden = true;
+    $("#campus-map canvas")?.focus({ preventScroll: true });
+  }
+}
+$("#report-start").onclick = () => setReporting(!reporting);
+$("#report-cancel").onclick = () => setReporting(false);
+function openRoadReport(selection) {
+  if (selection?.error) {
+    toast(selection.error);
+    return;
+  }
+  const existing = selection?.reportId
+    ? reports.find((r) => r.id === selection.reportId)
+    : null;
+  if (!existing && (!selection?.point || !selection?.edgeId)) return;
+  selectedReport = existing || selection;
+  $("#report-location").textContent = reportLocation(selectedReport);
+  $("#report-title").textContent = existing
+    ? "이 도로 구간에 내 신고가 있어요."
+    : "선택한 도로 구간이 공사 중인가요?";
+  $("#report-reasons").hidden = !!existing;
+  $("#new-report-actions").hidden = !!existing;
+  $("#existing-report-actions").hidden = !existing;
+  $("#report-dialog .report-scope").textContent = existing
+    ? `${existing.reason === "construction" ? "공사 중" : "통행 막힘"} · 학생 확인 전 · 선택한 도로 구간에 저장된 시연 신고입니다. 삭제하면 이 구간을 경로에 다시 포함합니다.`
+    : "지도에서 주황색으로 강조된 도로 구간 전체를 제외해 우회 경로를 다시 계산합니다. 내 브라우저에만 저장됩니다.";
+  $("#report-dialog").showModal();
+}
+$("#report-no").onclick = () => {
+  map?.clearReportSelection();
+  $("#report-dialog").close();
+};
+$("#report-keep").onclick = () => $("#report-dialog").close();
+function persistReports() {
+  const saved = writeReports(reportStorage, reports);
+  map?.setReports(reports);
+  renderReportList();
+  setReporting(false);
+  updateRoute();
+  $("#report-dialog").close();
+  if (!saved)
+    toast("저장소를 사용할 수 없어 이번 화면에서만 신고가 유지됩니다.");
+}
+$("#report-yes").onclick = () => {
+  if (!selectedReport?.point) return;
+  reports.push({
+    id: crypto.randomUUID(),
+    edgeId: selectedReport.edgeId,
+    point: selectedReport.point,
+    reason: $('input[name="road-reason"]:checked').value,
+    createdAt: new Date().toISOString(),
+  });
+  persistReports();
+};
+$("#report-remove").onclick = () => {
+  reports = reports.filter((r) => r.id !== selectedReport.id);
+  persistReports();
+};
+$("#report-dialog").addEventListener("close", () => {
+  if (!selectedReport?.id) map?.clearReportSelection();
+});
+function renderReportList() {
+  $("#report-count").textContent = reports.length;
+  $("#report-empty").hidden = reports.length > 0;
+  $("#report-list").replaceChildren();
+  for (const report of reports) {
+    const li = document.createElement("li"),
+      button = document.createElement("button");
+    button.innerHTML =
+      '<span aria-hidden="true">⚠</span><span><b></b><small></small></span><span>↗</span>';
+    button.querySelector("b").textContent = reportLocation(report);
+    button.querySelector("small").textContent =
+      (report.reason === "construction" ? "공사 중" : "통행 막힘") +
+      " · 학생 확인 전";
+    button.onclick = () => openRoadReport({ reportId: report.id });
+    li.append(button);
+    $("#report-list").append(li);
+  }
+}

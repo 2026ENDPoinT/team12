@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#7950ff" />
+    <meta
+      name="description"
+      content="학교 사람들이 아는 길, 사이. 서울과학기술대학교 3D 캠퍼스 지도에서 출발지와 도착지를 선택해보세요."
+    />
+    <meta property="og:title" content="사이 — 길을 아는 건, 우리니까." />
+    <meta
+      property="og:description"
+      content="서울과기대 3D 캠퍼스에서 출발지와 도착지를 선택해 경로를 확인해보세요."
+    />
+    <title>사이 · 길을 아는 건, 우리니까.</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <symbol id="i-search" viewBox="0 0 24 24">
+          <circle cx="10.5" cy="10.5" r="6.5" />
+          <path d="m16 16 5 5" />
+        </symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24">
+          <path d="M4 12h16m-6-6 6 6-6 6" />
+        </symbol>
+        <symbol id="i-pin" viewBox="0 0 24 24">
+          <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z" />
+          <circle cx="12" cy="10" r="2.5" />
+        </symbol>
+        <symbol id="i-cube" viewBox="0 0 24 24">
+          <path d="m12 2 9 5v10l-9 5-9-5V7Zm0 10L3 7m9 5 9-5m-9 5v10" />
+        </symbol>
+        <symbol id="i-route" viewBox="0 0 24 24">
+          <circle cx="6" cy="5" r="3" />
+          <circle cx="18" cy="19" r="3" />
+          <path d="M6 8v6a5 5 0 0 0 5 5h4M9 5h5a4 4 0 0 1 0 8h-3" />
+        </symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24">
+          <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z" />
+          <circle cx="12" cy="12" r="3" />
+        </symbol>
+      </defs>
+    </svg>
+    <header class="header">
+      <a class="brand" href="#" id="brand-home" aria-label="사이 홈"
+        ><span class="brand-mark">사이<span class="brand-dot">.</span></span
+        ><span class="brand-sub">CAMPUS, CONNECTED</span></a
+      >
+      <nav>
+        <a href="#campuses" id="find-school">학교 검색</a
+        ><button id="intro-button">서비스 소개</button>
+      </nav>
+    </header>
+    <main id="home-view">
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">
+            <span class="live-dot"></span> 아는 길이 달라지는 순간
+          </div>
+          <h1>
+            길을 아는 건,<br /><span>우리니까.</span
+            ><svg class="hero-spark" viewBox="0 0 60 60" aria-hidden="true">
+              <path d="M30 0v60M0 30h60M9 9l42 42M9 51 51 9" />
+            </svg>
+          </h1>
+          <p>
+            큰 지도는 모르는, 우리 학교의 작은 지름길.<br />건물 밖에서 안까지,
+            <b>사이</b>로 연결해요.
+          </p>
+          <a href="#campuses" class="primary hero-cta"
+            >우리 학교 찾아보기 <svg class="icon"><use href="#i-arrow" /></svg
+          ></a>
+          <div class="hero-proof">
+            <span class="avatar a1">↗</span><span class="avatar a2">⌘</span
+            ><span class="avatar a3">✦</span
+            ><span>걸어본 우리가 만드는 캠퍼스 지도</span>
+          </div>
+        </div>
+        <div class="hero-art">
+          <div class="orb orb1"></div>
+          <div class="orb orb2"></div>
+          <div class="art-caption">YOUR CAMPUS.<br />YOUR SHORTCUT.</div>
+          <div id="hero-map" class="hero-map"></div>
+          <div class="floating-tag tag-start">
+            <span>출발</span> 정문 <i>↗</i>
+          </div>
+          <div class="floating-tag tag-end">
+            <span>도착</span> 미래관 <i>✦</i>
+          </div>
+          <div class="art-sticker">
+            LET’S<br />TAKE A<br /><b>SHORTCUT ↗</b>
+          </div>
+          <div class="art-bottom">
+            <span class="live-dot"></span> 서울과기대 3D 캠퍼스 미리보기
+            <span>드래그해서 둘러보기 ↗</span>
+          </div>
+        </div>
+      </section>
+      <div class="ticker" aria-hidden="true">
+        <div>
+          BETWEEN PLACES <span>✦</span> BEYOND MAPS <span>✦</span> 건물과 건물
+          사이 <span>✦</span> BETWEEN PLACES <span>✦</span> BEYOND MAPS
+          <span>✦</span> 건물과 건물 사이 <span>✦</span>
+        </div>
+      </div>
+      <section id="campuses" class="campuses">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow purple">FIND YOUR CAMPUS</div>
+            <h2>어느 학교로 갈까요<span>?</span></h2>
+          </div>
+          <p>학교 이름을 검색하고 지도를 열어보세요.</p>
+        </div>
+        <form id="school-search-form" role="search">
+          <svg class="icon"><use href="#i-search" /></svg
+          ><input
+            id="school-search"
+            type="search"
+            placeholder="학교 이름을 검색해보세요"
+            aria-label="학교 이름 검색"
+            autocomplete="off"
+          /><kbd>/</kbd
+          ><button type="submit" class="primary">
+            학교 찾기 <span>↗</span>
+          </button>
+        </form>
+        <div class="school-toolbar">
+          <div class="region-filters" id="regions">
+            <button class="active" data-region="전체" aria-pressed="true">
+              전체</button
+            ><button data-region="서울" aria-pressed="false">서울</button
+            ><button data-region="경기·인천" aria-pressed="false">
+              경기·인천</button
+            ><button data-region="그 외 지역" aria-pressed="false">
+              그 외 지역
+            </button>
+          </div>
+          <span id="school-count" aria-live="polite"></span>
+        </div>
+        <div id="school-results" class="school-results"></div>
+        <button id="show-all" class="show-all">
+          학교 더 보기 <span>↓</span>
+        </button>
+        <p class="catalog-note">
+          현재 서울과학기술대학교에서 3D 지도 · 미래관 경로 시연이 가능해요.
+        </p>
+      </section>
+      <section class="features">
+        <div class="features-heading">
+          <span>사이가 잇는 것들</span>
+          <h2>문 앞에서 끝나던 지도,<br />그다음까지.</h2>
+        </div>
+        <article class="feature-card">
+          <span class="feature-no">01 / OUTSIDE</span
+          ><svg class="icon"><use href="#i-cube" /></svg>
+          <h3>학교를 입체적으로.</h3>
+          <p>건물의 위치와 길을 한눈에.<br />직접 돌려보는 3D 캠퍼스.</p>
+          <span class="feature-status">지금 체험 가능 ↗</span>
+        </article>
+        <article class="feature-card">
+          <span class="feature-no">02 / BETWEEN</span
+          ><svg class="icon"><use href="#i-route" /></svg>
+          <h3>우리만 아는 길로.</h3>
+          <p>어디서 출발하든, 미래관까지.<br />출발지에 맞춰 이어지는 경로.</p>
+          <span class="feature-status">시연 경로 제공 ↗</span>
+        </article>
+        <article class="feature-card dark-feature">
+          <span class="feature-no">03 / INSIDE</span
+          ><svg class="icon"><use href="#i-eye" /></svg>
+          <h3>건물 안까지, 자연스럽게.</h3>
+          <p>미래관 입구에서 실내로.<br />가우시안 · AR 실내 탐색을 준비 중.</p>
+          <span class="feature-status">COMING NEXT ✦</span>
+        </article>
+      </section>
+      <footer>
+        <a class="brand-mark" href="#">사이.</a
+        ><span>학교의 모든 사이를 잇다.</span
+        ><small>2026 SAI · CAMPUS NAVIGATION PROTOTYPE</small>
+      </footer>
+    </main>
+    <section id="map-view" class="map-view" hidden>
+      <div class="map-topbar">
+        <button id="back-home" aria-label="학교 검색으로 돌아가기">←</button
+        ><span class="map-mini-brand">사이.</span
+        ><span class="map-school-name"
+          >서울과학기술대학교 <small>공릉캠퍼스</small></span
+        ><button id="panel-toggle" class="panel-toggle" aria-expanded="true">
+          길찾기 접기
+        </button>
+      </div>
+      <div class="explorer">
+        <aside class="route-panel">
+          <div class="mobile-route-heading">
+            <b>캠퍼스 길찾기</b><span>출발지와 도착지를 선택해주세요</span>
+          </div>
+          <div class="panel-eyebrow">LET’S FIND YOUR WAY <span>↗</span></div>
+          <h2>학교 안에서,<br /><span>원하는 곳까지.</span></h2>
+          <p class="panel-description">출발지와 도착지를 선택해주세요.</p>
+          <div class="journey-form">
+            <label for="origin"><span class="origin-dot"></span>출발지</label
+            ><select id="origin" aria-label="출발지 선택"></select>
+            <div class="journey-connector"></div>
+            <label class="destination-label" for="destination">
+              <svg class="icon"><use href="#i-pin" /></svg><span>도착지</span>
+            </label>
+            <select id="destination" aria-label="도착지 선택"></select>
+          </div>
+          <div class="mode-tabs" role="group" aria-label="경로 모드">
+            <button class="active" data-mode="shortest" aria-pressed="true">
+              ↗ 최단 경로</button
+            ><button data-mode="stepfree" aria-pressed="false">
+              ▱ 계단 피하기
+            </button>
+          </div>
+          <button id="find-route" class="primary route-submit">
+            선택한 경로 찾기 <svg class="icon"><use href="#i-arrow" /></svg>
+          </button>
+          <div
+            id="no-route-message"
+            class="no-route-message"
+            role="status"
+            hidden
+          >
+            <b>지금은 연결된 우회 경로가 없어요.</b>
+            <p>
+              신고된 차단 구간을 제외하니 두 장소를 잇는 길이 없습니다. 신고
+              목록이나 출발지·도착지를 확인해주세요.
+            </p>
+          </div>
+          <div class="route-result" id="route-result" aria-live="polite">
+            <div class="result-heading">
+              <span class="result-icon">↗</span>
+              <div>
+                <small>시연 최단 경로</small>
+                <h3>
+                  <span id="route-minutes">—</span><small>분</small>
+                  <span id="route-distance">—</span><small>m</small>
+                </h3>
+              </div>
+              <span class="route-type" id="route-type">도보</span>
+            </div>
+            <p id="route-summary"></p>
+            <ol id="route-steps" class="route-steps"></ol>
+          </div>
+          <button id="indoor-open" class="indoor-card">
+            <span class="indoor-icon">✦</span
+            ><span
+              ><small>그다음은, 건물 안으로</small><b>미래관 실내 둘러보기</b
+              ><em>가우시안 · AR 연동 준비 중</em></span
+            ><span>↗</span>
+          </button>
+          <section class="road-reports">
+            <div class="reports-heading">
+              <h3>길 막힘 제보 <span id="report-count">0</span></h3>
+              <span>이 브라우저 시연</span>
+            </div>
+            <p id="report-empty">아직 등록한 신고가 없어요.</p>
+            <ul id="report-list"></ul>
+            <small
+              >신고는 학생 확인 전 정보입니다. 지금은 내 브라우저에만 저장되며
+              다른 사람과 공유되지 않아요.</small
+            >
+          </section>
+          <p class="route-disclaimer">
+            공개 건물 외곽선·도로 데이터를 사용한 시연 지도입니다. 높이·외벽
+            표현에는 추정값이 있으며, 보행 가능 여부와 건물 입구는 현장 검증
+            전입니다. 지형 고도는 평탄화했습니다.
+          </p>
+          <details class="data-credits">
+            <summary>지도 데이터 출처</summary>
+            <p>
+              ©
+              <a
+                href="https://www.openstreetmap.org/copyright"
+                target="_blank"
+                rel="noopener"
+                >OpenStreetMap 기여자</a
+              >
+              · ODbL 1.0<br />국토교통부 브이월드 · 공공누리 제1유형
+            </p>
+            <p>
+              <a
+                href="https://github.com/Hong-Iron/SMASH-SEOULTECH"
+                target="_blank"
+                rel="noopener"
+                >SMASH 서울과기대 공개 지도 데이터</a
+              >를 변환했습니다. SMASH 앱 코드는 사용하지 않았습니다.
+            </p>
+            <a href="data/seoultech.json" download
+              >사용한 지도 데이터 다운로드 (ODbL) ↗</a
+            >
+          </details>
+        </aside>
+        <div class="map-canvas-wrap">
+          <div id="campus-map" class="campus-map"></div>
+          <div class="map-overlay-heading">
+            <span class="map-live"><i></i> SEOULTECH CAMPUS MAP</span>
+            <h3>서울과학기술대학교</h3>
+            <small class="map-data-status"
+              >학생 표시 출입구 19곳 · 1차 지도</small
+            >
+          </div>
+          <button id="gps-toggle" class="gps-toggle" aria-pressed="false">
+            <span class="gps-icon" aria-hidden="true">◎</span>
+            <span>내 위치</span>
+          </button>
+          <div id="gps-status" class="gps-status" role="status" hidden></div>
+          <button id="report-start" class="report-start" aria-pressed="false">
+            ⚠ 공사 구간 신고
+          </button>
+          <div id="report-picker" class="report-picker" hidden>
+            <b>공사 중인 도로를 직접 눌러주세요.</b>
+            <p>
+              누른 곳과 연결된 도로 구간 전체가 주황색으로 표시됩니다. 맞는
+              구간인지 확인한 뒤 신고하면 돼요.
+            </p>
+            <small
+              >키보드: 지도에 초점을 두고 Enter를 누르면 화면 가운데 길을
+              선택합니다.</small
+            ><button id="report-cancel">선택 취소</button>
+          </div>
+          <div class="map-controls">
+            <button id="map-plus" aria-label="지도 확대">＋</button
+            ><button id="map-minus" aria-label="지도 축소">−</button
+            ><button id="map-reset" aria-label="지도 시점 초기화">⌖</button
+            ><button id="map-top" aria-label="지도 위에서 보기">▱</button>
+          </div>
+          <div class="map-legend">
+            <span><i class="legend-start"></i> 출발</span
+            ><span><i class="legend-route"></i> 선택 경로</span
+            ><span><i class="legend-end"></i> 도착지</span
+            ><span><i class="legend-entrance"></i> 출입구</span>
+          </div>
+          <div class="map-instructions">
+            드래그 회전 <span>·</span> 스크롤 확대 <span>·</span> 우클릭 드래그
+            이동
+          </div>
+          <button
+            id="map-north"
+            class="north-button"
+            aria-label="지도 방향 초기화"
+          >
+            N ↑
+          </button>
+          <div id="building-popover" class="building-popover" hidden></div>
+          <div id="map-error" class="map-error" hidden>
+            <h3>3D 지도를 표시할 수 없어요</h3>
+            <p>
+              WebGL을 지원하는 브라우저에서 다시 열어주세요. 왼쪽에서 출발지를
+              선택하면 경로 정보는 확인할 수 있습니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <dialog id="report-dialog" class="report-dialog">
+      <button class="dialog-close" aria-label="닫기">✕</button>
+      <div class="dialog-body">
+        <span class="report-dialog-symbol" aria-hidden="true">⚠</span
+        ><span class="eyebrow">길 막힘 신고 · 시연</span>
+        <h2 id="report-title">이 도로 구간이 공사 중인가요?</h2>
+        <p id="report-location"></p>
+        <fieldset id="report-reasons">
+          <legend>어떤 상황인가요?</legend>
+          <label
+            ><input
+              type="radio"
+              name="road-reason"
+              value="construction"
+              checked
+            />
+            공사 중이에요</label
+          ><label
+            ><input type="radio" name="road-reason" value="blocked" /> 통행이
+            막혔어요</label
+          >
+        </fieldset>
+        <p class="report-scope">
+          선택한 도로 구간 전체를 경로에서 제외하고 우회 경로를 다시 계산합니다.
+          현재 브라우저에만 저장됩니다.
+        </p>
+        <div id="new-report-actions" class="report-actions">
+          <button id="report-no">아니요</button
+          ><button id="report-yes">네, 신고할게요</button>
+        </div>
+        <div id="existing-report-actions" class="report-actions" hidden>
+          <button id="report-keep">닫기</button
+          ><button id="report-remove">내 시연 신고 삭제</button>
+        </div>
+      </div>
+    </dialog>
+    <dialog id="indoor-dialog" class="indoor-dialog">
+      <button class="dialog-close" aria-label="닫기">✕</button>
+      <div class="indoor-banner">
+        <span>OUTSIDE → INSIDE</span>
+        <div class="portal"><i></i><i></i><i></i><span>✦</span></div>
+        <b>미래관, 그 안의 사이.</b>
+      </div>
+      <div class="dialog-body">
+        <span class="purple eyebrow">NEXT CHAPTER</span>
+        <h2>문을 지나, 안으로.</h2>
+        <p>
+          외부 경로는 미래관 입구까지 이어져요.<br />이후 실내 공간은 팀에서
+          제작하는 뷰어와 연결될 예정입니다.
+        </p>
+        <div class="indoor-options">
+          <div>
+            <b>3D Gaussian Splatting</b><span>촬영한 공간을 3D로 둘러보기</span
+            ><small>공간 촬영 · 뷰어 준비 중</small
+            ><a id="gaussian-link" hidden target="_blank" rel="noopener"
+              >실내 뷰어 열기 ↗</a
+            >
+          </div>
+          <div>
+            <b>AR 실내 안내</b><span>현실 공간 위에 안내를 겹치기</span
+            ><small>위치 인식 · AR 연동 준비 중</small
+            ><a id="ar-link" hidden target="_blank" rel="noopener"
+              >AR 안내 열기 ↗</a
+            >
+          </div>
+        </div>
+        <p class="dialog-note">
+          현재 화면에는 실제 실내 촬영 데이터가 연결되어 있지 않습니다.
+        </p>
+      </div>
+    </dialog>
+    <dialog id="info-dialog" class="info-dialog">
+      <button class="dialog-close" aria-label="닫기">✕</button>
+      <div class="dialog-body">
+        <span class="eyebrow purple">ABOUT SAI</span>
+        <h2>길을 아는 건, 우리니까.</h2>
+        <p>
+          사이는 학교 사람들이 아는 길을 연결하는 캠퍼스 지도예요. 지금은
+          서울과기대 외부 3D 지도와 미래관까지의 경로를 확인하는
+          프로토타입입니다.
+        </p>
+        <div class="brand-color">
+          <span></span>
+          <div><b>SAI VIOLET</b><small>#7950FF · 사이의 대표 색상</small></div>
+        </div>
+        <p>
+          실측한 경로와 개방 시간, 학생들의 제보를 연결하고 미래관 내부의
+          가우시안·AR 탐색으로 확장할 예정입니다.
+        </p>
+      </div>
+    </dialog>
+    <div id="toast" class="toast" role="status" hidden></div>
+    <script src="app.js" defer></script>
+  </body>
+</html>

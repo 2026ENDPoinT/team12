@@ -1,0 +1,23 @@
+{
+  "name": "campus-sai",
+  "version": "1.0.0",
+  "description": "사이 캠퍼스 지도 · Three.js 외부 지도 및 미래관 경로 시연",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "dev": "node scripts/dev.mjs",
+    "format": "prettier --write src scripts tests dist/index.html dist/style.css"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.11",
+    "prettier": "^3.6.2"
+  },
+  "private": true
+}
