@@ -37,7 +37,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   renderer.domElement.tabIndex = 0;
   renderer.domElement.setAttribute(
     "aria-label",
-    "서울과기대 3D 지도. 드래그 회전, 스크롤 확대. 신고 모드에서 지도 위치 클릭. 방향키 회전, Enter로 지도 가운데 위치 신고.",
+    "서울과기대 3D 지도. 드래그 회전, 스크롤 확대. 터치: 한 손가락 이동, 두 손가락 벌리기 확대, 비틀기 회전, 함께 위아래로 밀기 기울이기. 신고 모드에서 지도 위치 클릭. 방향키 회전, Enter로 지도 가운데 위치 신고.",
   );
   const scene = new THREE.Scene(),
     camera = new THREE.OrthographicCamera(-600, 600, 600, -600, 1, 3500);
@@ -49,6 +49,9 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   controls.minZoom = 0.5;
   controls.maxZoom = 12;
   controls.zoomToCursor = true;
+  // 터치: 한 손가락은 지도 이동, 두 손가락은 아래 touchGesture가 직접 처리합니다.
+  // (OrbitControls 기본값은 두 손가락 확대·이동뿐이라 비틀어 회전·기울이기가 없습니다.)
+  controls.touches = { ONE: THREE.TOUCH.PAN, TWO: null };
   const labels = new CSS2DRenderer();
   labels.domElement.style.cssText =
     "position:absolute;inset:0;pointer-events:none;overflow:hidden";
@@ -513,6 +516,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   function setHomeMode(value) {
     homeMode = value;
     controls.enablePan = !value;
+    // 첫 화면 미리보기는 이동 대신 한 손가락으로 둘러보기를 유지합니다.
+    controls.touches.ONE = value ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN;
     entranceGroup.visible = !value;
     for (const { id, label } of labelObjects) {
       label.visible =
@@ -588,12 +593,139 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       },
     );
   }
+  // ===== 두 손가락 제스처 (지도 앱 방식) =====
+  // 벌리기/오므리기 = 확대·축소, 비틀기 = 방향 회전, 손가락 사이 지점 = 이동.
+  // 두 손가락을 함께 위아래로 밀면 기울기(위에서 보기 ↔ 비스듬히 보기)를 바꿉니다.
+  const touchPoints = new Map(),
+    upAxis = new THREE.Vector3(0, 1, 0),
+    MIN_PHI = controls.minPolarAngle,
+    MAX_PHI = controls.maxPolarAngle;
+  let gesture = null,
+    suppressTap = false;
+  function groundAt(clientX, clientY) {
+    const r = renderer.domElement.getBoundingClientRect();
+    mouse.set(
+      ((clientX - r.left) / r.width) * 2 - 1,
+      (-(clientY - r.top) / r.height) * 2 + 1,
+    );
+    raycaster.setFromCamera(mouse, camera);
+    return raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3());
+  }
+  function twoFingers() {
+    const [a, b] = [...touchPoints.values()];
+    return {
+      a,
+      b,
+      mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+      distance: Math.hypot(b.x - a.x, b.y - a.y),
+      angle: Math.atan2(b.y - a.y, b.x - a.x),
+    };
+  }
+  function startGesture() {
+    const f = twoFingers();
+    gesture = { start: f, last: f, mode: null };
+  }
+  function tilt(deltaPixels) {
+    const offset = camera.position.clone().sub(controls.target),
+      s = new THREE.Spherical().setFromVector3(offset);
+    // 위로 밀면 비스듬히(지평선 쪽), 아래로 밀면 위에서 내려다보는 쪽입니다.
+    s.phi = THREE.MathUtils.clamp(
+      s.phi - deltaPixels * 0.006,
+      MIN_PHI,
+      MAX_PHI,
+    );
+    camera.position
+      .copy(controls.target)
+      .add(new THREE.Vector3().setFromSpherical(s));
+  }
+  function transform(previous, next) {
+    // 손가락 사이에 있던 지면 지점을 기준으로 확대·회전한 뒤, 새 손가락 위치로 옮깁니다.
+    const anchor = groundAt(previous.mid.x, previous.mid.y);
+    if (!anchor) return;
+    if (previous.distance > 0) {
+      camera.zoom = THREE.MathUtils.clamp(
+        camera.zoom * (next.distance / previous.distance),
+        controls.minZoom,
+        controls.maxZoom,
+      );
+      camera.updateProjectionMatrix();
+    }
+    let turn = next.angle - previous.angle;
+    if (turn > Math.PI) turn -= Math.PI * 2;
+    if (turn < -Math.PI) turn += Math.PI * 2;
+    if (turn) {
+      for (const point of [camera.position, controls.target]) {
+        point.sub(anchor).applyAxisAngle(upAxis, turn).add(anchor);
+      }
+      camera.lookAt(controls.target);
+    }
+    camera.updateMatrixWorld();
+    const moved = groundAt(next.mid.x, next.mid.y);
+    // 첫 화면 미리보기는 지도가 화면 밖으로 밀리지 않도록 이동하지 않습니다.
+    if (moved && !homeMode) {
+      const shift = anchor.sub(moved).setY(0);
+      camera.position.add(shift);
+      controls.target.add(shift);
+    }
+  }
+  function chooseMode(f) {
+    const { start } = gesture,
+      da = { x: f.a.x - start.a.x, y: f.a.y - start.a.y },
+      db = { x: f.b.x - start.b.x, y: f.b.y - start.b.y },
+      travel = Math.max(Math.hypot(da.x, da.y), Math.hypot(db.x, db.y));
+    if (travel < 10) return null;
+    let twist = Math.abs(f.angle - start.angle);
+    if (twist > Math.PI) twist = Math.PI * 2 - twist;
+    const sameVertical =
+        Math.sign(da.y) === Math.sign(db.y) &&
+        Math.abs(da.y) > Math.abs(da.x) * 1.5 &&
+        Math.abs(db.y) > Math.abs(db.x) * 1.5,
+      fingersSideBySide = Math.abs(Math.cos(start.angle)) > 0.6,
+      steady =
+        Math.abs(f.distance - start.distance) < start.distance * 0.12 &&
+        twist < 0.12;
+    return sameVertical && fingersSideBySide && steady ? "tilt" : "transform";
+  }
+  const canvas = renderer.domElement;
+  canvas.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "touch") return;
+    touchPoints.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touchPoints.size === 2) {
+      suppressTap = true;
+      startGesture();
+    } else if (touchPoints.size > 2) gesture = null;
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!touchPoints.has(e.pointerId)) return;
+    touchPoints.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (!gesture || touchPoints.size !== 2) return;
+    const f = twoFingers();
+    if (!gesture.mode) {
+      gesture.mode = chooseMode(f);
+      if (!gesture.mode) return;
+      // 판정 전까지 움직인 만큼도 반영해 손가락과 지도가 어긋나지 않게 합니다.
+      gesture.last = gesture.start;
+    }
+    if (gesture.mode === "tilt") tilt(f.mid.y - gesture.last.mid.y);
+    else transform(gesture.last, f);
+    gesture.last = f;
+    controls.update();
+  });
+  function endTouch(e) {
+    if (!touchPoints.delete(e.pointerId)) return;
+    if (touchPoints.size === 2) startGesture();
+    else gesture = null;
+    if (!touchPoints.size) setTimeout(() => (suppressTap = false));
+  }
+  canvas.addEventListener("pointerup", endTouch);
+  canvas.addEventListener("pointercancel", endTouch);
   renderer.domElement.addEventListener("pointerdown", (e) => {
     down = { x: e.clientX, y: e.clientY };
   });
   renderer.domElement.addEventListener("pointerup", (e) => {
     if (
       homeMode ||
+      suppressTap ||
       !down ||
       e.button !== 0 ||
       Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5
