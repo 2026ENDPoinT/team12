@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import {
   CAMPUS_GEOMETRY,
   BUILDINGS,
-  ENTRANCES,
   MAIN_GATE,
 } from "../src/data.mjs";
+import { SAMPLE_DOORS } from "./fixtures.mjs";
 import { mergeSurvey, attachToGraph, crossesBuilding } from "../src/survey.mjs";
 import { toLngLat } from "../src/geo.mjs";
 import { shortestPath } from "../src/routing.mjs";
@@ -17,9 +17,10 @@ const origin = CAMPUS_GEOMETRY.meta,
   merge = (features) =>
     mergeSurvey(base, { type: "FeatureCollection", features }, options);
 
-// 출입구 후보 좌표는 이미 건물 외곽선 위에 있으므로 시험용 조사 데이터로 씁니다.
-const [futureA, futureB] = ENTRANCES.filter((e) => e.buildingId === "future"),
-  other = ENTRANCES.find((e) => e.buildingId !== "future");
+// 건물 외곽선 위의 시험용 출입구 위치(tests/fixtures.mjs)
+const futureA = SAMPLE_DOORS.futureWest,
+  futureB = SAMPLE_DOORS.futureNorthEast,
+  other = SAMPLE_DOORS.dasanNorth;
 
 function entrance(id, point, extra = {}) {
   return {

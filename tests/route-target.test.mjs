@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import {
   CAMPUS_GEOMETRY,
   BUILDINGS,
-  ENTRANCES,
   MAIN_GATE,
   NODES,
   PLACES,
@@ -13,10 +12,15 @@ import { mergeSurvey } from "../src/survey.mjs";
 import { routeBetween } from "../src/route-target.mjs";
 import { shortestPath } from "../src/routing.mjs";
 import { toLngLat } from "../src/geo.mjs";
+import { SAMPLE_DOORS } from "./fixtures.mjs";
 
 const origin = CAMPUS_GEOMETRY.meta;
 // 미래관 출입구 후보 3곳(서측, 북동측, 동측)을 조사 데이터로 넣은 그래프
-const futureCandidates = ENTRANCES.filter((e) => e.buildingId === "future"),
+const futureCandidates = [
+    SAMPLE_DOORS.futureWest,
+    SAMPLE_DOORS.futureNorthEast,
+    SAMPLE_DOORS.futureEast,
+  ],
   surveyed = mergeSurvey(
     CAMPUS_GEOMETRY,
     {

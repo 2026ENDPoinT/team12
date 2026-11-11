@@ -41,69 +41,21 @@ export const SURVEY = {
   warnings: merged.warnings,
 };
 
-function nearestPointOnBuilding(building, point) {
-  let nearest = null;
-  for (const ring of [building.outline, ...building.holes]) {
-    for (let i = 0; i < ring.length; i++) {
-      const [ax, az] = ring[i],
-        [bx, bz] = ring[(i + 1) % ring.length],
-        dx = bx - ax,
-        dz = bz - az,
-        length = dx * dx + dz * dz,
-        t = length
-          ? Math.max(
-              0,
-              Math.min(1, ((point.x - ax) * dx + (point.z - az) * dz) / length),
-            )
-          : 0,
-        candidate = { x: ax + dx * t, z: az + dz * t },
-        distance = Math.hypot(point.x - candidate.x, point.z - candidate.z);
-      if (!nearest || distance < nearest.distance)
-        nearest = { ...candidate, distance };
-    }
-  }
-  return nearest;
+// 지도에 초록 점으로 표시하고 GIS로 내보내는 출입구입니다. 팀이 조사해 등록한 출입구
+// (team-survey.json)만 씁니다. 예전에 코드에 적혀 있던 1차 후보 19곳은 위치가 최대 13m
+// 어긋나 있어 지웠고, 편집기(?edit=1)로 다시 등록합니다. 그래서 초록 점은 곧
+// 경로 계산에 실제로 쓰이는 출입구입니다.
+export function toEntranceMarkers(entrances) {
+  return entrances.map((e) => ({
+    id: e.id,
+    buildingId: e.building_id,
+    name: e.name,
+    x: e.x,
+    z: e.z,
+    verification_status: e.verification_status,
+  }));
 }
-
-// 사용자가 표시한 초록 점을 현재 공개 건물 외곽선에 맞춘 1차 출입구 데이터입니다.
-const markedEntrances = [
-  ["eoui", "어의관 출입구", -220, -302],
-  ["davinci", "다빈치관 출입구", -50, -300],
-  ["way-382499356", "중앙도서관 별관 출입구", -215, -134],
-  ["library", "중앙도서관 출입구", -198, -87],
-  ["dasan", "다산관 북측 출입구", -100, -36],
-  ["dasan", "다산관 남측 출입구", -101, -5],
-  ["frontier", "프론티어관 출입구", -282, 125],
-  ["memorial", "100주년기념관 서측 출입구", -97, 182],
-  ["memorial", "100주년기념관 동측 출입구", -49, 187],
-  ["memorial", "100주년기념관 북측 출입구", -30, 164],
-  ["way-579071105", "상상관 출입구", 92, 156],
-  ["cube", "테크노큐브 북측 출입구", 56, 255],
-  ["cube", "테크노큐브 남측 출입구", 44, 279],
-  ["gym", "체육관 출입구", 38, 311],
-  ["way-382499351", "아름관 출입구", 151, 249],
-  ["future", "미래관 서측 출입구", 182, 328],
-  ["future", "미래관 북동측 출입구", 221, 310],
-  ["future", "미래관 동측 출입구", 236, 310],
-  ["vw-56", "학군단 출입구", 229, 406],
-];
-export const ENTRANCES = markedEntrances.flatMap(
-  ([buildingId, name, x, z], index) => {
-    const building = BUILDINGS.find(({ id }) => id === buildingId),
-      point = building && nearestPointOnBuilding(building, { x, z });
-    return point
-      ? [
-          {
-            id: `entrance-${index + 1}`,
-            buildingId,
-            name,
-            x: point.x,
-            z: point.z,
-          },
-        ]
-      : [];
-  },
-);
+export const ENTRANCES = toEntranceMarkers(SURVEY.entrances);
 
 const markedGate = { x: -233, z: 216 };
 export const MAIN_GATE = {

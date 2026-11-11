@@ -304,7 +304,13 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     entranceStemGeometry = new THREE.CylinderGeometry(0.45, 0.45, 4.2, 8),
     entranceDotGeometry = new THREE.SphereGeometry(1.75, 12, 8),
     entranceRingGeometry = new THREE.RingGeometry(2.2, 3.1, 20);
-  for (const entrance of ENTRANCES) {
+  // 등록된 출입구(team-survey.json)를 초록 점으로 그립니다. 편집기로 바꾸면 다시 그립니다.
+  function setEntrances(list) {
+    for (const child of [...entranceGroup.children]) entranceGroup.remove(child);
+    for (const entrance of list) addEntranceMarker(entrance);
+    if (editHandler) setEditHandler(editHandler);
+  }
+  function addEntranceMarker(entrance) {
     const stem = new THREE.Mesh(entranceStemGeometry, entranceMaterial),
       dot = new THREE.Mesh(entranceDotGeometry, entranceMaterial),
       ring = new THREE.Mesh(entranceRingGeometry, entranceMaterial),
@@ -322,6 +328,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     stem.renderOrder = dot.renderOrder = ring.renderOrder = 4;
     entranceGroup.add(stem, dot, ring, marker);
   }
+  for (const entrance of ENTRANCES) addEntranceMarker(entrance);
   entranceGroup.visible = false;
   scene.add(entranceGroup);
   const gateLabel = document.createElement("span");
@@ -918,6 +925,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     // 편집 모드 전용: 미리보기 도형(점·선)과 클릭·이동 처리기. null이면 지웁니다.
     setEditPreview: (spec) => graphOverlay.setPreview(spec),
     setEditHandler,
+    setEntrances,
     focusTop,
     setRoute,
     setReports,

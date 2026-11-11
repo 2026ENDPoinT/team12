@@ -49,7 +49,7 @@ for (const [key, value] of Object.entries(GIS_SUMMARY)) {
   if (element) element.textContent = value.toLocaleString("ko-KR");
 }
 $(".map-data-status").textContent =
-  `건물 ${GIS_SUMMARY.buildings} · 출입구 후보 ${GIS_SUMMARY.entrances}`;
+  `건물 ${GIS_SUMMARY.buildings} · 등록 출입구 ${GIS_SUMMARY.entrances}`;
 const normalize = (s) => s.toLowerCase().replace(/\s/g, "");
 const schoolData = [
   catalog.find((s) => s[0] === CAMPUS.name),
