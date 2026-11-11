@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { NODES, EDGES } from "../src/data.mjs";
+import { NODES, EDGES, CAMPUS_GEOMETRY } from "../src/data.mjs";
 import { shortestPath } from "../src/routing.mjs";
 import {
   edgeId,
@@ -49,20 +49,32 @@ test("GPS coordinates convert to the campus east/south meter axes", () => {
   assert.equal(gpsToCampus(NaN, origin.lon, origin), null);
 });
 test("blocked edge is removed from routing; deleting report restores it", () => {
-  const edge = EDGES.find((e) => e.a === "futureDoor" || e.b === "futureDoor"),
-    report = reportFor(edge);
+  // 자동 생성 그래프에서 futureDoor는 간선 하나로만 이어진 끝 노드입니다.
+  // 팀 조사 데이터가 근처에 길을 더하면 달라지므로, 조사 데이터 없는 그래프로 확인합니다.
+  const nodes = CAMPUS_GEOMETRY.nodes,
+    edges = CAMPUS_GEOMETRY.edges,
+    edge = edges.find((e) => e.a === "futureDoor" || e.b === "futureDoor"),
+    a = nodes[edge.a],
+    b = nodes[edge.b],
+    report = {
+      id: "test-report",
+      edgeId: edgeId(edge),
+      point: { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 },
+      reason: "construction",
+      createdAt: "2026-11-09T15:00:00.000Z",
+    };
   assert.equal(
     shortestPath(
       "gate",
       "futureDoor",
       "shortest",
-      NODES,
-      availableEdges([report]),
+      nodes,
+      availableEdges([report], edges, nodes),
     ),
     null,
   );
   assert.ok(
-    shortestPath("gate", "futureDoor", "shortest", NODES, availableEdges([])),
+    shortestPath("gate", "futureDoor", "shortest", nodes, availableEdges([], edges, nodes)),
   );
 });
 test("several reports on one edge remain separate points and keep edge blocked until all removed", () => {

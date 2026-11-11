@@ -5,6 +5,7 @@ import {
   BUILDINGS,
   MAIN_GATE,
   NODES,
+  EDGES,
   PLACES,
   placeEntries,
 } from "../src/data.mjs";
@@ -93,8 +94,8 @@ test("several start doors work the same way in reverse", () => {
 });
 
 test("one start and one target behave exactly like shortestPath", () => {
-  const plain = shortestPath(MAIN_GATE.entry, "futureDoor"),
-    wrapped = routeBetween([MAIN_GATE.entry], ["futureDoor"], "shortest", NODES, CAMPUS_GEOMETRY.edges);
+  const plain = shortestPath(MAIN_GATE.entry, "futureDoor", "shortest", NODES, EDGES),
+    wrapped = routeBetween([MAIN_GATE.entry], ["futureDoor"], "shortest", NODES, EDGES);
   assert.deepEqual(wrapped.path, plain.path);
   assert.equal(wrapped.meters, plain.meters);
 });
