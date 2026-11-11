@@ -17,6 +17,7 @@ import {
   PLACES,
   ENTRANCES,
   SURVEY,
+  placeEntries,
 } from "./data.mjs";
 import { createCampusMap } from "./map.js";
 import { setupEditMode } from "./edit-mode.js";
@@ -140,36 +141,54 @@ for (const select of [$("#origin"), $("#destination")]) {
 }
 $("#origin").value = activeStart;
 $("#destination").value = activeDestination;
-function selectedPlace(selector) {
+// 경로 계산에 쓰는 보행 그래프입니다. 평소에는 data.mjs의 합친 그래프이고,
+// 편집 모드에서는 편집 중인 조사 데이터를 합친 그래프로 바뀝니다.
+let graph = { nodes: NODES, edges: EDGES, entrances: SURVEY.entrances };
+function selectedPlace(selector, g = graph) {
   const id = $(selector).value;
-  return id === "gps" && gpsStartNode
-    ? {
-        id: "gps",
-        name: "현재 위치",
-        entry: gpsStartNode,
-        entries: [gpsStartNode],
-      }
-    : PLACES.find((place) => place.id === id);
+  if (id === "gps")
+    return gpsStartNode
+      ? {
+          id: "gps",
+          name: "현재 위치",
+          entry: gpsStartNode,
+          entries: [gpsStartNode],
+        }
+      : undefined;
+  const place = PLACES.find((item) => item.id === id),
+    building = BUILDINGS.find((b) => b.id === id);
+  return place && building
+    ? { ...place, entries: placeEntries(building, g.entrances) }
+    : place;
+}
+// [팀 알고리즘 호출 지점]
+// 신고된 차단 edge를 제외한 그래프를 routing.mjs의 임시 알고리즘에 전달합니다.
+// 건물에 출입구가 여러 개면 route-target.mjs가 가장 가까운 문을 고릅니다.
+function routeOn(g) {
+  const start = selectedPlace("#origin", g),
+    destination = selectedPlace("#destination", g);
+  if (!start || !destination) return { start, destination, route: null };
+  return {
+    start,
+    destination,
+    route: routeBetween(
+      start.entries,
+      destination.entries,
+      mode,
+      g.nodes,
+      availableEdges(reports, g.edges, g.nodes),
+    ),
+  };
 }
 function updateRoute({ announce = false } = {}) {
   activeStart = $("#origin").value;
   activeDestination = $("#destination").value;
-  const start = selectedPlace("#origin"),
-    destination = selectedPlace("#destination");
+  const { start, destination, route } = routeOn(graph);
   if (!start || !destination) {
     toast("현재 위치를 먼저 확인해주세요.");
     return;
   }
-  // [팀 알고리즘 호출 지점]
-  // 신고된 차단 edge를 제외한 그래프를 routing.mjs의 임시 알고리즘에 전달합니다.
-  // 건물에 출입구가 여러 개면 route-target.mjs가 가장 가까운 문을 고릅니다.
-  currentRoute = routeBetween(
-    start.entries,
-    destination.entries,
-    mode,
-    NODES,
-    availableEdges(reports),
-  );
+  currentRoute = route;
   if (!currentRoute) {
     $("#route-result").hidden = true;
     $("#no-route-message").hidden = false;
@@ -196,7 +215,7 @@ function updateRoute({ announce = false } = {}) {
   );
   visible.forEach((id, i) => {
     const li = document.createElement("li");
-    const point = NODES[id];
+    const point = graph.nodes[id];
     const nearestBuilding = BUILDINGS.filter(
       (b) => b.name !== "교내 건물",
     ).reduce(
@@ -227,7 +246,7 @@ function updateRoute({ announce = false } = {}) {
     $("#route-steps").append(li);
   });
   $("#indoor-open").hidden = destination.id !== "future";
-  map?.setRoute(currentRoute, start.id, destination.id);
+  map?.setRoute(currentRoute, start.id, destination.id, graph.nodes);
   if (announce)
     toast(`${start.name}에서 ${destination.name}까지 경로를 표시했어요.`);
 }
@@ -302,8 +321,17 @@ if (!map) {
   );
   setupEditMode({
     map,
-    graph: { nodes: NODES, edges: EDGES },
     survey: SURVEY,
+    geometry: CAMPUS_GEOMETRY,
+    buildings: BUILDINGS,
+    getGraph: () => graph,
+    // 편집기가 조사 데이터를 바꿀 때마다 합친 그래프를 넘겨받아 경로를 다시 그립니다.
+    applyGraph(next) {
+      graph = next;
+      updateRoute();
+    },
+    // 주어진 그래프에서 지금 고른 출발지·도착지 경로를 계산만 합니다(화면은 그대로).
+    routeOn,
   });
 }
 $("#origin").onchange = () => {
@@ -346,7 +374,7 @@ $("#panel-toggle").onclick = () =>
 // 공개 데이터의 중심 위·경도를 로컬 미터 좌표로 변환합니다.
 // 실서비스 전에는 학교에서 기준점을 실측해 좌표 오차를 보정해야 합니다.
 function nearestGraphNode(point) {
-  return Object.entries(NODES).reduce((best, [id, node]) => {
+  return Object.entries(graph.nodes).reduce((best, [id, node]) => {
     const distance = Math.hypot(point.x - node.x, point.z - node.z);
     return !best || distance < best.distance ? { id, distance } : best;
   }, null);

@@ -351,7 +351,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       else child.material?.dispose();
     }
   }
-  function setRoute(route, startId, destinationId) {
+  // nodes: 경로의 노드 위치를 찾을 그래프. 편집 모드에서는 조사 데이터를 합친 그래프가 들어옵니다.
+  function setRoute(route, startId, destinationId, nodes = NODES) {
     clearGroup(routeGroup);
     movingDot = null;
     for (const [id, { body, profile, label }] of buildingGroups) {
@@ -367,7 +368,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     }
     if (!route) return;
     const points = route.path.map(
-      (id) => new THREE.Vector3(NODES[id].x, 1.8, NODES[id].z),
+      (id) => new THREE.Vector3(nodes[id].x, 1.8, nodes[id].z),
     );
     routeCurve = new THREE.CurvePath();
     for (let i = 1; i < points.length; i++) {
@@ -579,6 +580,14 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     controls.target.set(0, 0, 0);
     controls.update();
   }
+  // 편집 모드: 한 지점을 화면 가운데에 두고 위에서 내려다봅니다.
+  function focusTop(point, zoomLevel = 5) {
+    controls.target.set(point.x, 0, point.z);
+    camera.position.set(point.x, 1400, point.z + 5);
+    camera.zoom = THREE.MathUtils.clamp(zoomLevel, controls.minZoom, controls.maxZoom);
+    camera.updateProjectionMatrix();
+    controls.update();
+  }
   const raycaster = new THREE.Raycaster(),
     mouse = new THREE.Vector2(),
     groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.8);
@@ -725,6 +734,31 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   renderer.domElement.addEventListener("pointerdown", (e) => {
     down = { x: e.clientX, y: e.clientY };
   });
+  // 편집 모드: 클릭·마우스 이동을 땅 위 좌표(x, z)로 편집기에 넘깁니다.
+  let editHandler = null,
+    pendingMove = null;
+  renderer.domElement.addEventListener("pointermove", (e) => {
+    if (!editHandler || e.pointerType === "touch") return;
+    const first = !pendingMove;
+    pendingMove = { x: e.clientX, y: e.clientY };
+    if (first)
+      requestAnimationFrame(() => {
+        const hit = pendingMove && groundAt(pendingMove.x, pendingMove.y);
+        pendingMove = null;
+        if (hit && editHandler) editHandler.move?.({ x: hit.x, z: hit.z });
+      });
+  });
+  function setEditHandler(handler) {
+    editHandler = handler;
+    renderer.domElement.style.cursor = handler ? "crosshair" : "";
+    // 편집 중에는 지도 위 HTML 표시(건물 이름표, 출입구 후보 점)가 클릭을 가로채지 않게 합니다.
+    const block = handler || homeMode || reporting;
+    for (const { label } of labelObjects)
+      label.element.style.pointerEvents = block ? "none" : "auto";
+    entranceGroup.traverse((object) => {
+      if (object.element) object.element.style.pointerEvents = handler ? "none" : "";
+    });
+  }
   renderer.domElement.addEventListener("pointerup", (e) => {
     if (
       homeMode ||
@@ -738,6 +772,11 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     const r = renderer.domElement.getBoundingClientRect(),
       x = ((e.clientX - r.left) / r.width) * 2 - 1,
       y = (-(e.clientY - r.top) / r.height) * 2 + 1;
+    if (editHandler) {
+      const hit = groundAt(e.clientX, e.clientY);
+      if (hit) editHandler.click?.({ x: hit.x, z: hit.z });
+      return;
+    }
     if (reporting) {
       pickPoint(x, y);
       return;
@@ -876,6 +915,10 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     moveTo,
     // 편집 모드 전용: 보행 그래프 디버그 오버레이. graph가 null이면 끕니다.
     setGraphOverlay: (graph) => graphOverlay.set(graph),
+    // 편집 모드 전용: 미리보기 도형(점·선)과 클릭·이동 처리기. null이면 지웁니다.
+    setEditPreview: (spec) => graphOverlay.setPreview(spec),
+    setEditHandler,
+    focusTop,
     setRoute,
     setReports,
     setReporting,

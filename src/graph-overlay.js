@@ -159,12 +159,73 @@ export function createGraphOverlay({ THREE, scene, CSS2DObject }) {
     return { deadEnds: ends };
   }
 
+  // ===== 편집 미리보기 =====
+  // spec: { lines: [{ points: [{x,z}], color, width, dashed, y }], dots: [{ x, z, color, radius }] }
+  const preview = new THREE.Group();
+  preview.renderOrder = 8;
+  scene.add(preview);
+  function bar(a, b, width, color, y) {
+    const length = Math.hypot(b.x - a.x, b.z - a.z);
+    if (length < 0.01) return;
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(width, 0.2, length),
+      new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true }),
+    );
+    mesh.position.set((a.x + b.x) / 2, y, (a.z + b.z) / 2);
+    mesh.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
+    mesh.renderOrder = 8;
+    preview.add(mesh);
+  }
+  function setPreview(spec) {
+    for (const child of [...preview.children]) {
+      preview.remove(child);
+      child.geometry?.dispose();
+      child.material?.dispose();
+    }
+    if (!spec) return;
+    for (const line of spec.lines || []) {
+      const { points: pts, color, width = 1.2, dashed = false, y = Y + 0.4 } = line;
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1],
+          b = pts[i];
+        if (!dashed) {
+          bar(a, b, width, color, y);
+          continue;
+        }
+        const length = Math.hypot(b.x - a.x, b.z - a.z);
+        for (let s = 0; s < length; s += 5) {
+          const e = Math.min(s + 3, length),
+            at = (t) => ({
+              x: a.x + ((b.x - a.x) * t) / length,
+              z: a.z + ((b.z - a.z) * t) / length,
+            });
+          bar(at(s), at(e), width, color, y);
+        }
+      }
+    }
+    for (const dot of spec.dots || []) {
+      const mesh = new THREE.Mesh(
+        new THREE.CircleGeometry(dot.radius || 2.2, 24),
+        new THREE.MeshBasicMaterial({
+          color: dot.color,
+          depthTest: false,
+          transparent: true,
+        }),
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(dot.x, Y + 0.6, dot.z);
+      mesh.renderOrder = 9;
+      preview.add(mesh);
+    }
+  }
+
   // 첫 화면(홈)에서는 숨기고, 지도 화면으로 들어가면 다시 보입니다.
   function setHidden(value) {
     hidden = value;
     group.visible = enabled && !hidden;
+    preview.visible = !hidden;
     for (const l of labels) l.visible = enabled && !hidden;
   }
 
-  return { set, setHidden };
+  return { set, setHidden, setPreview };
 }
