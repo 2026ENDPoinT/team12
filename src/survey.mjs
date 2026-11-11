@@ -7,7 +7,9 @@ const SNAP_LINE_M = 3; // 길·계단의 끝점이 기존 길에 붙는 최대 �
 const MAX_ATTACH_M = 30; // 출입구가 기존 길에 붙을 수 있는 최대 거리
 const WALL_TOLERANCE_M = 0.7; // 벽에서 이 거리 안의 건물 내부는 관통으로 보지 않음 (기존 테스트와 같은 기준)
 
-const TYPE_ORDER = { entrance: 0, sidewalk: 1, stairs: 1, building_passage: 2 };
+// 처리 순서: 길·계단 → 출입구 → 관통. 길을 먼저 넣어야, 기존 길이 닿지 않는 문 앞까지
+// 팀이 그린 길에 출입구가 붙을 수 있습니다. 관통은 양 끝 출입구가 있어야 하므로 마지막입니다.
+const TYPE_ORDER = { sidewalk: 0, stairs: 0, entrance: 1, building_passage: 2 };
 const EXCLUDED_STATUS = new Set(["rejected", "expired"]);
 
 const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -158,9 +160,16 @@ function addLine(graph, feature, id, ctx) {
         maxDistance: SNAP_LINE_M,
       });
       if (attached) return attached.nodeId;
-      ctx.warn(id, `${i === 0 ? "시작" : "끝"}점이 기존 길과 ${SNAP_LINE_M}m 넘게 떨어져 있습니다.`);
     }
     const nodeId = freeId(graph.nodes, `${id}:${i}`);
+    // 끝점이 기존 길에 안 닿았으면 일단 두고, 모든 항목을 합친 뒤에도 다른 것(예: 출입구)과
+    // 이어지지 않았을 때만 경고합니다.
+    if (isEnd)
+      ctx.loose.push({
+        id,
+        nodeId,
+        message: `${i === 0 ? "시작" : "끝"}점이 기존 길과 ${SNAP_LINE_M}m 넘게 떨어져 있고 다른 항목과도 이어지지 않았습니다.`,
+      });
     graph.nodes[nodeId] = {
       x: round(pt.x),
       z: round(pt.z),
@@ -224,6 +233,7 @@ export function mergeSurvey(base, survey, { origin, buildings }) {
       origin,
       buildings,
       entrances,
+      loose: [],
       warn: (id, message) => warnings.push({ id, message }),
     };
 
@@ -257,6 +267,13 @@ export function mergeSurvey(base, survey, { origin, buildings }) {
     if (type === "entrance") addEntrance(graph, f, id, ctx);
     else if (type === "building_passage") addPassage(graph, f, id, ctx);
     else addLine(graph, f, id, ctx);
+  }
+  if (ctx.loose.length) {
+    const degree = new Map();
+    for (const e of graph.edges)
+      for (const n of [e.a, e.b]) degree.set(n, (degree.get(n) || 0) + 1);
+    for (const end of ctx.loose)
+      if ((degree.get(end.nodeId) || 0) <= 1) ctx.warn(end.id, end.message);
   }
   return { nodes: graph.nodes, edges: graph.edges, entrances, warnings };
 }

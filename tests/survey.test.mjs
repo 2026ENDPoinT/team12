@@ -190,6 +190,43 @@ test("a line end far from any path is kept but warned", () => {
   assert.ok(merged.warnings.some((w) => w.id === "lonely"));
 });
 
+// 미래관 남서쪽 오목한 벽(x≈173, z 352~361)은 30m 안의 기존 길이 모두 건물 너머라 바로는 못 붙습니다.
+const recessedDoor = { buildingId: "future", name: "미래관 남서 오목 벽 문", x: 172.9, z: 356 };
+// 그 문 앞까지 건물을 돌아 그린 길: 기존 길 위 점 → 꺾는 점 → 문 바로 앞
+const pathToRecessedDoor = [
+  { x: 167.6, z: 379.7 },
+  { x: 164, z: 368 },
+  { x: 171.5, z: 356 },
+];
+
+test("a door no existing path can reach is left out with a warning", () => {
+  const merged = merge([entrance("recessed", recessedDoor)]);
+  assert.equal(merged.nodes.recessed, undefined);
+  assert.deepEqual(
+    merged.warnings.map((w) => w.id),
+    ["recessed"],
+  );
+});
+
+test("a path drawn up to such a door lets the door join the graph", () => {
+  // 파일 안 순서와 상관없이 길이 먼저 합쳐져야 합니다.
+  const merged = merge([
+    entrance("recessed", recessedDoor),
+    line("to-recessed", pathToRecessedDoor),
+  ]);
+  assert.deepEqual(merged.warnings, []);
+  assert.ok(merged.nodes.recessed);
+  const route = shortestPath(
+    MAIN_GATE.entry,
+    "recessed",
+    "shortest",
+    merged.nodes,
+    merged.edges,
+  );
+  assert.ok(route, "정문에서 오목한 벽의 문까지 경로가 있어야 합니다");
+  assert.ok(route.path.some((id) => id.startsWith("to-recessed")));
+});
+
 test("attaching near an edge end reuses that node instead of splitting", () => {
   const edge = base.edges.find((e) => e.meters > 10),
     graph = { nodes: { ...base.nodes }, edges: base.edges.map((e) => ({ ...e })) },

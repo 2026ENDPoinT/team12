@@ -462,9 +462,19 @@ function startEditor(api) {
         `<div>종류</div>` +
         `<label style="margin-right:12px"><input type="radio" name="path-kind" data-field="kind" value="sidewalk" ${p.feature_type === "sidewalk" ? "checked" : ""}> 인도</label>` +
         `<label><input type="radio" name="path-kind" data-field="kind" value="stairs" ${p.feature_type === "stairs" ? "checked" : ""}> 계단</label>`;
+    // 합치기에서 빠지거나 경고가 난 항목이면 저장 전에 알려 줍니다.
+    const issues = (state.merged?.warnings ?? []).filter((w) => w.id === p.id),
+      notice = issues.length
+        ? `<div style="color:#c92a2a;font-size:12px;margin-top:6px">${issues.map((w) => esc(w.message)).join("<br>")}` +
+          (state.pending.kind === "entrance"
+            ? "<br>이대로 저장하면 경로에는 쓰이지 않아요. [길·계단]으로 문 앞까지 길을 먼저 그리면 그 길에 붙습니다."
+            : "") +
+          `</div>`
+        : "";
     return (
       `<div style="border:1px solid #e4e1fb;border-radius:8px;padding:8px;margin-top:8px">` +
       `<b>새 ${state.pending.kind === "entrance" ? "출입구" : state.pending.kind === "passage" ? "관통 경로" : "길·계단"}</b>` +
+      notice +
       `<div style="margin-top:6px">${body}</div>` +
       `<div style="display:flex;gap:6px;margin-top:8px">${btn("cancel", "취소", "flex:1")}${primary("save", "저장")}</div></div>`
     );
@@ -585,7 +595,13 @@ function startEditor(api) {
         next = clone(state.survey);
       next.features.push(feature);
       state.passageFrom = null;
-      return commit(next, `${feature.properties.name || feature.properties.id} 저장했어요.`);
+      const label = feature.properties.name || feature.properties.id;
+      commit(next, `${label} 저장했어요.`);
+      if (state.merged.warnings.some((w) => w.id === feature.properties.id)) {
+        state.message = `${label} 저장은 했지만 경고가 있어요. 아래 빨간 목록을 확인하세요.`;
+        renderPanel();
+      }
+      return;
     }
     if (action === "path-done") return finishPath();
     if (action === "path-cancel") return cancelPending("그리던 길을 지웠어요.");
