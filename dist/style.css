@@ -8,6 +8,7 @@
   --line: #e9e5f1;
   --bg: #fcfbff;
 }
+
 * {
   box-sizing: border-box;
 }
@@ -1006,6 +1007,65 @@ body.exploring {
   line-height: 1.8;
   color: #b2a4bd;
   margin: 15px 0 5px;
+}
+.gis-status {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #e7dff0;
+  border-radius: 12px;
+  background: #faf8fd;
+  color: #8e7b9b;
+}
+.gis-status summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  color: #715d80;
+}
+.gis-status summary small {
+  font-size: 8px;
+  color: #aa96b5;
+  font-weight: 500;
+}
+.gis-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 12px;
+}
+.gis-stat-grid > span {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 5px;
+  border-radius: 8px;
+  background: #fff;
+  text-align: center;
+}
+.gis-stat-grid b {
+  font-size: 12px;
+  color: var(--violet);
+}
+.gis-stat-grid small {
+  margin-top: 2px;
+  font-size: 7px;
+}
+.gis-status p {
+  margin: 10px 0;
+  font-size: 8px;
+  line-height: 1.7;
+}
+.gis-downloads {
+  display: flex;
+  gap: 10px;
+  font-size: 8px;
+  color: #7556b5;
+}
+.gis-downloads a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .source-link {
   font-size: 8px;
@@ -2826,6 +2886,7 @@ body.exploring .header {
   .route-panel > .panel-description,
   .route-panel .indoor-card,
   .route-panel .road-reports,
+  .route-panel .gis-status,
   .route-panel .route-disclaimer,
   .route-panel .data-credits,
   .route-result > p,
@@ -2956,5 +3017,122 @@ body.exploring .header {
     right: 58px;
     bottom: 18px;
     max-width: none;
+  }
+}
+
+/* 지도 UI 레이어: 3D 라벨보다 조작 버튼과 정보 카드가 항상 위에 표시됩니다. */
+.campus-map {
+  z-index: 0;
+}
+.map-overlay-heading {
+  z-index: 4;
+  max-width: min(250px, calc(100% - 230px));
+}
+.map-data-status {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.map-quick-actions {
+  position: absolute;
+  z-index: 7;
+  right: 22px;
+  top: 22px;
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.map-quick-actions .gps-toggle,
+.map-quick-actions .report-start {
+  position: static;
+  inset: auto;
+  min-height: 40px;
+  margin: 0;
+}
+.map-quick-actions .report-start {
+  white-space: nowrap;
+}
+.gps-status,
+.report-picker {
+  right: 22px;
+  top: 70px;
+}
+.map-controls,
+.map-legend,
+.north-button {
+  z-index: 4;
+}
+.building-popover {
+  z-index: 10;
+  border: 1px solid #ded4e8;
+  box-shadow: 0 16px 44px #38234f2b;
+}
+.campus-map .building-label,
+.campus-map .entrance-dot {
+  transition: opacity 0.15s ease;
+}
+.has-building-popover .campus-map .building-label,
+.has-building-popover .campus-map .entrance-dot {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+@media (max-width: 760px) {
+  .map-overlay-heading,
+  .map-view.panel-closed .map-overlay-heading {
+    max-width: calc(100% - 72px);
+  }
+  .map-overlay-heading .map-data-status {
+    display: block;
+    margin-top: 5px;
+    width: fit-content;
+  }
+  .map-quick-actions {
+    right: 10px;
+    top: 10px;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .map-quick-actions .gps-toggle,
+  .map-quick-actions .report-start {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+  .map-quick-actions .gps-toggle span:last-child {
+    display: none;
+  }
+  .map-quick-actions .report-start {
+    font-size: 0;
+  }
+  .map-quick-actions .report-start::before {
+    content: "⚠";
+    font-size: 16px;
+  }
+  .map-quick-actions .report-start.active::before {
+    content: "×";
+    font-size: 22px;
+  }
+  .gps-status {
+    right: 58px;
+    top: 10px;
+  }
+  .report-picker {
+    right: 58px;
+    top: 57px;
+    width: min(260px, calc(100vw - 78px));
+  }
+  .building-popover {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 13px 14px;
+    border-radius: 14px;
   }
 }

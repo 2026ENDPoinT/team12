@@ -14,9 +14,11 @@ import {
   NODES,
   EDGES,
   PLACES,
+  ENTRANCES,
 } from "./data.mjs";
 import { createCampusMap } from "./map.js";
 import { gpsToCampus } from "./geo.mjs";
+import { gisSummary } from "./gis.mjs";
 const $ = (s) => document.querySelector(s),
   $$ = (s) => document.querySelectorAll(s);
 let region = "전체",
@@ -37,6 +39,13 @@ try {
 let reports = readReports(reportStorage),
   reporting = false,
   selectedReport = null;
+const GIS_SUMMARY = gisSummary(CAMPUS_GEOMETRY, ENTRANCES);
+for (const [key, value] of Object.entries(GIS_SUMMARY)) {
+  const element = document.querySelector(`[data-gis-count="${key}"]`);
+  if (element) element.textContent = value.toLocaleString("ko-KR");
+}
+$(".map-data-status").textContent =
+  `건물 ${GIS_SUMMARY.buildings} · 출입구 후보 ${GIS_SUMMARY.entrances}`;
 const normalize = (s) => s.toLowerCase().replace(/\s/g, "");
 const schoolData = [
   catalog.find((s) => s[0] === CAMPUS.name),
@@ -223,6 +232,10 @@ function buildingSelect(id) {
       id === "future",
     );
 }
+function closeBuildingPopover() {
+  $("#building-popover").hidden = true;
+  $(".map-canvas-wrap").classList.remove("has-building-popover");
+}
 function showPopover(title, description, place = null, indoor = false) {
   const el = $("#building-popover");
   el.replaceChildren();
@@ -241,7 +254,7 @@ function showPopover(title, description, place = null, indoor = false) {
       button.onclick = () => {
         $(selector).value = place.id;
         updateRoute();
-        el.hidden = true;
+        closeBuildingPopover();
       };
       el.append(button);
     }
@@ -255,9 +268,10 @@ function showPopover(title, description, place = null, indoor = false) {
   const close = document.createElement("button");
   close.textContent = "닫기";
   close.style.marginLeft = "5px";
-  close.onclick = () => (el.hidden = true);
+  close.onclick = closeBuildingPopover;
   el.append(close);
   el.hidden = false;
+  $(".map-canvas-wrap").classList.add("has-building-popover");
 }
 let map = createCampusMap($("#hero-map"), buildingSelect, openRoadReport);
 if (!map) {
@@ -280,15 +294,15 @@ if (!map) {
 }
 $("#origin").onchange = () => {
   updateRoute();
-  $("#building-popover").hidden = true;
+  closeBuildingPopover();
 };
 $("#destination").onchange = () => {
   updateRoute();
-  $("#building-popover").hidden = true;
+  closeBuildingPopover();
 };
 $("#find-route").onclick = () => {
   updateRoute({ announce: true });
-  $("#building-popover").hidden = true;
+  closeBuildingPopover();
 };
 $$("[data-mode]").forEach(
   (b) =>
@@ -541,7 +555,7 @@ function setReporting(value) {
   map?.setReporting(value);
   if (!value) map?.clearReportSelection();
   if (value) {
-    $("#building-popover").hidden = true;
+    closeBuildingPopover();
     $("#campus-map canvas")?.focus({ preventScroll: true });
   }
 }
