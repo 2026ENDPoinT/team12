@@ -1,20 +1,49 @@
 // Three.js와 무관한 평면 지리 계산. 좌표 단위는 데이터 원점 기준 미터입니다.
-export function gpsToCampus(latitude, longitude, origin) {
+
+// 위경도 ↔ 미터 변환은 이 두 함수(toScene, toLngLat)만 씁니다.
+// 지도 데이터를 만든 SMASH-SEOULTECH tools/build_campus.py와 같은 식입니다.
+// 원점은 데이터의 meta(위도·경도)이고, +x는 동쪽, +z는 남쪽(화면 아래쪽)입니다.
+function metersPerDegree(originLat) {
+  const phi = (originLat * Math.PI) / 180;
+  return {
+    lat: 111132.92 - 559.82 * Math.cos(2 * phi) + 1.175 * Math.cos(4 * phi),
+    lon: 111412.84 * Math.cos(phi) - 93.5 * Math.cos(3 * phi),
+  };
+}
+const validOrigin = (origin) =>
+  Number.isFinite(origin?.lat) && Number.isFinite(origin?.lon);
+
+// [경도, 위도] → { x, z } (미터)
+export function toScene(lngLat, origin) {
+  const [longitude, latitude] = lngLat ?? [];
   if (
     !Number.isFinite(latitude) ||
     !Number.isFinite(longitude) ||
-    !Number.isFinite(origin?.lat) ||
-    !Number.isFinite(origin?.lon)
+    !validOrigin(origin)
   )
     return null;
+  const m = metersPerDegree(origin.lat);
   return {
-    x:
-      (longitude - origin.lon) *
-      111320 *
-      Math.cos((origin.lat * Math.PI) / 180),
-    // 저장된 캠퍼스 도형은 화면 아래쪽(남쪽)이 +z인 좌표계입니다.
-    z: (origin.lat - latitude) * 111132,
+    x: (longitude - origin.lon) * m.lon,
+    z: (origin.lat - latitude) * m.lat,
   };
+}
+
+// { x, z } (미터) → [경도, 위도]
+export function toLngLat(point, origin) {
+  if (
+    !Number.isFinite(point?.x) ||
+    !Number.isFinite(point?.z) ||
+    !validOrigin(origin)
+  )
+    return null;
+  const m = metersPerDegree(origin.lat);
+  return [origin.lon + point.x / m.lon, origin.lat - point.z / m.lat];
+}
+
+// GPS 콜백용 이름. 인자 순서(위도, 경도)는 기존 호출부와 같습니다.
+export function gpsToCampus(latitude, longitude, origin) {
+  return toScene([longitude, latitude], origin);
 }
 export function pointInRing(point, ring) {
   let inside = false;
