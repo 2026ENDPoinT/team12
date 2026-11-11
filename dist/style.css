@@ -8,6 +8,7 @@
   --line: #e9e5f1;
   --bg: #fcfbff;
 }
+
 * {
   box-sizing: border-box;
 }
@@ -3016,5 +3017,122 @@ body.exploring .header {
     right: 58px;
     bottom: 18px;
     max-width: none;
+  }
+}
+
+/* 지도 UI 레이어: 3D 라벨보다 조작 버튼과 정보 카드가 항상 위에 표시됩니다. */
+.campus-map {
+  z-index: 0;
+}
+.map-overlay-heading {
+  z-index: 4;
+  max-width: min(250px, calc(100% - 230px));
+}
+.map-data-status {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.map-quick-actions {
+  position: absolute;
+  z-index: 7;
+  right: 22px;
+  top: 22px;
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.map-quick-actions .gps-toggle,
+.map-quick-actions .report-start {
+  position: static;
+  inset: auto;
+  min-height: 40px;
+  margin: 0;
+}
+.map-quick-actions .report-start {
+  white-space: nowrap;
+}
+.gps-status,
+.report-picker {
+  right: 22px;
+  top: 70px;
+}
+.map-controls,
+.map-legend,
+.north-button {
+  z-index: 4;
+}
+.building-popover {
+  z-index: 10;
+  border: 1px solid #ded4e8;
+  box-shadow: 0 16px 44px #38234f2b;
+}
+.campus-map .building-label,
+.campus-map .entrance-dot {
+  transition: opacity 0.15s ease;
+}
+.has-building-popover .campus-map .building-label,
+.has-building-popover .campus-map .entrance-dot {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+@media (max-width: 760px) {
+  .map-overlay-heading,
+  .map-view.panel-closed .map-overlay-heading {
+    max-width: calc(100% - 72px);
+  }
+  .map-overlay-heading .map-data-status {
+    display: block;
+    margin-top: 5px;
+    width: fit-content;
+  }
+  .map-quick-actions {
+    right: 10px;
+    top: 10px;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .map-quick-actions .gps-toggle,
+  .map-quick-actions .report-start {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+  .map-quick-actions .gps-toggle span:last-child {
+    display: none;
+  }
+  .map-quick-actions .report-start {
+    font-size: 0;
+  }
+  .map-quick-actions .report-start::before {
+    content: "⚠";
+    font-size: 16px;
+  }
+  .map-quick-actions .report-start.active::before {
+    content: "×";
+    font-size: 22px;
+  }
+  .gps-status {
+    right: 58px;
+    top: 10px;
+  }
+  .report-picker {
+    right: 58px;
+    top: 57px;
+    width: min(260px, calc(100vw - 78px));
+  }
+  .building-popover {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 13px 14px;
+    border-radius: 14px;
   }
 }

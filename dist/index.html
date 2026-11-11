@@ -335,14 +335,16 @@
               >공개 GIS와 팀 입력을 불러오는 중</small
             >
           </div>
-          <button id="gps-toggle" class="gps-toggle" aria-pressed="false">
-            <span class="gps-icon" aria-hidden="true">◎</span>
-            <span>내 위치</span>
-          </button>
+          <div class="map-quick-actions" aria-label="지도 빠른 기능">
+            <button id="gps-toggle" class="gps-toggle" aria-pressed="false">
+              <span class="gps-icon" aria-hidden="true">◎</span>
+              <span>내 위치</span>
+            </button>
+            <button id="report-start" class="report-start" aria-pressed="false">
+              ⚠ 공사 구간 신고
+            </button>
+          </div>
           <div id="gps-status" class="gps-status" role="status" hidden></div>
-          <button id="report-start" class="report-start" aria-pressed="false">
-            ⚠ 공사 구간 신고
-          </button>
           <div id="report-picker" class="report-picker" hidden>
             <b>공사 중인 도로를 직접 눌러주세요.</b>
             <p>
