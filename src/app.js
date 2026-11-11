@@ -15,8 +15,10 @@ import {
   EDGES,
   PLACES,
   ENTRANCES,
+  SURVEY,
 } from "./data.mjs";
 import { createCampusMap } from "./map.js";
+import { setupEditMode } from "./edit-mode.js";
 import { gpsToCampus } from "./geo.mjs";
 import { gisSummary } from "./gis.mjs";
 const $ = (s) => document.querySelector(s),
@@ -291,6 +293,11 @@ if (!map) {
     "gate",
     "future",
   );
+  setupEditMode({
+    map,
+    graph: { nodes: NODES, edges: EDGES },
+    survey: SURVEY,
+  });
 }
 $("#origin").onchange = () => {
   updateRoute();

@@ -13,6 +13,7 @@ import {
   MAIN_GATE,
 } from "./data.mjs";
 import { locateReportPoint, edgeId, reportLocation } from "./reports.mjs";
+import { createGraphOverlay } from "./graph-overlay.js";
 const VIOLET = 0x7950ff;
 
 // Three.js 기반 독립 구현. 외곽선/도로 데이터만 별도 ODbL 데이터에서 가져옵니다.
@@ -513,8 +514,10 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       controls.update();
     }
   }
+  const graphOverlay = createGraphOverlay({ THREE, scene, CSS2DObject });
   function setHomeMode(value) {
     homeMode = value;
+    graphOverlay.setHidden(value);
     controls.enablePan = !value;
     // 첫 화면 미리보기는 이동 대신 한 손가락으로 둘러보기를 유지합니다.
     controls.touches.ONE = value ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN;
@@ -871,6 +874,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   });
   return {
     moveTo,
+    // 편집 모드 전용: 보행 그래프 디버그 오버레이. graph가 null이면 끕니다.
+    setGraphOverlay: (graph) => graphOverlay.set(graph),
     setRoute,
     setReports,
     setReporting,
