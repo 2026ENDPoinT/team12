@@ -1007,6 +1007,65 @@ body.exploring {
   color: #b2a4bd;
   margin: 15px 0 5px;
 }
+.gis-status {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #e7dff0;
+  border-radius: 12px;
+  background: #faf8fd;
+  color: #8e7b9b;
+}
+.gis-status summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  color: #715d80;
+}
+.gis-status summary small {
+  font-size: 8px;
+  color: #aa96b5;
+  font-weight: 500;
+}
+.gis-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 12px;
+}
+.gis-stat-grid > span {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 5px;
+  border-radius: 8px;
+  background: #fff;
+  text-align: center;
+}
+.gis-stat-grid b {
+  font-size: 12px;
+  color: var(--violet);
+}
+.gis-stat-grid small {
+  margin-top: 2px;
+  font-size: 7px;
+}
+.gis-status p {
+  margin: 10px 0;
+  font-size: 8px;
+  line-height: 1.7;
+}
+.gis-downloads {
+  display: flex;
+  gap: 10px;
+  font-size: 8px;
+  color: #7556b5;
+}
+.gis-downloads a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .source-link {
   font-size: 8px;
   color: #a590b7;
@@ -2826,6 +2885,7 @@ body.exploring .header {
   .route-panel > .panel-description,
   .route-panel .indoor-card,
   .route-panel .road-reports,
+  .route-panel .gis-status,
   .route-panel .route-disclaimer,
   .route-panel .data-credits,
   .route-result > p,

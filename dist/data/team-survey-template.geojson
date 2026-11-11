@@ -1,0 +1,27 @@
+{
+  "type": "FeatureCollection",
+  "name": "SEOULTECH team survey template",
+  "coordinate_system": "EPSG:4326",
+  "allowed_feature_types": [
+    "entrance",
+    "sidewalk",
+    "stairs",
+    "building_passage"
+  ],
+  "required_properties": [
+    "id",
+    "campus_id",
+    "feature_type",
+    "verification_status",
+    "source_kind"
+  ],
+  "verification_status_values": [
+    "candidate",
+    "reviewing",
+    "verified",
+    "rejected",
+    "expired"
+  ],
+  "note": "회의 후 팀이 확인한 출입구·인도·계단·건물 관통 통로만 features에 추가합니다. QR 위치 정보는 현재 범위에서 제외했습니다.",
+  "features": []
+}

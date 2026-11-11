@@ -265,6 +265,37 @@
               다른 사람과 공유되지 않아요.</small
             >
           </section>
+          <details class="gis-status">
+            <summary>
+              <span>GIS 데이터 현황</span><small>공개자료 + 팀 검증</small>
+            </summary>
+            <div class="gis-stat-grid">
+              <span
+                ><b data-gis-count="buildings">—</b><small>건물</small></span
+              >
+              <span
+                ><b data-gis-count="roads">—</b><small>도로 선형</small></span
+              >
+              <span
+                ><b data-gis-count="stairs">—</b><small>계단 선형</small></span
+              >
+              <span
+                ><b data-gis-count="routeEdges">—</b
+                ><small>경로 간선</small></span
+              >
+            </div>
+            <p>
+              건물·도로·계단은 공개 GIS 후보 데이터입니다. 출입구
+              <b data-gis-count="entrances">—</b>곳과 실제 보행 가능 여부는 팀의
+              현장 확인 전이며 경로는 현재 모두 통행 가능하다고 가정합니다.
+            </p>
+            <div class="gis-downloads">
+              <a href="data/seoultech.geojson" download>표준 GeoJSON 받기 ↗</a>
+              <a href="data/team-survey-template.geojson" download
+                >팀 조사 입력 틀 받기 ↗</a
+              >
+            </div>
+          </details>
           <p class="route-disclaimer">
             공개 건물 외곽선·도로 데이터를 사용한 시연 지도입니다. 높이·외벽
             표현에는 추정값이 있으며, 보행 가능 여부와 건물 입구는 현장 검증
@@ -291,7 +322,7 @@
               >를 변환했습니다. SMASH 앱 코드는 사용하지 않았습니다.
             </p>
             <a href="data/seoultech.json" download
-              >사용한 지도 데이터 다운로드 (ODbL) ↗</a
+              >원본 변환 데이터 (JSON) ↗</a
             >
           </details>
         </aside>
@@ -301,7 +332,7 @@
             <span class="map-live"><i></i> SEOULTECH CAMPUS MAP</span>
             <h3>서울과학기술대학교</h3>
             <small class="map-data-status"
-              >학생 표시 출입구 19곳 · 1차 지도</small
+              >공개 GIS와 팀 입력을 불러오는 중</small
             >
           </div>
           <button id="gps-toggle" class="gps-toggle" aria-pressed="false">

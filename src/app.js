@@ -14,9 +14,11 @@ import {
   NODES,
   EDGES,
   PLACES,
+  ENTRANCES,
 } from "./data.mjs";
 import { createCampusMap } from "./map.js";
 import { gpsToCampus } from "./geo.mjs";
+import { gisSummary } from "./gis.mjs";
 const $ = (s) => document.querySelector(s),
   $$ = (s) => document.querySelectorAll(s);
 let region = "전체",
@@ -37,6 +39,13 @@ try {
 let reports = readReports(reportStorage),
   reporting = false,
   selectedReport = null;
+const GIS_SUMMARY = gisSummary(CAMPUS_GEOMETRY, ENTRANCES);
+for (const [key, value] of Object.entries(GIS_SUMMARY)) {
+  const element = document.querySelector(`[data-gis-count="${key}"]`);
+  if (element) element.textContent = value.toLocaleString("ko-KR");
+}
+$(".map-data-status").textContent =
+  `공개 GIS 건물 ${GIS_SUMMARY.buildings}개 · 출입구 ${GIS_SUMMARY.entrances}곳 검증 대기`;
 const normalize = (s) => s.toLowerCase().replace(/\s/g, "");
 const schoolData = [
   catalog.find((s) => s[0] === CAMPUS.name),
