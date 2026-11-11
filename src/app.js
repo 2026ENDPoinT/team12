@@ -1,4 +1,5 @@
 import { shortestPath } from "./routing.mjs";
+import { routeBetween } from "./route-target.mjs";
 import {
   edgeId,
   reportLocation,
@@ -142,7 +143,12 @@ $("#destination").value = activeDestination;
 function selectedPlace(selector) {
   const id = $(selector).value;
   return id === "gps" && gpsStartNode
-    ? { id: "gps", name: "현재 위치", entry: gpsStartNode }
+    ? {
+        id: "gps",
+        name: "현재 위치",
+        entry: gpsStartNode,
+        entries: [gpsStartNode],
+      }
     : PLACES.find((place) => place.id === id);
 }
 function updateRoute({ announce = false } = {}) {
@@ -156,9 +162,10 @@ function updateRoute({ announce = false } = {}) {
   }
   // [팀 알고리즘 호출 지점]
   // 신고된 차단 edge를 제외한 그래프를 routing.mjs의 임시 알고리즘에 전달합니다.
-  currentRoute = shortestPath(
-    start.entry,
-    destination.entry,
+  // 건물에 출입구가 여러 개면 route-target.mjs가 가장 가까운 문을 고릅니다.
+  currentRoute = routeBetween(
+    start.entries,
+    destination.entries,
     mode,
     NODES,
     availableEdges(reports),

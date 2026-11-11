@@ -120,16 +120,26 @@ function nearestNodeId(point) {
   }, null).id;
 }
 
-// shortcut: 출입구가 아직 표시되지 않은 건물은 중심에서 가장 가까운 보행
-// 노드에 임시 연결합니다. 현장 조사 후 실제 출입구 노드로 교체해야 합니다.
+// 건물의 출입 노드 목록입니다. 경로 계산은 이 중 가장 가까운 문을 고릅니다(route-target.mjs).
+// 1) 팀이 조사한 출입구가 있으면 그것만 씁니다. 자동 생성 *Door는 실제 문과 무관해서 뺍니다.
+// 2) 없으면 자동 생성 입구(building.entry), 그것도 없으면 건물 중심에서 가장 가까운
+//    보행 노드에 임시로 연결합니다. 현장 조사 후 실제 출입구로 바뀌어야 합니다.
+export function placeEntries(building, entrances = SURVEY.entrances) {
+  const surveyed = entrances
+    .filter((e) => e.building_id === building.id)
+    .map((e) => e.id);
+  return surveyed.length
+    ? surveyed
+    : [building.entry || nearestNodeId(building)];
+}
 export const PLACES = [
-  { id: "gate", name: "정문", entry: MAIN_GATE.entry },
+  { id: "gate", name: "정문", entry: MAIN_GATE.entry, entries: [MAIN_GATE.entry] },
   ...BUILDINGS.filter(({ name }) => name !== "교내 건물" && name !== "조형물")
-    .map((building) => ({
-      id: building.id,
-      name: building.name,
-      entry: building.entry || nearestNodeId(building),
-    }))
+    .map((building) => {
+      const entries = placeEntries(building);
+      // entry는 기존 코드 호환용(첫 번째 문)입니다.
+      return { id: building.id, name: building.name, entry: entries[0], entries };
+    })
     .sort((a, b) => a.name.localeCompare(b.name, "ko")),
 ];
 
