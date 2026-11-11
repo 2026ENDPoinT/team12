@@ -47,8 +47,21 @@ export function reportLocation(report) {
   );
   return `${b?.name || "캠퍼스"} 인근 · 선택한 도로 구간`;
 }
-export function sanitizeReports(value) {
+// 신고가 가리키던 간선이 팀 조사 데이터로 잘려 id가 바뀌어도, 저장된 클릭 좌표에서
+// 가장 가까운 간선을 다시 찾아 신고를 유지합니다.
+function nearestEdge(point, edges, nodes, maxDistance) {
+  let best = null;
+  for (const edge of edges) {
+    const { distance } = projectToSegment(point, nodes[edge.a], nodes[edge.b]);
+    if (distance <= maxDistance && (!best || distance < best.distance))
+      best = { edge, distance };
+  }
+  return best?.edge ?? null;
+}
+export function sanitizeReports(value, edges = EDGES, nodes = NODES) {
   if (!Array.isArray(value)) return [];
+  const lookup =
+    edges === EDGES ? edgeLookup : new Map(edges.map((e) => [edgeId(e), e]));
   const unique = new Map();
   for (const report of value.slice(0, 500)) {
     if (
@@ -56,7 +69,7 @@ export function sanitizeReports(value) {
       typeof report.id !== "string" ||
       report.id.length > 100 ||
       !report.id ||
-      !edgeLookup.has(report.edgeId) ||
+      typeof report.edgeId !== "string" ||
       !["construction", "blocked"].includes(report.reason)
     )
       continue;
@@ -67,12 +80,13 @@ export function sanitizeReports(value) {
       continue;
     const p = report.point;
     if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) continue;
-    const edge = edgeLookup.get(report.edgeId);
-    if (projectToSegment(p, NODES[edge.a], NODES[edge.b]).distance > 20)
-      continue;
+    let edge = lookup.get(report.edgeId);
+    if (!edge || projectToSegment(p, nodes[edge.a], nodes[edge.b]).distance > 20)
+      edge = nearestEdge(p, edges, nodes, 20);
+    if (!edge) continue;
     unique.set(report.id, {
       id: report.id,
-      edgeId: report.edgeId,
+      edgeId: edgeId(edge),
       point: { x: p.x, z: p.z },
       reason: report.reason,
       createdAt: report.createdAt,
@@ -102,7 +116,9 @@ export function writeReports(storage, reports) {
 }
 // TODO(팀 알고리즘): 선택한 위치와 연결된 길을 차단하는 임시 정책입니다.
 // 실제 서비스에서는 공사 범위·보행 너비·검증 상태를 반영하도록 교체하세요.
-export function availableEdges(reports, edges = EDGES) {
-  const blocked = new Set(sanitizeReports(reports).map((r) => r.edgeId));
+export function availableEdges(reports, edges = EDGES, nodes = NODES) {
+  const blocked = new Set(
+    sanitizeReports(reports, edges, nodes).map((r) => r.edgeId),
+  );
   return edges.filter((edge) => !blocked.has(edgeId(edge)));
 }

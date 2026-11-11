@@ -1,4 +1,6 @@
 import geometry from "../data/seoultech.json" with { type: "json" };
+import teamSurvey from "../data/team-survey.json" with { type: "json" };
+import { mergeSurvey } from "./survey.mjs";
 
 const officialBuildingNames = {
   "way-382499356": "중앙도서관 별관",
@@ -24,9 +26,20 @@ export const CAMPUS = {
   interior: { building: "future", gaussianUrl: null, arUrl: null },
 };
 export const BUILDINGS = geometry.buildings;
-// TODO(팀 데이터): 공개 도로를 분할한 그래프입니다. 통행 가능 여부·입구는 현장 검증 전입니다.
-export const NODES = geometry.nodes;
-export const EDGES = geometry.edges;
+// 공개 도로를 분할한 자동 생성 그래프(seoultech.json) 위에 팀 조사 데이터(team-survey.json)를
+// 합친 그래프입니다. 경로 계산·지도·신고는 모두 이 NODES, EDGES를 씁니다.
+const merged = mergeSurvey(geometry, teamSurvey, {
+  origin: geometry.meta,
+  buildings: geometry.buildings,
+});
+export const NODES = merged.nodes;
+export const EDGES = merged.edges;
+// 합친 출입구 목록과, 넣지 못한 조사 항목의 경고입니다.
+export const SURVEY = {
+  data: teamSurvey,
+  entrances: merged.entrances,
+  warnings: merged.warnings,
+};
 
 function nearestPointOnBuilding(building, point) {
   let nearest = null;

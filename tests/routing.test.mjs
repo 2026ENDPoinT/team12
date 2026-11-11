@@ -75,7 +75,8 @@ test("missing or disconnected nodes return no route; already there returns zero"
   assert.equal(shortestPath("futureDoor").meters, 0);
 });
 test("derived walking edges do not cut across building interiors", () => {
-  for (const edge of EDGES) {
+  // 건물을 가로지를 수 있는 간선은 팀이 조사한 건물 관통(building_passage)뿐입니다.
+  for (const edge of EDGES.filter(({ type }) => type !== "building_passage")) {
     const a = NODES[edge.a],
       b = NODES[edge.b];
     for (const t of [0.2, 0.5, 0.8]) {
