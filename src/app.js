@@ -1,4 +1,5 @@
 import { shortestPath } from "./routing.mjs";
+import { routeBetween } from "./route-target.mjs";
 import {
   edgeId,
   reportLocation,
@@ -10,17 +11,27 @@ import {
   sanitizeReports,
   rowToReport,
   confirmedEdgesFromRows,
+  reasonLabel,
   REPORT_THRESHOLD,
 } from "./reports.mjs";
 import {
   fetchReportRows,
   insertReportRow,
   deleteReportRow,
-  confirmEdgeRows,
-  dismissEdgeRows,
+  confirmReportRows,
+  deleteReportRows,
   uploadReportPhoto,
   photoUrlFor,
+  fetchWorkRows,
+  insertWorkRow,
+  deleteWorkRow,
 } from "./backend.mjs";
+import {
+  activeWorks,
+  buildingLabel,
+  worksPeriod,
+  today,
+} from "./buildings.mjs";
 import catalog from "./schools.json";
 import {
   CAMPUS,
@@ -30,8 +41,11 @@ import {
   EDGES,
   PLACES,
   ENTRANCES,
+  SURVEY,
+  placeEntries,
 } from "./data.mjs";
 import { createCampusMap } from "./map.js";
+import { setupEditMode } from "./edit-mode.js";
 import { gpsToCampus } from "./geo.mjs";
 import { gisSummary } from "./gis.mjs";
 const $ = (s) => document.querySelector(s),
@@ -54,7 +68,9 @@ let reports = [],
   adminUnlocked = false,
   // 신고를 올릴 때 Storage에 업로드할 File. 미리보기용 blob URL은 따로 관리합니다.
   selectedPhotoFile = null,
-  photoPreviewUrl = null;
+  photoPreviewUrl = null,
+  // 관리자가 등록한 건물 공사 (Supabase building_works, 종료일 안 지난 것만)
+  works = [];
 // TODO(백엔드): 지금은 코드만 맞으면 누구나 여는 시연용 잠금입니다.
 // 실제 배포 전 서버에서 관리자 로그인/권한을 검증하도록 교체하세요.
 const ADMIN_DEMO_CODE = "team12admin";
@@ -64,7 +80,7 @@ for (const [key, value] of Object.entries(GIS_SUMMARY)) {
   if (element) element.textContent = value.toLocaleString("ko-KR");
 }
 $(".map-data-status").textContent =
-  `건물 ${GIS_SUMMARY.buildings} · 출입구 후보 ${GIS_SUMMARY.entrances}`;
+  `건물 ${GIS_SUMMARY.buildings} · 등록 출입구 ${GIS_SUMMARY.entrances}`;
 const normalize = (s) => s.toLowerCase().replace(/\s/g, "");
 const schoolData = [
   catalog.find((s) => s[0] === CAMPUS.name),
@@ -156,30 +172,54 @@ for (const select of [$("#origin"), $("#destination")]) {
 }
 $("#origin").value = activeStart;
 $("#destination").value = activeDestination;
-function selectedPlace(selector) {
+// 경로 계산에 쓰는 보행 그래프입니다. 평소에는 data.mjs의 합친 그래프이고,
+// 편집 모드에서는 편집 중인 조사 데이터를 합친 그래프로 바뀝니다.
+let graph = { nodes: NODES, edges: EDGES, entrances: SURVEY.entrances };
+function selectedPlace(selector, g = graph) {
   const id = $(selector).value;
-  return id === "gps" && gpsStartNode
-    ? { id: "gps", name: "현재 위치", entry: gpsStartNode }
-    : PLACES.find((place) => place.id === id);
+  if (id === "gps")
+    return gpsStartNode
+      ? {
+          id: "gps",
+          name: "현재 위치",
+          entry: gpsStartNode,
+          entries: [gpsStartNode],
+        }
+      : undefined;
+  const place = PLACES.find((item) => item.id === id),
+    building = BUILDINGS.find((b) => b.id === id);
+  return place && building
+    ? { ...place, entries: placeEntries(building, g.entrances) }
+    : place;
+}
+// [팀 알고리즘 호출 지점]
+// 신고된 차단 edge를 제외한 그래프를 routing.mjs의 임시 알고리즘에 전달합니다.
+// 건물에 출입구가 여러 개면 route-target.mjs가 가장 가까운 문을 고릅니다.
+function routeOn(g) {
+  const start = selectedPlace("#origin", g),
+    destination = selectedPlace("#destination", g);
+  if (!start || !destination) return { start, destination, route: null };
+  return {
+    start,
+    destination,
+    route: routeBetween(
+      start.entries,
+      destination.entries,
+      mode,
+      g.nodes,
+      availableEdges(confirmedEdges, g.edges),
+    ),
+  };
 }
 function updateRoute({ announce = false } = {}) {
   activeStart = $("#origin").value;
   activeDestination = $("#destination").value;
-  const start = selectedPlace("#origin"),
-    destination = selectedPlace("#destination");
+  const { start, destination, route } = routeOn(graph);
   if (!start || !destination) {
     toast("현재 위치를 먼저 확인해주세요.");
     return;
   }
-  // [팀 알고리즘 호출 지점]
-  // 신고된 차단 edge를 제외한 그래프를 routing.mjs의 임시 알고리즘에 전달합니다.
-  currentRoute = shortestPath(
-    start.entry,
-    destination.entry,
-    mode,
-    NODES,
-    availableEdges(confirmedEdges),
-  );
+  currentRoute = route;
   if (!currentRoute) {
     $("#route-result").hidden = true;
     $("#no-route-message").hidden = false;
@@ -206,7 +246,7 @@ function updateRoute({ announce = false } = {}) {
   );
   visible.forEach((id, i) => {
     const li = document.createElement("li");
-    const point = NODES[id];
+    const point = graph.nodes[id];
     const nearestBuilding = BUILDINGS.filter(
       (b) => b.name !== "교내 건물",
     ).reduce(
@@ -237,7 +277,7 @@ function updateRoute({ announce = false } = {}) {
     $("#route-steps").append(li);
   });
   $("#indoor-open").hidden = destination.id !== "future";
-  map?.setRoute(currentRoute, start.id, destination.id);
+  map?.setRoute(currentRoute, start.id, destination.id, graph.nodes);
   if (announce)
     toast(`${start.name}에서 ${destination.name}까지 경로를 표시했어요.`);
 }
@@ -310,6 +350,20 @@ if (!map) {
     "gate",
     "future",
   );
+  setupEditMode({
+    map,
+    survey: SURVEY,
+    geometry: CAMPUS_GEOMETRY,
+    buildings: BUILDINGS,
+    getGraph: () => graph,
+    // 편집기가 조사 데이터를 바꿀 때마다 합친 그래프를 넘겨받아 경로를 다시 그립니다.
+    applyGraph(next) {
+      graph = next;
+      updateRoute();
+    },
+    // 주어진 그래프에서 지금 고른 출발지·도착지 경로를 계산만 합니다(화면은 그대로).
+    routeOn,
+  });
 }
 $("#origin").onchange = () => {
   updateRoute();
@@ -351,7 +405,7 @@ $("#panel-toggle").onclick = () =>
 // 공개 데이터의 중심 위·경도를 로컬 미터 좌표로 변환합니다.
 // 실서비스 전에는 학교에서 기준점을 실측해 좌표 오차를 보정해야 합니다.
 function nearestGraphNode(point) {
-  return Object.entries(NODES).reduce((best, [id, node]) => {
+  return Object.entries(graph.nodes).reduce((best, [id, node]) => {
     const distance = Math.hypot(point.x - node.x, point.z - node.z);
     return !best || distance < best.distance ? { id, distance } : best;
   }, null);
@@ -605,14 +659,32 @@ function openRoadReport(selection) {
   selectedPhotoFile = null;
   $("#report-photo-input").value = "";
   $("#report-photo-preview").hidden = true;
+  $('input[name="road-reason"][value="construction"]').checked = true;
+  $("#report-reason-note").value = "";
+  $("#report-reason-note").hidden = true;
+  updateReportSubmit();
   const existingPhotoUrl = existing && photoUrlFor(existing.photoPath);
   $("#report-existing-photo").hidden = !existingPhotoUrl;
   if (existingPhotoUrl) $("#report-existing-photo").src = existingPhotoUrl;
   $("#report-dialog .report-scope").textContent = existing
-    ? `${existing.reason === "construction" ? "공사 중" : "통행 막힘"} · ${reportStatusLabel(existing)} · 선택한 도로 구간에 저장된 신고입니다. 삭제하면 집계에서 빠집니다.`
-    : `신고하면 바로 지도에 주의(노란색)로 표시됩니다. 같은 구간에 신고가 ${REPORT_THRESHOLD}건 이상 모이면 관리자에게 검토 알림이 가고, 관리자가 확인해 확정하면 통행 막힘(빨간색)으로 바뀌며 경로에서 제외됩니다.`;
+    ? `${reasonLabel(existing)} · ${reportStatusLabel(existing)} · 선택한 도로 구간에 저장된 신고입니다. 삭제하면 집계에서 빠집니다.`
+    : `같은 구간에 신고가 ${REPORT_THRESHOLD}건 이상 모이면 지도에 주의(노란색)로 표시되고 관리자에게 검토 알림이 갑니다. 관리자가 확인해 확정하면 통행 막힘(빨간색)으로 바뀌며 우회 경로를 안내합니다.`;
   $("#report-dialog").showModal();
 }
+// 사진이 있고, 기타 사유면 글까지 써야 신고 버튼이 켜집니다.
+function updateReportSubmit() {
+  const other = $('input[name="road-reason"]:checked').value === "other";
+  $("#report-yes").disabled =
+    !selectedPhotoFile || (other && !$("#report-reason-note").value.trim());
+}
+for (const radio of $$('input[name="road-reason"]'))
+  radio.onchange = () => {
+    const other = radio.value === "other" && radio.checked;
+    $("#report-reason-note").hidden = !other;
+    if (other) $("#report-reason-note").focus();
+    updateReportSubmit();
+  };
+$("#report-reason-note").oninput = updateReportSubmit;
 $("#report-photo-input").onchange = () => {
   selectedPhotoFile = $("#report-photo-input").files[0] || null;
   if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
@@ -621,6 +693,7 @@ $("#report-photo-input").onchange = () => {
     : null;
   $("#report-photo-preview").src = photoPreviewUrl || "";
   $("#report-photo-preview").hidden = !photoPreviewUrl;
+  updateReportSubmit();
 };
 $("#report-no").onclick = () => {
   map?.clearReportSelection();
@@ -646,25 +719,39 @@ async function loadReports() {
 }
 $("#report-yes").onclick = async () => {
   if (!selectedReport?.point) return;
-  const file = selectedPhotoFile;
-  let photoPath = null;
-  if (file) {
-    try {
-      photoPath = await uploadReportPhoto(file);
-    } catch {
-      toast("사진 업로드에 실패해서 사진 없이 신고를 저장할게요.");
-    }
-  }
-  try {
-    await insertReportRow({
-      edgeId: selectedReport.edgeId,
-      point: selectedReport.point,
-      reason: $('input[name="road-reason"]:checked').value,
-      photoPath,
-    });
-  } catch {
-    toast("신고 저장에 실패했어요. 다시 시도해주세요.");
+  const reason = $('input[name="road-reason"]:checked').value,
+    reasonNote = $("#report-reason-note").value.trim();
+  if (!selectedPhotoFile) {
+    toast("현장 사진을 찍어 올려야 신고할 수 있어요.");
     return;
+  }
+  if (reason === "other" && !reasonNote) {
+    toast("기타 사유를 적어주세요.");
+    return;
+  }
+  $("#report-yes").disabled = true; // 업로드 중 중복 신고 방지
+  try {
+    let photoPath;
+    try {
+      photoPath = await uploadReportPhoto(selectedPhotoFile);
+    } catch {
+      toast("사진 업로드에 실패했어요. 다시 시도해주세요.");
+      return;
+    }
+    try {
+      await insertReportRow({
+        edgeId: selectedReport.edgeId,
+        point: selectedReport.point,
+        reason,
+        reasonNote,
+        photoPath,
+      });
+    } catch {
+      toast("신고 저장에 실패했어요. 다시 시도해주세요.");
+      return;
+    }
+  } finally {
+    updateReportSubmit();
   }
   setReporting(false);
   $("#report-dialog").close();
@@ -691,9 +778,8 @@ function reportStatusLabel(report) {
     confirmedEdges,
   );
   if (status === "confirmed") return "관리자 확정 · 통행 막힘";
-  const needsReview =
-    groupReportsByEdge(reports).get(report.edgeId)?.count >= REPORT_THRESHOLD;
-  return needsReview ? "주의 표시 중 · 관리자 검토 대기" : "주의 표시 중";
+  if (status === "caution") return "주의 표시 중 · 관리자 검토 대기";
+  return `접수됨 · ${REPORT_THRESHOLD}건 이상 모이면 지도에 주의 표시`;
 }
 function renderReportList() {
   $("#report-count").textContent = reports.length;
@@ -706,9 +792,7 @@ function renderReportList() {
       '<span aria-hidden="true">⚠</span><span><b></b><small></small></span><span>↗</span>';
     button.querySelector("b").textContent = reportLocation(report);
     button.querySelector("small").textContent =
-      (report.reason === "construction" ? "공사 중" : "통행 막힘") +
-      " · " +
-      reportStatusLabel(report);
+      reasonLabel(report) + " · " + reportStatusLabel(report);
     button.onclick = () => openRoadReport({ reportId: report.id });
     li.append(button);
     $("#report-list").append(li);
@@ -734,7 +818,7 @@ function renderAdminSection(listId, emptyId, groups) {
       `신고 ${group.count}건 · 최근 ${new Date(group.latestAt).toLocaleString("ko-KR")}`;
     li.querySelector('[data-act="confirm"]').onclick = async () => {
       try {
-        await confirmEdgeRows(group.edgeId);
+        await confirmReportRows(group.reports.map((r) => r.id));
       } catch {
         toast("확정 처리에 실패했어요. 다시 시도해주세요.");
         return;
@@ -743,7 +827,7 @@ function renderAdminSection(listId, emptyId, groups) {
     };
     li.querySelector('[data-act="dismiss"]').onclick = async () => {
       try {
-        await dismissEdgeRows(group.edgeId);
+        await deleteReportRows(group.reports.map((r) => r.id));
       } catch {
         toast("반려 처리에 실패했어요. 다시 시도해주세요.");
         return;
@@ -753,7 +837,36 @@ function renderAdminSection(listId, emptyId, groups) {
     $(listId).append(li);
   }
 }
+// 확정된(빨간색) 구간: 공사가 끝나면 해제해서 신고를 지우고 경로를 다시 엽니다.
+function renderConfirmedSection() {
+  const groups = [...groupReportsByEdge(reports).values()].filter((g) =>
+    confirmedEdges.includes(g.edgeId),
+  );
+  $("#admin-empty-confirmed").hidden = groups.length > 0;
+  $("#admin-list-confirmed").replaceChildren();
+  for (const group of groups) {
+    const li = document.createElement("li");
+    li.className = "admin-item";
+    li.innerHTML =
+      '<b></b><small></small><div class="admin-actions"><button type="button" data-act="release">해제 · 공사 끝남</button></div>';
+    li.querySelector("b").textContent = reportLocation(group.reports[0]);
+    li.querySelector("small").textContent =
+      `통행 막힘(확정) · 신고 ${group.count}건`;
+    li.querySelector("button").onclick = async () => {
+      try {
+        await deleteReportRows(group.reports.map((r) => r.id));
+      } catch {
+        toast("확정 해제에 실패했어요. 다시 시도해주세요.");
+        return;
+      }
+      toast("확정을 해제했어요. 이 구간은 다시 경로에 포함돼요.");
+      await loadReports();
+    };
+    $("#admin-list-confirmed").append(li);
+  }
+}
 function renderAdminPanel() {
+  renderConfirmedSection();
   const groups = reviewGroups(reports, confirmedEdges);
   renderAdminSection(
     "#admin-list-urgent",
@@ -772,6 +885,20 @@ function renderAdminAlert() {
   $("#admin-alert-count").textContent = count;
   $("#admin-alert-count").hidden = count === 0;
 }
+// 관리자 버튼은 사용자에게 숨깁니다. 주소에 ?admin=1을 붙여 열거나, 이 기기에서 한 번
+// 관리자 코드를 맞게 넣었으면 보입니다. 화면에서 감추는 것일 뿐 보안 장치는 아닙니다
+// (진짜 보호는 관리자 로그인 + Supabase RLS로 해야 합니다).
+const ADMIN_DEVICE_KEY = "sai:seoultech:admin-device:v1";
+function isAdminDevice() {
+  try {
+    return localStorage.getItem(ADMIN_DEVICE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+$("#admin-toggle").hidden = !(
+  new URLSearchParams(location.search).has("admin") || isAdminDevice()
+);
 $("#admin-toggle").onclick = () => {
   if (!adminUnlocked) {
     const input = prompt("관리자 코드를 입력하세요 (해커톤 시연용 임시 잠금)");
@@ -781,7 +908,93 @@ $("#admin-toggle").onclick = () => {
       return;
     }
     adminUnlocked = true;
+    try {
+      localStorage.setItem(ADMIN_DEVICE_KEY, "1");
+    } catch {}
   }
   renderAdminPanel();
+  renderWorkList();
   $("#admin-dialog").showModal();
 };
+
+// ===== 건물 공사 (관리자가 건물을 골라 기간과 함께 등록 → 지도에 🚧 표시만, 경로는 그대로) =====
+async function loadWorks() {
+  let rows;
+  try {
+    rows = await fetchWorkRows();
+  } catch {
+    return; // 공사 표시는 부가 기능이라 실패해도 조용히 넘어갑니다.
+  }
+  works = activeWorks(rows);
+  map?.setWorks(works);
+  renderWorkList();
+}
+function renderWorkList() {
+  $("#work-empty").hidden = works.length > 0;
+  $("#work-list").replaceChildren();
+  for (const work of works) {
+    const b = BUILDINGS.find((x) => x.id === work.buildingId),
+      li = document.createElement("li");
+    li.className = "admin-item";
+    li.innerHTML =
+      '<b></b><small></small><div class="admin-actions"><button type="button">공사 해제</button></div>';
+    li.querySelector("b").textContent = `🚧 ${buildingLabel(b)}`;
+    li.querySelector("small").textContent =
+      worksPeriod(work) + (work.note ? ` · ${work.note}` : "");
+    li.querySelector("button").onclick = async () => {
+      try {
+        await deleteWorkRow(work.id);
+      } catch {
+        toast("공사 해제에 실패했어요. 다시 시도해주세요.");
+        return;
+      }
+      await loadWorks();
+    };
+    $("#work-list").append(li);
+  }
+}
+for (const b of BUILDINGS.filter(
+  (b) => b.name !== "교내 건물" && b.name !== "조형물",
+).sort((a, b) => a.name.localeCompare(b.name, "ko"))) {
+  const option = document.createElement("option");
+  option.value = b.id;
+  option.textContent = buildingLabel(b);
+  $("#work-building").append(option);
+}
+$("#work-start").value = today();
+$("#work-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const start = $("#work-start").value,
+    end = $("#work-end").value;
+  if (start > end) {
+    toast("종료일이 시작일보다 빠를 수 없어요.");
+    return;
+  }
+  try {
+    await insertWorkRow({
+      buildingId: $("#work-building").value,
+      start,
+      end,
+      note: $("#work-note").value.trim(),
+    });
+  } catch {
+    toast("공사 등록에 실패했어요. 다시 시도해주세요.");
+    return;
+  }
+  $("#work-note").value = "";
+  $("#work-end").value = "";
+  await loadWorks();
+};
+loadWorks();
+
+// 다른 사람(사용자↔관리자)이 바꾼 내용을 가져옵니다. 10초마다, 그리고 탭으로 돌아올 때 다시 읽습니다.
+// 신고 창이 열려 있거나 위치를 고르는 중에는 선택이 지워지지 않게 건너뜁니다.
+// ponytail: 10초 폴링. 즉시 반영이 필요하면 Supabase Realtime 구독으로 바꾸세요.
+function refreshShared() {
+  if (document.hidden || reporting || document.querySelector("dialog[open]"))
+    return;
+  loadReports();
+  loadWorks();
+}
+setInterval(refreshShared, 10000);
+document.addEventListener("visibilitychange", refreshShared);

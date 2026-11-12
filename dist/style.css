@@ -3229,3 +3229,177 @@ body.exploring .header {
     border-radius: 14px;
   }
 }
+/* 신고 사유 3가지 + 기타 직접 입력 */
+#report-reasons {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+.report-reason-note {
+  flex-basis: 100%;
+  font-size: 11px;
+  padding: 9px 10px;
+  border: 1px solid #eee0c5;
+  border-radius: 8px;
+  color: #6f5631;
+}
+.report-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+/* 건물 공사 표시: 건물 위 🚧, 누르면 3초간 공사 기간 말풍선 */
+.building-work {
+  position: relative;
+  background: #fff4d6;
+  border: 1px solid #e3be74;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+  pointer-events: auto;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 3px #6c4a1b40);
+}
+.building-work-bubble {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 10px;
+  color: #72531d;
+  background: #fff9e5;
+  border: 1px solid #e3be74;
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+/* 관리자: 건물 공사 등록 */
+.work-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 10px;
+  color: #967244;
+}
+.work-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.work-form label:first-child,
+.work-form .work-note,
+.work-form button {
+  grid-column: 1 / -1;
+}
+.work-form select,
+.work-form input {
+  font-size: 11px;
+  padding: 7px;
+  border: 1px solid #eee0c5;
+  border-radius: 6px;
+  min-width: 0;
+}
+.work-form button {
+  padding: 9px;
+  border-radius: 6px;
+  border: 1px solid #b48025;
+  background: #b48025;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+#work-empty {
+  font-size: 10px;
+  color: #ae9c84;
+}
+/* 모바일: 지도가 메인. 길찾기 입력은 위쪽에 얇게 압축합니다(네이버 지도처럼). */
+@media (max-width: 760px) {
+  .route-panel,
+  .map-view.panel-closed .route-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+  .route-panel > * {
+    flex: 0 0 100%;
+    margin: 0;
+  }
+  .mobile-route-heading,
+  .journey-connector,
+  .map-overlay-heading,
+  .map-view.panel-closed .map-overlay-heading {
+    display: none;
+  }
+  .journey-form {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 2px;
+    padding: 4px 10px;
+  }
+  .journey-form > label,
+  .destination-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    margin: 0;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  #origin,
+  #destination {
+    width: 100%;
+    margin: 0;
+    padding: 5px 0;
+    font-size: 13px;
+  }
+  #origin {
+    border-bottom: 1px solid #eee8f3;
+  }
+  .route-panel > .mode-tabs {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    margin: 0;
+  }
+  .route-panel > .route-submit {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 32px;
+    padding: 6px 12px;
+    gap: 6px;
+  }
+  .mode-tabs button {
+    padding: 7px 4px;
+  }
+  .route-result {
+    margin: 0;
+    padding: 0 2px;
+  }
+  .result-icon,
+  .result-heading > div > small {
+    display: none;
+  }
+  .result-heading h3 {
+    font-size: 16px;
+  }
+}
+/* 관리자 버튼: 사용자에게는 숨김(?admin=1 또는 관리자 기기에서만 보임), 모바일 아이콘은 🛠로 구분 */
+.admin-toggle[hidden] {
+  display: none !important;
+}
+@media (max-width: 760px) {
+  .map-quick-actions .admin-toggle::before {
+    content: "🛠";
+  }
+  .map-quick-actions .admin-toggle {
+    background: #f1ecff;
+    border-color: #c9b8ff;
+  }
+}
