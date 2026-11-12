@@ -1,0 +1,203 @@
+{
+  "type": "FeatureCollection",
+  "name": "SEOULTECH team survey",
+  "coordinate_system": "EPSG:4326",
+  "note": "팀이 조사한 출입구(entrance), 인도(sidewalk), 계단(stairs), 건물 관통(building_passage). 앱이 열릴 때 보행 그래프에 합쳐집니다. 양식은 team-survey-template.geojson, 규칙은 docs/decisions.md 참고.",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.081715,
+          37.6292035
+        ]
+      },
+      "properties": {
+        "id": "ent-future-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "future",
+        "name": "미래관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0795266,
+          37.629447
+        ]
+      },
+      "properties": {
+        "id": "ent-gym-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "gym",
+        "name": "체육관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0814906,
+          37.6293362
+        ]
+      },
+      "properties": {
+        "id": "ent-future-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "future",
+        "name": "미래관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.081715,
+            37.6292035
+          ],
+          [
+            127.0814907,
+            37.6293362
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "future",
+        "from": "ent-future-1",
+        "to": "ent-future-2",
+        "length_m": 20,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.081414,
+          37.6295928
+        ]
+      },
+      "properties": {
+        "id": "ent-future-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "future",
+        "name": "미래관 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0814968,
+          37.6297456
+        ]
+      },
+      "properties": {
+        "id": "ent-future-4",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "future",
+        "name": "미래관 출입구 4",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0814968,
+            37.6297456
+          ],
+          [
+            127.081414,
+            37.6295928
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "future",
+        "from": "ent-future-4",
+        "to": "ent-future-3",
+        "length_m": 18,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0810401,
+            37.6294274
+          ],
+          [
+            127.0809713,
+            37.6291605
+          ],
+          [
+            127.081138,
+            37.6291439
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0811447,
+          37.6291517
+        ]
+      },
+      "properties": {
+        "id": "ent-future-7",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "future",
+        "name": "미래관 출입구 5",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    }
+  ]
+}

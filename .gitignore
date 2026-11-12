@@ -10,3 +10,4 @@ room.mp4
 mirae_map_final_v6/
 # npm run dev:phone 용 자체 서명 인증서
 .cert/
+dist/editor.js

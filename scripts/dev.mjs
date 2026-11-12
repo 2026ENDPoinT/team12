@@ -5,6 +5,7 @@ import { networkInterfaces } from "node:os";
 import { copyIndoorAssets } from "./indoor-assets.mjs";
 
 // IntelliJ 터미널에서 npm run dev 실행 → 파일 저장 → 브라우저 새로고침.
+// app.js(앱)·editor.js(?edit=1 편집기)·미래관 실내 지도를 함께 빌드합니다.
 // npm run dev:phone 은 같은 와이파이의 휴대폰에서 열 수 있게 HTTPS(자체 서명)로 띄웁니다.
 // (카메라·센서는 HTTPS에서만 동작합니다.)
 const phone = process.argv.includes("--phone");
@@ -15,7 +16,11 @@ const opts = {
   sourcemap: true,
 };
 const contexts = await Promise.all([
-  context({ ...opts, entryPoints: ["src/app.js"], outfile: "dist/app.js" }),
+  context({
+    ...opts,
+    entryPoints: { app: "src/app.js", editor: "src/editor/index.js" },
+    outdir: "dist",
+  }),
   context({
     ...opts,
     entryPoints: ["src/indoor/main.js"],
@@ -70,9 +75,11 @@ if (phone) {
   console.log("휴대폰에서 열기 (같은 와이파이, 인증서 경고는 '계속'):");
   for (const ip of ips) console.log(`  https://${ip}:4173/indoor/`);
 } else
-  console.log(
-    "사이 개발 서버: http://127.0.0.1:4173  · 미래관 실내: http://127.0.0.1:4173/indoor/",
-  );
+{
+  console.log("사이 개발 서버: http://127.0.0.1:4173");
+  console.log("편집 모드: http://127.0.0.1:4173/?edit=1#campus/seoultech");
+  console.log("미래관 실내: http://127.0.0.1:4173/indoor/");
+}
 console.log(
   "src를 수정하면 자동 빌드됩니다. 화면은 브라우저에서 새로고침하세요.",
 );

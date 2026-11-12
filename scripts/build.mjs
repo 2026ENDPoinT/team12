@@ -6,6 +6,7 @@ import { copyIndoorAssets } from "./indoor-assets.mjs";
 
 // 개발용 소스맵을 공개 배포물에 포함하지 않습니다.
 await rm("dist/app.js.map", { force: true });
+await rm("dist/editor.js.map", { force: true });
 await rm("dist/indoor/indoor.js.map", { force: true });
 await rm("dist/indoor/ar-worker.js.map", { force: true });
 const common = { bundle: true, minify: true, target: "es2020" };
@@ -14,6 +15,15 @@ await build({
   entryPoints: ["src/app.js"],
   format: "iife",
   outfile: "dist/app.js",
+});
+// 편집기는 ?edit=1에서만 불러오는 별도 파일입니다(src/edit-mode.js 참고).
+await build({
+  entryPoints: ["src/editor/index.js"],
+  bundle: true,
+  minify: true,
+  format: "iife",
+  target: "es2020",
+  outfile: "dist/editor.js",
 });
 // 미래관 실내 지도 · AR 안내 (별도 페이지)
 await build({

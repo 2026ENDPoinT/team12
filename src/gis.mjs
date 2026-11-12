@@ -109,7 +109,8 @@ export function createCampusGeoJson(geometry, entrances = []) {
           building_id: entrance.buildingId,
           name: entrance.name,
           source_kind: "team_input",
-          verification_status: "candidate",
+          // 팀이 편집기에서 "현장 확인함"으로 표시한 출입구는 verified로 내보냅니다.
+          verification_status: entrance.verification_status || "candidate",
           access_status: "unverified",
         },
       ),

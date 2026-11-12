@@ -44,8 +44,21 @@ export function reportLocation(report) {
   );
   return `${b?.name || "캠퍼스"} 인근 · 선택한 도로 구간`;
 }
-export function sanitizeReports(value) {
+// 신고가 가리키던 간선이 팀 조사 데이터로 잘려 id가 바뀌어도, 저장된 클릭 좌표에서
+// 가장 가까운 간선을 다시 찾아 신고를 유지합니다.
+function nearestEdge(point, edges, nodes, maxDistance) {
+  let best = null;
+  for (const edge of edges) {
+    const { distance } = projectToSegment(point, nodes[edge.a], nodes[edge.b]);
+    if (distance <= maxDistance && (!best || distance < best.distance))
+      best = { edge, distance };
+  }
+  return best?.edge ?? null;
+}
+export function sanitizeReports(value, edges = EDGES, nodes = NODES) {
   if (!Array.isArray(value)) return [];
+  const lookup =
+    edges === EDGES ? edgeLookup : new Map(edges.map((e) => [edgeId(e), e]));
   const unique = new Map();
   for (const report of value.slice(0, 500)) {
     if (
@@ -53,10 +66,16 @@ export function sanitizeReports(value) {
       typeof report.id !== "string" ||
       report.id.length > 100 ||
       !report.id ||
-      !edgeLookup.has(report.edgeId) ||
-      !["construction", "blocked"].includes(report.reason)
+      typeof report.edgeId !== "string" ||
+      !REPORT_REASONS.includes(report.reason)
     )
       continue;
+    const note =
+      typeof report.reasonNote === "string"
+        ? report.reasonNote.trim().slice(0, REASON_NOTE_MAX)
+        : "";
+    // 기타 사유는 직접 쓴 글이 있어야 의미가 있습니다.
+    if (report.reason === "other" && !note) continue;
     if (
       typeof report.createdAt !== "string" ||
       !Number.isFinite(Date.parse(report.createdAt))
@@ -64,15 +83,23 @@ export function sanitizeReports(value) {
       continue;
     const p = report.point;
     if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) continue;
-    const edge = edgeLookup.get(report.edgeId);
-    if (projectToSegment(p, NODES[edge.a], NODES[edge.b]).distance > 20)
-      continue;
+    let edge = lookup.get(report.edgeId);
+    if (
+      !edge ||
+      projectToSegment(p, nodes[edge.a], nodes[edge.b]).distance > 20
+    )
+      edge = nearestEdge(p, edges, nodes, 20);
+    if (!edge) continue;
     unique.set(report.id, {
       id: report.id,
-      edgeId: report.edgeId,
+      edgeId: edgeId(edge),
       point: { x: p.x, z: p.z },
       reason: report.reason,
+      ...(report.reason === "other" ? { reasonNote: note } : {}),
       createdAt: report.createdAt,
+      ...(typeof report.deviceId === "string"
+        ? { deviceId: report.deviceId }
+        : {}),
       // 사진은 Supabase Storage 경로만 들고 다닙니다. 실제 URL은 backend.mjs의
       // photoUrlFor()로 보여줄 때 만듭니다.
       ...(typeof report.photoPath === "string"
@@ -91,30 +118,55 @@ export function rowToReport(row) {
     edgeId: row.edge_id,
     point: { x: row.point_x, z: row.point_z },
     reason: row.reason,
+    ...(row.reason_note ? { reasonNote: row.reason_note } : {}),
     createdAt: row.created_at,
+    ...(row.reporter_device_id ? { deviceId: row.reporter_device_id } : {}),
     ...(row.photo_path ? { photoPath: row.photo_path } : {}),
   };
 }
-// status='confirmed'인 행들의 edge_id만 모읍니다.
-export function confirmedEdgesFromRows(rows) {
-  return [
-    ...new Set(
-      (rows || [])
-        .filter((row) => row.status === "confirmed")
-        .map((row) => row.edge_id),
-    ),
-  ];
+// 신고 사유: 1. 공사 중 2. 장애물·통제 3. 기타(직접 입력)
+export const REPORT_REASONS = ["construction", "blocked", "other"];
+export const REASON_NOTE_MAX = 100;
+export function reasonLabel(report) {
+  if (report.reason === "construction") return "공사 중";
+  if (report.reason === "blocked") return "장애물·통제";
+  return `기타: ${report.reasonNote || ""}`;
 }
-// 신고는 1건부터 바로 지도에 "주의"(노란색)로 뜹니다.
-// 이 값 이상 쌓이면 관리자에게 검토 알림이 갑니다. 관리자가 확정하기 전까지는 경로를 막지 않습니다.
+// status='confirmed'인 행들의 edge_id를 모읍니다. 팀 조사 데이터가 그 구간을
+// 쪼개서 원래 edge_id가 사라졌으면, 저장된 클릭 좌표로 가장 가까운 edge를 다시 찾습니다
+// (sanitizeReports의 재매핑과 같은 방식 — 안 그러면 확정 차단이 조용히 풀려버립니다).
+export function confirmedEdgesFromRows(rows, edges = EDGES, nodes = NODES) {
+  const lookup =
+    edges === EDGES ? edgeLookup : new Map(edges.map((e) => [edgeId(e), e]));
+  const result = new Set();
+  for (const row of rows || []) {
+    if (row.status !== "confirmed") continue;
+    const point = { x: row.point_x, z: row.point_z };
+    let edge = lookup.get(row.edge_id);
+    if (
+      !edge ||
+      (Number.isFinite(point.x) &&
+        Number.isFinite(point.z) &&
+        projectToSegment(point, nodes[edge.a], nodes[edge.b]).distance > 20)
+    )
+      edge =
+        Number.isFinite(point.x) && Number.isFinite(point.z)
+          ? (nearestEdge(point, edges, nodes, 20) ?? edge)
+          : edge;
+    if (edge) result.add(edgeId(edge));
+  }
+  return [...result];
+}
+// 신고가 이 값 이상 쌓이면 지도에 "주의"(노란색)로 뜨고 관리자에게 검토 알림이 갑니다.
+// 관리자가 확정하기 전까지는 경로를 막지 않습니다.
 export const REPORT_THRESHOLD = 3;
 
-export function sanitizeConfirmedEdges(value) {
+export function sanitizeConfirmedEdges(value, edges = EDGES) {
   if (!Array.isArray(value)) return [];
+  const lookup =
+    edges === EDGES ? edgeLookup : new Set(edges.map((e) => edgeId(e)));
   return [
-    ...new Set(
-      value.filter((id) => typeof id === "string" && edgeLookup.has(id)),
-    ),
+    ...new Set(value.filter((id) => typeof id === "string" && lookup.has(id))),
   ].slice(0, 500);
 }
 
@@ -130,7 +182,8 @@ export function groupReportsByEdge(reports) {
     groups.set(report.edgeId, group);
   }
   for (const group of groups.values()) {
-    group.count = group.reports.length;
+    // 같은 기기가 여러 번 신고해도 1건으로 셉니다. 기기 ID가 없는 신고는 각각 1건입니다.
+    group.count = new Set(group.reports.map((r) => r.deviceId || r.id)).size;
     group.latestAt = group.reports.reduce(
       (latest, r) =>
         Date.parse(r.createdAt) > Date.parse(latest) ? r.createdAt : latest,
@@ -140,10 +193,18 @@ export function groupReportsByEdge(reports) {
   return groups;
 }
 
-// caution(신고 1건부터, 노란색) → confirmed(관리자 확정, 빨간색 차단).
-export function edgeStatus(edgeId, groups, confirmedEdges) {
+// pending(신고 접수, 지도엔 안 보임) → caution(threshold 이상, 노란색)
+// → confirmed(관리자 확정, 빨간색 차단).
+export function edgeStatus(
+  edgeId,
+  groups,
+  confirmedEdges,
+  threshold = REPORT_THRESHOLD,
+) {
   if (confirmedEdges.includes(edgeId)) return "confirmed";
-  return groups.has(edgeId) ? "caution" : "none";
+  const count = groups.get(edgeId)?.count || 0;
+  if (count >= threshold) return "caution";
+  return count ? "pending" : "none";
 }
 
 // 관리자 검토 화면에 띄울 구간 목록입니다. 1건부터 전부 보이며(확정된 구간은 제외).
@@ -178,6 +239,6 @@ export function reviewAlertCount(
 
 // 관리자가 확정한 구간만 경로에서 제외합니다. 신고가 쌓인 것만으로는 막지 않습니다.
 export function availableEdges(confirmedEdges, edges = EDGES) {
-  const blocked = new Set(sanitizeConfirmedEdges(confirmedEdges));
+  const blocked = new Set(sanitizeConfirmedEdges(confirmedEdges, edges));
   return edges.filter((edge) => !blocked.has(edgeId(edge)));
 }
