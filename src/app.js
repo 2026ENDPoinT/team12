@@ -280,7 +280,7 @@ function showPopover(title, description, place = null, indoor = false) {
   }
   if (indoor) {
     const button = document.createElement("button");
-    button.textContent = "미래관 실내 연동 보기 ↗";
+    button.textContent = "미래관 실내 지도 ↗";
     button.onclick = () => $("#indoor-dialog").showModal();
     el.append(button);
   }
@@ -526,7 +526,7 @@ $$("dialog").forEach((d) =>
   }),
 );
 for (const [key, selector] of [
-  ["gaussianUrl", "#gaussian-link"],
+  ["indoorUrl", "#indoor-link"],
   ["arUrl", "#ar-link"],
 ]) {
   const url = CAMPUS.interior[key];
