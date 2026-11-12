@@ -13,6 +13,19 @@ import {
   MAIN_GATE,
 } from "./data.mjs";
 import { locateReportPoint, edgeId, reportLocation } from "./reports.mjs";
+import { createFutureBuilding } from "./future-building.js";
+import { createSangsangBuilding } from "./sangsang-building.js";
+import { createMemorialBuilding } from "./memorial-building.js";
+import { createDasanBuilding } from "./dasan-building.js";
+import { createFrontierBuilding } from "./frontier-building.js";
+import { createTechnocubeBuilding } from "./technocube-building.js";
+import { createDaeryukBuilding } from "./daeryuk-building.js";
+import { buildingAppearance } from "./building-appearance.mjs";
+import {
+  facadeGeometry,
+  facadeMaterial,
+  createBuildingDetails,
+} from "./procedural-building.mjs";
 const VIOLET = 0x7950ff;
 
 // Three.js 기반 독립 구현. 외곽선/도로 데이터만 별도 ODbL 데이터에서 가져옵니다.
@@ -60,8 +73,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   labels.domElement.style.cssText =
     "position:absolute;inset:0;pointer-events:none;overflow:hidden";
   host.append(renderer.domElement, labels.domElement);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xcadbb1, 1.8));
-  const sun = new THREE.DirectionalLight(0xffffff, 2.1);
+  scene.add(new THREE.HemisphereLight(0xfffaf0, 0xb7c7a5, 1.9));
+  const sun = new THREE.DirectionalLight(0xfff4df, 1.85);
   sun.position.set(-350, 950, 550);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -105,7 +118,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
         depth: 5,
         bevelEnabled: false,
       }),
-      matte(0xaec58e),
+      matte(0xb5c99a),
     );
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.y = -5;
@@ -114,26 +127,119 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     terrainMeshes.push(mesh);
   }
   const landColors = {
-    wood: 0x90af73,
-    park: 0xb8ce9a,
-    pitch: 0x77a65f,
-    water: 0x75b6c4,
-    construction: 0xcbbd9e,
+    wood: 0x96b681,
+    park: 0xc4d5a6,
+    pitch: 0x8ab379,
+    water: 0x70b9bd,
+    construction: 0xd3c6ad,
   };
+  // All pond banks share one mesh. No textures or extra per-bank draw calls.
+  const bankVertices = [];
   for (const land of CAMPUS_GEOMETRY.lands) {
     const poly = flatPolygon(
       land.outline,
       landColors[land.kind] || 0xb0c696,
       0.15,
     );
-    if (land.kind === "water") poly.material.roughness = 0.35;
+    if (land.kind === "water") {
+      poly.position.y = 0.3;
+      const ring = land.outline;
+      poly.material.dispose();
+      // Distance to the actual shoreline also works for the long, narrow stream.
+      // One draw call per water polygon, with no texture downloads or reflections.
+      poly.material = new THREE.ShaderMaterial({
+        uniforms: {
+          shore: {
+            value: ring.map(([x, z]) => new THREE.Vector2(x, -z)),
+          },
+          shallow: { value: new THREE.Color(0xb4e6d5) },
+          middle: { value: new THREE.Color(0x49b8bd) },
+          deep: { value: new THREE.Color(0x23829e) },
+        },
+        vertexShader: `
+          varying vec2 waterPoint;
+          void main() {
+            waterPoint = position.xy;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec2 shore[${ring.length}];
+          uniform vec3 shallow;
+          uniform vec3 middle;
+          uniform vec3 deep;
+          varying vec2 waterPoint;
+          void main() {
+            float bankDistance = 10000.0;
+            for (int i = 0; i < ${ring.length}; i++) {
+              vec2 a = shore[i];
+              vec2 b = shore[(i + 1) % ${ring.length}];
+              vec2 edge = b - a;
+              float t = clamp(dot(waterPoint - a, edge) / max(dot(edge, edge), 0.0001), 0.0, 1.0);
+              bankDistance = min(bankDistance, length(waterPoint - a - edge * t));
+            }
+            vec3 water = mix(shallow, middle, smoothstep(1.0, 6.0, bankDistance));
+            water = mix(water, deep, smoothstep(8.0, 26.0, bankDistance));
+            // Sparse, static highlights suggest water without an animation pass.
+            vec2 p = waterPoint;
+            float rows = pow(max(0.0, cos(p.y * 0.48 + sin(p.x * 0.05))), 36.0);
+            float dashes = pow(max(0.0, sin(p.x * 0.20 + p.y * 0.08)), 12.0);
+            water = mix(water, shallow, rows * dashes * 0.42 * smoothstep(3.0, 8.0, bankDistance));
+            gl_FragColor = vec4(water, 1.0);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
+          }
+        `,
+      });
+      for (let i = 0; i < ring.length; i++) {
+        const [ax, az] = ring[i],
+          [bx, bz] = ring[(i + 1) % ring.length],
+          length = Math.hypot(bx - ax, bz - az);
+        if (length < 0.01) continue;
+        const nx = (-(bz - az) / length) * 2.2,
+          nz = ((bx - ax) / length) * 2.2;
+        bankVertices.push(
+          ax + nx,
+          0.22,
+          az + nz,
+          bx + nx,
+          0.22,
+          bz + nz,
+          bx - nx,
+          0.22,
+          bz - nz,
+          ax + nx,
+          0.22,
+          az + nz,
+          bx - nx,
+          0.22,
+          bz - nz,
+          ax - nx,
+          0.22,
+          az - nz,
+        );
+      }
+    }
   }
-  function segment(a, b, width, color, y, group = scene) {
+  if (bankVertices.length) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(bankVertices, 3),
+    );
+    geometry.computeVertexNormals();
+    const material = matte(0xd8cfb6);
+    material.side = THREE.DoubleSide;
+    const banks = new THREE.Mesh(geometry, material);
+    banks.receiveShadow = true;
+    scene.add(banks);
+  }
+  function segment(a, b, width, color, y, group = scene, material = null) {
     const length = Math.hypot(b.x - a.x, b.z - a.z);
     if (length < 0.01) return;
     const mesh = new THREE.Mesh(
       new THREE.BoxGeometry(width, 0.22, length),
-      matte(color),
+      material || matte(color),
     );
     mesh.position.set((a.x + b.x) / 2, y, (a.z + b.z) / 2);
     mesh.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
@@ -141,6 +247,46 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     group.add(mesh);
     return mesh;
   }
+  // Shared procedural finishes: road detail needs no downloaded texture.
+  function roadFinish(color, paved) {
+    const material = matte(color);
+    material.onBeforeCompile = (shader) => {
+      shader.vertexShader = `varying vec2 surfacePoint;\n${shader.vertexShader}`;
+      shader.vertexShader = shader.vertexShader.replace(
+        "#include <begin_vertex>",
+        "#include <begin_vertex>\nsurfacePoint = position.xz;",
+      );
+      shader.fragmentShader = `varying vec2 surfacePoint;\n${shader.fragmentShader}`;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+          float grain = sin(surfacePoint.x * 7.3) * sin(surfacePoint.y * 8.7);
+          float grainFade = 1.0 - smoothstep(0.2, 0.8, max(fwidth(surfacePoint.x), fwidth(surfacePoint.y)));
+          diffuseColor.rgb *= 1.0 + grain * grainFade * 0.035;
+          ${
+            paved
+              ? `
+          float spacing = 2.8;
+          float seam = abs(fract(surfacePoint.y / spacing + 0.5) - 0.5) * spacing;
+          float aa = max(fwidth(surfacePoint.y), 0.03);
+          float joint = 1.0 - smoothstep(0.035, 0.035 + aa, seam);
+          float seamFade = 1.0 - smoothstep(0.4, 1.5, aa);
+          diffuseColor.rgb *= 1.0 - joint * seamFade * 0.16;
+          `
+              : ""
+          }
+        `,
+      );
+    };
+    material.customProgramCacheKey = () => `campus-road-${paved}`;
+    return material;
+  }
+  const roadMaterials = {
+    curb: matte(0xc1d0c5),
+    vehicle: roadFinish(0x637b79, false),
+    walk: roadFinish(0xd8d6bd, true),
+    steps: roadFinish(0xa1b1a5, true),
+  };
   // 공개 도로 형태에 따라 차도·보행로를 구분해 표시합니다.
   for (const road of CAMPUS_GEOMETRY.roads) {
     const vehicle = [
@@ -160,21 +306,38 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     for (let i = 1; i < road.points.length; i++) {
       const [ax, az] = road.points[i - 1],
         [bx, bz] = road.points[i];
-      segment({ x: ax, z: az }, { x: bx, z: bz }, width + 1.4, 0xd8d4c2, 0.35);
+      segment(
+        { x: ax, z: az },
+        { x: bx, z: bz },
+        width + (vehicle ? 1.8 : 1.2),
+        0xc1d0c5,
+        0.35,
+        scene,
+        roadMaterials.curb,
+      );
       segment(
         { x: ax, z: az },
         { x: bx, z: bz },
         width,
-        vehicle ? 0x89908d : road.kind === "steps" ? 0xb8aa91 : 0xe6d8bd,
+        0xffffff,
         0.55,
+        scene,
+        roadMaterials[
+          vehicle ? "vehicle" : road.kind === "steps" ? "steps" : "walk"
+        ],
       );
     }
   }
   const profiles = {
-    future: { wall: 0xd8dbd7, glass: 0x5c858f },
+    future: { wall: 0xdde3df, glass: 0x437d83 },
+    "way-579071105": { wall: 0xd9ddd7, glass: 0x43758a },
+    memorial: { wall: 0x444d4b, glass: 0x4c8293 },
+    frontier: { wall: 0xd1d0c0, glass: 0x347e99 },
+    cube: { wall: 0x81877f, glass: 0x357c97 },
+    "way-470639154": { wall: 0xbab5a2, glass: 0x526d65 },
     eoui: { wall: 0xd8d9cf, glass: 0x568598 },
     davinci: { wall: 0xc2bcac, glass: 0x4d788b },
-    dasan: { wall: 0xd7c09b, glass: 0x586f70 },
+    dasan: { wall: 0xdac9bd, glass: 0x547f83 },
     changhak: { wall: 0xd7c59e, glass: 0x576f75 },
     student: { wall: 0xc2a576, glass: 0x657b79 },
     student2: { wall: 0xc99e72, glass: 0x607d83 },
@@ -183,75 +346,63 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   const buildingMeshes = [],
     buildingGroups = new Map(),
     labelObjects = [];
+  const buildingDetails = createBuildingDetails();
   let homeMode = true,
     reporting = false;
   for (const b of BUILDINGS) {
-    const profile = profiles[b.id] || { wall: 0xd3d4cc, glass: 0x557e8b };
+    const appearance = buildingAppearance(b);
+    const profile = profiles[b.id] || {
+      wall: appearance.wall,
+      glass: appearance.glass,
+    };
     const roofColor = b.roof
       ? new THREE.Color(b.roof)
       : new THREE.Color(0x82928c);
-    const body = new THREE.Mesh(
-      new THREE.ExtrudeGeometry(shapeFor(b.outline, b.holes), {
-        depth: b.h,
-        bevelEnabled: false,
-      }),
-      matte(profile.wall),
-    );
-    body.rotation.x = -Math.PI / 2;
-    body.position.y = 0.9;
-    body.castShadow = true;
-    body.receiveShadow = true;
-    body.userData.building = b.id;
-    scene.add(body);
-    buildingMeshes.push(body);
-    const roof = flatPolygon(b.outline, roofColor, b.h + 1, b.holes);
-    roof.userData.building = b.id;
-    buildingMeshes.push(roof);
-    const windowSpecs = [];
-    const floors = Math.max(1, Math.round(b.floors));
-    for (const ring of [b.outline, ...b.holes])
-      for (let i = 0; i < ring.length; i++) {
-        const a = ring[i],
-          c = ring[(i + 1) % ring.length],
-          dx = c[0] - a[0],
-          dz = c[1] - a[1],
-          length = Math.hypot(dx, dz);
-        if (length < 5) continue;
-        const count = Math.floor(length / 5.8);
-        for (let k = 0; k < count; k++)
-          for (let floor = 0; floor < floors; floor++) {
-            const y = 3.2 + floor * (b.h / floors);
-            if (y + 1.6 > b.h) continue;
-            const t = (k + 0.5) / count;
-            windowSpecs.push({
-              x: a[0] + dx * t,
-              z: a[1] + dz * t,
-              y,
-              angle: Math.atan2(dz, dx),
-              w: Math.min(2.6, length / count - 1.6),
-            });
-          }
-      }
-    const glass = new THREE.InstancedMesh(
-        new THREE.BoxGeometry(1, 1, 1),
-        new THREE.MeshStandardMaterial({
-          color: profile.glass,
-          roughness: 0.35,
-          metalness: 0.18,
-        }),
-        windowSpecs.length,
-      ),
-      dummy = new THREE.Object3D();
-    windowSpecs.forEach((window, i) => {
-      dummy.position.set(window.x, window.y, window.z);
-      dummy.rotation.set(0, -window.angle, 0);
-      dummy.scale.set(window.w, 2.4, 0.32);
-      dummy.updateMatrix();
-      glass.setMatrixAt(i, dummy.matrix);
-    });
-    glass.userData.building = b.id;
-    scene.add(glass);
-    buildingMeshes.push(glass);
+    let body;
+    let displayHeight = b.h;
+    const customBuilding =
+      b.id === "future"
+        ? createFutureBuilding
+        : b.id === "way-579071105"
+          ? createSangsangBuilding
+          : b.id === "memorial"
+            ? createMemorialBuilding
+            : b.id === "dasan"
+              ? createDasanBuilding
+              : b.id === "frontier"
+                ? createFrontierBuilding
+                : b.id === "cube"
+                  ? createTechnocubeBuilding
+                  : b.id === "way-470639154"
+                    ? createDaeryukBuilding
+                    : null;
+    if (customBuilding) {
+      const model = customBuilding(b, profile.wall);
+      body = model.body;
+      displayHeight = model.height ?? b.h;
+      scene.add(model.group);
+      buildingMeshes.push(...model.pickables);
+    } else {
+      const entrance = ENTRANCES.find((e) => e.buildingId === b.id);
+      body = new THREE.Mesh(
+        facadeGeometry(b),
+        facadeMaterial(
+          { ...appearance, glass: profile.glass },
+          profile.wall,
+          entrance,
+        ),
+      );
+      body.rotation.x = -Math.PI / 2;
+      body.position.y = 0.9;
+      body.castShadow = body.receiveShadow = true;
+      body.userData.building = b.id;
+      scene.add(body);
+      buildingMeshes.push(body);
+      const roof = flatPolygon(b.outline, roofColor, b.h + 1, b.holes);
+      roof.userData.building = b.id;
+      buildingMeshes.push(roof);
+      buildingDetails.decorate(b, appearance, entrance);
+    }
     // 이름이 있는 건물만 라벨을 표시하고 모든 건물에 클릭을 연결합니다.
     let label = null;
     if (b.name !== "교내 건물") {
@@ -265,39 +416,69 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       };
       element.ondblclick = (e) => {
         e.stopPropagation();
-        if (!homeMode && !reporting) focusBuilding(b);
+        if (!homeMode && !reporting) focusBuilding({ ...b, h: displayHeight });
       };
       label = new CSS2DObject(element);
-      label.position.set(b.x, b.h + 12, b.z);
+      label.position.set(b.x, displayHeight + 12, b.z);
       scene.add(label);
       labelObjects.push({ id: b.id, label });
     }
     buildingGroups.set(b.id, { body, profile, label, b });
   }
+  scene.add(buildingDetails.finish());
   const treeData = CAMPUS_GEOMETRY.trees;
   const trunks = new THREE.InstancedMesh(
-      new THREE.CylinderGeometry(0.6, 0.9, 6, 4),
-      matte(0x8d7655),
+      new THREE.CylinderGeometry(0.45, 0.8, 6, 5),
+      matte(0x775d44),
       treeData.length,
     ),
     crowns = new THREE.InstancedMesh(
       new THREE.IcosahedronGeometry(1, 0),
-      matte(0x6f925a),
-      treeData.length,
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 1,
+        metalness: 0,
+        flatShading: true,
+      }),
+      treeData.length * 3,
     ),
     treeMatrix = new THREE.Object3D();
+  // Keep foliage subordinate to buildings: muted greens with gentle variation.
+  const foliageColors = [0x7c9478, 0x879e80, 0x748d73, 0x91a587];
+  const foliageColor = new THREE.Color();
   treeData.forEach(([x, z, s], i) => {
-    treeMatrix.position.set(x, 3, z);
+    // Stable variation: the campus looks identical after every reload.
+    const variation = (Math.sin(x * 12.9898 + z * 78.233) + 1) / 2;
+    const angle = variation * Math.PI * 2;
+    treeMatrix.position.set(x, 3 * s, z);
     treeMatrix.rotation.set(0, 0, 0);
-    treeMatrix.scale.set(1, 1, 1);
+    treeMatrix.scale.set(s, s, s);
     treeMatrix.updateMatrix();
     trunks.setMatrixAt(i, treeMatrix.matrix);
-    treeMatrix.position.set(x, 9, z);
-    treeMatrix.scale.set(3.5 * s, 6 * s, 3.5 * s);
-    treeMatrix.updateMatrix();
-    crowns.setMatrixAt(i, treeMatrix.matrix);
+    for (let lobe = 0; lobe < 3; lobe++) {
+      const offset = lobe === 0 ? 0 : 1.65 * s;
+      const direction = angle + (lobe === 1 ? 0 : Math.PI);
+      treeMatrix.position.set(
+        x + Math.cos(direction) * offset,
+        (lobe === 0 ? 9.2 : 7.5) * s,
+        z + Math.sin(direction) * offset,
+      );
+      treeMatrix.rotation.set(0, angle + lobe * 0.7, 0);
+      treeMatrix.scale.set(
+        (lobe === 0 ? 3.3 : 2.7) * s,
+        (lobe === 0 ? 4.4 : 3.1) * s,
+        (lobe === 0 ? 3.2 : 2.6) * s,
+      );
+      treeMatrix.updateMatrix();
+      crowns.setMatrixAt(i * 3 + lobe, treeMatrix.matrix);
+      foliageColor.setHex(foliageColors[i % foliageColors.length]);
+      foliageColor.multiplyScalar(lobe === 0 ? 1.03 : 0.97);
+      crowns.setColorAt(i * 3 + lobe, foliageColor);
+    }
   });
   crowns.castShadow = true;
+  crowns.receiveShadow = true;
+  trunks.receiveShadow = true;
   scene.add(trunks, crowns);
   const entranceGroup = new THREE.Group(),
     entranceMaterial = new THREE.MeshBasicMaterial({
