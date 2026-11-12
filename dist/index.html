@@ -259,7 +259,7 @@
               <span>이 브라우저 시연</span>
             </div>
             <p id="report-empty">아직 등록한 신고가 없어요.</p>
-            <ul id="report-list"></ul>
+            <ul id="report-list" class="report-list"></ul>
             <small
               >신고는 학생 확인 전 정보입니다. 지금은 내 브라우저에만 저장되며
               다른 사람과 공유되지 않아요.</small
@@ -343,13 +343,23 @@
             <button id="report-start" class="report-start" aria-pressed="false">
               ⚠ 공사 구간 신고
             </button>
+            <button
+              id="admin-toggle"
+              class="report-start admin-toggle"
+              aria-pressed="false"
+            >
+              🛠 관리자 검토
+              <span id="admin-alert-count" class="admin-alert-count" hidden
+                >0</span
+              >
+            </button>
           </div>
           <div id="gps-status" class="gps-status" role="status" hidden></div>
           <div id="report-picker" class="report-picker" hidden>
             <b>공사 중인 도로를 직접 눌러주세요.</b>
             <p>
-              누른 곳과 연결된 도로 구간 전체가 주황색으로 표시됩니다. 맞는
-              구간인지 확인한 뒤 신고하면 돼요.
+              같은 구간에 신고가 쌓이면 주의(노란색)로 표시되고, 관리자가
+              확정하면 통행 막힘(빨간색)으로 바뀝니다.
             </p>
             <small
               >키보드: 지도에 초점을 두고 Enter를 누르면 화면 가운데 길을
@@ -416,6 +426,22 @@
           선택한 도로 구간 전체를 경로에서 제외하고 우회 경로를 다시 계산합니다.
           현재 브라우저에만 저장됩니다.
         </p>
+        <label id="report-photo-field" class="report-photo-field">
+          <span>사진 첨부 (선택)</span>
+          <input
+            type="file"
+            id="report-photo-input"
+            accept="image/*"
+            capture="environment"
+          />
+          <img id="report-photo-preview" alt="첨부한 사진 미리보기" hidden />
+        </label>
+        <img
+          id="report-existing-photo"
+          class="report-existing-photo"
+          alt="신고에 첨부된 사진"
+          hidden
+        />
         <div id="new-report-actions" class="report-actions">
           <button id="report-no">아니요</button
           ><button id="report-yes">네, 신고할게요</button>
@@ -424,6 +450,29 @@
           <button id="report-keep">닫기</button
           ><button id="report-remove">내 시연 신고 삭제</button>
         </div>
+      </div>
+    </dialog>
+    <dialog id="admin-dialog" class="report-dialog admin-dialog">
+      <button class="dialog-close" aria-label="닫기">✕</button>
+      <div class="dialog-body">
+        <span class="report-dialog-symbol" aria-hidden="true">🛠</span
+        ><span class="eyebrow">관리자 검토 · 시연</span>
+        <h2>신고된 구간</h2>
+        <section class="admin-section admin-section-urgent">
+          <h3>🔴 검토 필요 · 3건 이상</h3>
+          <p id="admin-empty-urgent">지금은 검토가 급한 구간이 없어요.</p>
+          <ul id="admin-list-urgent" class="report-list"></ul>
+        </section>
+        <section class="admin-section">
+          <h3>참고용 · 3건 미만</h3>
+          <p id="admin-empty-minor">3건 미만으로 쌓인 신고가 없어요.</p>
+          <ul id="admin-list-minor" class="report-list"></ul>
+        </section>
+        <small
+          >신고는 1건부터 여기 모두 보입니다. 확정하면 지도에 빨간색 통행
+          막힘으로 표시되고 경로에서 제외됩니다. 반려하면 누적된 신고를 지우고
+          처음부터 다시 집계합니다.</small
+        >
       </div>
     </dialog>
     <dialog id="indoor-dialog" class="indoor-dialog">

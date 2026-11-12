@@ -12,7 +12,13 @@ import {
   ENTRANCES,
   MAIN_GATE,
 } from "./data.mjs";
-import { locateReportPoint, edgeId, reportLocation } from "./reports.mjs";
+import {
+  locateReportPoint,
+  edgeId,
+  reportLocation,
+  groupReportsByEdge,
+  edgeStatus,
+} from "./reports.mjs";
 const VIOLET = 0x7950ff;
 
 // Three.js 기반 독립 구현. 외곽선/도로 데이터만 별도 ODbL 데이터에서 가져옵니다.
@@ -407,7 +413,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     }
     routeLength = route.meters;
   }
-  function setReports(reports) {
+  // 신고는 1건부터 바로 주의(노란색)로 뜨고, 관리자가 확정한 구간만 빨간색으로 막습니다.
+  function setReports(reports, confirmedEdges = []) {
     clearReportSelection();
     clearGroup(warningGroup);
     for (const label of warningLabels) {
@@ -415,21 +422,41 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       label.element.remove();
     }
     warningLabels.length = 0;
-    for (const report of reports) {
-      const edge = EDGES.find((e) => edgeId(e) === report.edgeId);
+    const groups = groupReportsByEdge(reports);
+    for (const group of groups.values()) {
+      const confirmed =
+        edgeStatus(group.edgeId, groups, confirmedEdges) === "confirmed";
+      const edge = EDGES.find((e) => edgeId(e) === group.edgeId);
       if (edge)
-        segment(NODES[edge.a], NODES[edge.b], 3.5, 0xe3a443, 1, warningGroup);
+        segment(
+          NODES[edge.a],
+          NODES[edge.b],
+          3.5,
+          confirmed ? 0xd43f3f : 0xf2c200,
+          1,
+          warningGroup,
+        );
+      // 신고가 몇 건이든 구간당 마커는 하나만 찍습니다. 가장 최근 신고 위치를 씁니다.
+      const latestReport = group.reports.reduce((a, r) =>
+        Date.parse(r.createdAt) > Date.parse(a.createdAt) ? r : a,
+      );
       const el = document.createElement("button");
-      el.className = "road-warning";
-      el.setAttribute("aria-label", `신고 위치: ${reportLocation(report)}`);
-      el.innerHTML =
-        '<span class="warning-triangle" aria-hidden="true">!</span><small>통행 주의</small>';
+      el.className = confirmed
+        ? "road-warning road-warning-confirmed"
+        : "road-warning";
+      el.setAttribute(
+        "aria-label",
+        `신고 위치: ${reportLocation(latestReport)}`,
+      );
+      el.innerHTML = confirmed
+        ? '<span class="warning-triangle" aria-hidden="true">⛔</span><small>통행 막힘(확정)</small>'
+        : `<span class="warning-triangle" aria-hidden="true">!</span><small>통행 주의 · 신고 ${group.count}건</small>`;
       el.onclick = (e) => {
         e.stopPropagation();
-        onRoadSelect({ reportId: report.id });
+        onRoadSelect({ reportId: latestReport.id });
       };
       const label = new CSS2DObject(el);
-      label.position.set(report.point.x, 12, report.point.z);
+      label.position.set(latestReport.point.x, 12, latestReport.point.z);
       label.visible = !homeMode;
       scene.add(label);
       warningLabels.push(label);

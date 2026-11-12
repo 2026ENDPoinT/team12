@@ -113,15 +113,16 @@ test("marked entrances stay on their matching building outline", () => {
     assert.ok(building, entrance.name);
     const distance = Math.min(
       ...[building.outline, ...building.holes].flatMap((ring) =>
-        ring.map(([x, z], index) =>
-          projectToSegment(
-            entrance,
-            { x, z },
-            {
-              x: ring[(index + 1) % ring.length][0],
-              z: ring[(index + 1) % ring.length][1],
-            },
-          ).distance,
+        ring.map(
+          ([x, z], index) =>
+            projectToSegment(
+              entrance,
+              { x, z },
+              {
+                x: ring[(index + 1) % ring.length][0],
+                z: ring[(index + 1) % ring.length][1],
+              },
+            ).distance,
         ),
       ),
     );

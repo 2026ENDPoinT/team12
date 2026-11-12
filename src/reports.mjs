@@ -1,9 +1,6 @@
 import { EDGES, NODES, BUILDINGS } from "./data.mjs";
 import { projectToSegment, insideBuilding } from "./geo.mjs";
 
-// TODO(백엔드): 클릭한 위치를 저장하는 브라우저 전용 시연입니다. 서버 API로 교체하세요.
-// v2는 예전 구간 중앙 방식과 분리합니다. 선택 목록은 없고 실제 클릭 좌표를 저장합니다.
-export const REPORT_STORAGE_KEY = "sai:seoultech:point-reports:v2";
 export const edgeId = (edge) => [edge.a, edge.b].sort().join("--");
 export const edgeName = (edge) => edge.name || "교내 보행로";
 const edgeLookup = new Map(EDGES.map((edge) => [edgeId(edge), edge]));
@@ -76,33 +73,111 @@ export function sanitizeReports(value) {
       point: { x: p.x, z: p.z },
       reason: report.reason,
       createdAt: report.createdAt,
+      // 사진은 Supabase Storage 경로만 들고 다닙니다. 실제 URL은 backend.mjs의
+      // photoUrlFor()로 보여줄 때 만듭니다.
+      ...(typeof report.photoPath === "string"
+        ? { photoPath: report.photoPath }
+        : {}),
     });
   }
   return [...unique.values()];
 }
-export function readReports(storage) {
-  try {
-    return sanitizeReports(
-      JSON.parse(storage.getItem(REPORT_STORAGE_KEY) || "[]"),
-    );
-  } catch {
-    return [];
-  }
+// Supabase road_reports 행을 클라이언트 report 모양으로 바꿉니다. DB 컬럼은
+// snake_case(edge_id, point_x...), 클라이언트 쪽은 기존 로컬 데모와 같은
+// camelCase 모양을 그대로 써서 groupReportsByEdge 등 아래 함수들을 바꿀 필요가 없게 합니다.
+export function rowToReport(row) {
+  return {
+    id: row.id,
+    edgeId: row.edge_id,
+    point: { x: row.point_x, z: row.point_z },
+    reason: row.reason,
+    createdAt: row.created_at,
+    ...(row.photo_path ? { photoPath: row.photo_path } : {}),
+  };
 }
-export function writeReports(storage, reports) {
-  try {
-    storage.setItem(
-      REPORT_STORAGE_KEY,
-      JSON.stringify(sanitizeReports(reports)),
-    );
-    return true;
-  } catch {
-    return false;
-  }
+// status='confirmed'인 행들의 edge_id만 모읍니다.
+export function confirmedEdgesFromRows(rows) {
+  return [
+    ...new Set(
+      (rows || [])
+        .filter((row) => row.status === "confirmed")
+        .map((row) => row.edge_id),
+    ),
+  ];
 }
-// TODO(팀 알고리즘): 선택한 위치와 연결된 길을 차단하는 임시 정책입니다.
-// 실제 서비스에서는 공사 범위·보행 너비·검증 상태를 반영하도록 교체하세요.
-export function availableEdges(reports, edges = EDGES) {
-  const blocked = new Set(sanitizeReports(reports).map((r) => r.edgeId));
+// 신고는 1건부터 바로 지도에 "주의"(노란색)로 뜹니다.
+// 이 값 이상 쌓이면 관리자에게 검토 알림이 갑니다. 관리자가 확정하기 전까지는 경로를 막지 않습니다.
+export const REPORT_THRESHOLD = 3;
+
+export function sanitizeConfirmedEdges(value) {
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Set(
+      value.filter((id) => typeof id === "string" && edgeLookup.has(id)),
+    ),
+  ].slice(0, 500);
+}
+
+// 같은 구간(edge)에 쌓인 신고를 하나로 묶어 개수·최신 시각을 셉니다.
+export function groupReportsByEdge(reports) {
+  const groups = new Map();
+  for (const report of sanitizeReports(reports)) {
+    const group = groups.get(report.edgeId) || {
+      edgeId: report.edgeId,
+      reports: [],
+    };
+    group.reports.push(report);
+    groups.set(report.edgeId, group);
+  }
+  for (const group of groups.values()) {
+    group.count = group.reports.length;
+    group.latestAt = group.reports.reduce(
+      (latest, r) =>
+        Date.parse(r.createdAt) > Date.parse(latest) ? r.createdAt : latest,
+      group.reports[0].createdAt,
+    );
+  }
+  return groups;
+}
+
+// caution(신고 1건부터, 노란색) → confirmed(관리자 확정, 빨간색 차단).
+export function edgeStatus(edgeId, groups, confirmedEdges) {
+  if (confirmedEdges.includes(edgeId)) return "confirmed";
+  return groups.has(edgeId) ? "caution" : "none";
+}
+
+// 관리자 검토 화면에 띄울 구간 목록입니다. 1건부터 전부 보이며(확정된 구간은 제외).
+// needsReview: threshold 이상 쌓여 관리자 확인이 필요하다고 알려야 하는 구간.
+export function reviewGroups(
+  reports,
+  confirmedEdges,
+  threshold = REPORT_THRESHOLD,
+) {
+  const groups = groupReportsByEdge(reports);
+  return [...groups.values()]
+    .filter((g) => !confirmedEdges.includes(g.edgeId))
+    .map((g) => ({ ...g, needsReview: g.count >= threshold }))
+    .sort(
+      (a, b) =>
+        Number(b.needsReview) - Number(a.needsReview) ||
+        b.count - a.count ||
+        Date.parse(b.latestAt) - Date.parse(a.latestAt),
+    );
+}
+
+// 관리자 알림용: 지금 검토가 필요한(threshold 이상 쌓인) 구간 수.
+export function reviewAlertCount(
+  reports,
+  confirmedEdges,
+  threshold = REPORT_THRESHOLD,
+) {
+  return reviewGroups(reports, confirmedEdges, threshold).filter(
+    (g) => g.needsReview,
+  ).length;
+}
+
+// 관리자가 확정한 구간만 경로에서 제외합니다. 신고가 쌓인 것만으로는 막지 않습니다.
+export function availableEdges(confirmedEdges, edges = EDGES) {
+  const blocked = new Set(sanitizeConfirmedEdges(confirmedEdges));
   return edges.filter((edge) => !blocked.has(edgeId(edge)));
 }
