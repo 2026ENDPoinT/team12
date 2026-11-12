@@ -885,6 +885,20 @@ function renderAdminAlert() {
   $("#admin-alert-count").textContent = count;
   $("#admin-alert-count").hidden = count === 0;
 }
+// 관리자 버튼은 사용자에게 숨깁니다. 주소에 ?admin=1을 붙여 열거나, 이 기기에서 한 번
+// 관리자 코드를 맞게 넣었으면 보입니다. 화면에서 감추는 것일 뿐 보안 장치는 아닙니다
+// (진짜 보호는 관리자 로그인 + Supabase RLS로 해야 합니다).
+const ADMIN_DEVICE_KEY = "sai:seoultech:admin-device:v1";
+function isAdminDevice() {
+  try {
+    return localStorage.getItem(ADMIN_DEVICE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+$("#admin-toggle").hidden = !(
+  new URLSearchParams(location.search).has("admin") || isAdminDevice()
+);
 $("#admin-toggle").onclick = () => {
   if (!adminUnlocked) {
     const input = prompt("관리자 코드를 입력하세요 (해커톤 시연용 임시 잠금)");
@@ -894,6 +908,9 @@ $("#admin-toggle").onclick = () => {
       return;
     }
     adminUnlocked = true;
+    try {
+      localStorage.setItem(ADMIN_DEVICE_KEY, "1");
+    } catch {}
   }
   renderAdminPanel();
   renderWorkList();
