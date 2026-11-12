@@ -15,6 +15,7 @@ import {
   rowToReport,
   confirmedEdgesFromRows,
   REPORT_THRESHOLD,
+  REASON_NOTE_MAX,
 } from "../src/reports.mjs";
 import { gpsToCampus } from "../src/geo.mjs";
 function reportFor(edge, overrides = {}) {
@@ -92,12 +93,42 @@ test("several reports on one edge remain separate points and don't block routing
   assert.equal(sanitizeReports([one, two]).length, 2);
   assert.ok(availableEdges([]).some((e) => edgeId(e) === edgeId(edge)));
 });
-test("a single report shows caution on the map right away, before any threshold", () => {
+test("caution (yellow) only appears once THRESHOLD distinct devices report the edge", () => {
   const edge = EDGES[0],
-    reports = [reportFor(edge)],
+    device = (i) => reportFor(edge, { id: `r${i}`, deviceId: `device-${i}` });
+  const one = groupReportsByEdge([device(0)]);
+  assert.equal(edgeStatus(edgeId(edge), one, []), "pending");
+  assert.equal(edgeStatus("no-such-edge--id", one, []), "none");
+  const many = Array.from({ length: REPORT_THRESHOLD }, (_, i) => device(i));
+  assert.equal(
+    edgeStatus(edgeId(edge), groupReportsByEdge(many), []),
+    "caution",
+  );
+});
+test("the same device reporting one edge several times counts once", () => {
+  const edge = EDGES[0],
+    reports = Array.from({ length: REPORT_THRESHOLD }, (_, i) =>
+      reportFor(edge, { id: `r${i}`, deviceId: "same-device" }),
+    ),
     groups = groupReportsByEdge(reports);
-  assert.equal(edgeStatus(edgeId(edge), groups, []), "caution");
-  assert.equal(edgeStatus("no-such-edge--id", groups, []), "none");
+  assert.equal(groups.get(edgeId(edge)).count, 1);
+  assert.equal(edgeStatus(edgeId(edge), groups, []), "pending");
+});
+test("'other' reason needs a written note; the note is trimmed and capped", () => {
+  const edge = EDGES[0];
+  assert.equal(
+    sanitizeReports([reportFor(edge, { reason: "other", reasonNote: "  " })])
+      .length,
+    0,
+  );
+  const [kept] = sanitizeReports([
+    reportFor(edge, { reason: "other", reasonNote: ` ${"가".repeat(300)} ` }),
+  ]);
+  assert.equal(kept.reasonNote.length, REASON_NOTE_MAX);
+  assert.equal(
+    sanitizeReports([reportFor(edge, { reason: "unknown" })]).length,
+    0,
+  );
 });
 test("reviewGroups lists every reported edge, flagging needsReview once the threshold is hit", () => {
   const edge = EDGES[0],
@@ -157,6 +188,24 @@ test("rowToReport maps Supabase snake_case rows to the client report shape", () 
     createdAt: "2026-11-09T15:00:00.000Z",
     photoPath: "device-1/photo.jpg",
   });
+  assert.deepEqual(
+    rowToReport({
+      ...row,
+      reason: "other",
+      reason_note: "펜스 설치",
+      reporter_device_id: "device-1",
+    }),
+    {
+      id: "row-1",
+      edgeId: edgeId(edge),
+      point: { x: 12.3, z: -4.5 },
+      reason: "other",
+      reasonNote: "펜스 설치",
+      createdAt: "2026-11-09T15:00:00.000Z",
+      deviceId: "device-1",
+      photoPath: "device-1/photo.jpg",
+    },
+  );
 });
 test("confirmedEdgesFromRows collects only status='confirmed' rows, deduped", () => {
   const edge = EDGES[0],

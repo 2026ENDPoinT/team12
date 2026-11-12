@@ -418,21 +418,31 @@
             />
             공사 중이에요</label
           ><label
-            ><input type="radio" name="road-reason" value="blocked" /> 통행이
-            막혔어요</label
+            ><input type="radio" name="road-reason" value="blocked" /> 장애물이
+            있거나 통제 중이에요</label
+          ><label
+            ><input type="radio" name="road-reason" value="other" /> 기타 (직접
+            입력)</label
           >
+          <input
+            type="text"
+            id="report-reason-note"
+            class="report-reason-note"
+            maxlength="100"
+            placeholder="어떤 상황인지 적어주세요"
+            aria-label="기타 사유"
+            hidden
+          />
         </fieldset>
-        <p class="report-scope">
-          선택한 도로 구간 전체를 경로에서 제외하고 우회 경로를 다시 계산합니다.
-          현재 브라우저에만 저장됩니다.
-        </p>
+        <p class="report-scope"></p>
         <label id="report-photo-field" class="report-photo-field">
-          <span>사진 첨부 (선택)</span>
+          <span>현장 사진 (필수) · 휴대폰에서는 카메라가 바로 열려요</span>
           <input
             type="file"
             id="report-photo-input"
             accept="image/*"
             capture="environment"
+            required
           />
           <img id="report-photo-preview" alt="첨부한 사진 미리보기" hidden />
         </label>
@@ -464,15 +474,39 @@
           <ul id="admin-list-urgent" class="report-list"></ul>
         </section>
         <section class="admin-section">
+          <h3>⛔ 확정된 구간 · 우회 안내 중</h3>
+          <p id="admin-empty-confirmed">확정된 구간이 없어요.</p>
+          <ul id="admin-list-confirmed" class="report-list"></ul>
+        </section>
+        <section class="admin-section">
           <h3>참고용 · 3건 미만</h3>
           <p id="admin-empty-minor">3건 미만으로 쌓인 신고가 없어요.</p>
           <ul id="admin-list-minor" class="report-list"></ul>
         </section>
         <small
-          >신고는 1건부터 여기 모두 보입니다. 확정하면 지도에 빨간색 통행
-          막힘으로 표시되고 경로에서 제외됩니다. 반려하면 누적된 신고를 지우고
-          처음부터 다시 집계합니다.</small
+          >신고는 1건부터 여기 모두 보입니다. 지도에는 3건 이상부터
+          주의(노란색)로 표시됩니다. 확정하면 빨간색 통행 막힘으로 바뀌고
+          경로에서 제외됩니다. 반려하면 누적된 신고를 지우고 처음부터 다시
+          집계합니다.</small
         >
+        <section class="admin-section admin-works">
+          <h3>🚧 건물 공사</h3>
+          <form id="work-form" class="work-form">
+            <label>건물<select id="work-building" required></select></label
+            ><label>시작일<input type="date" id="work-start" required /></label
+            ><label>종료일<input type="date" id="work-end" required /></label
+            ><label class="work-note"
+              >메모 (선택)<input
+                type="text"
+                id="work-note"
+                maxlength="100"
+                placeholder="예: 리모델링, 출입 제한"
+            /></label>
+            <button type="submit">공사 등록</button>
+          </form>
+          <p id="work-empty">등록된 공사가 없어요.</p>
+          <ul id="work-list" class="report-list"></ul>
+        </section>
       </div>
     </dialog>
     <dialog id="indoor-dialog" class="indoor-dialog">

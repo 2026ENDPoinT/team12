@@ -3229,3 +3229,88 @@ body.exploring .header {
     border-radius: 14px;
   }
 }
+/* 신고 사유 3가지 + 기타 직접 입력 */
+#report-reasons {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+.report-reason-note {
+  flex-basis: 100%;
+  font-size: 11px;
+  padding: 9px 10px;
+  border: 1px solid #eee0c5;
+  border-radius: 8px;
+  color: #6f5631;
+}
+.report-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+/* 건물 공사 표시: 건물 위 🚧, 누르면 3초간 공사 기간 말풍선 */
+.building-work {
+  position: relative;
+  background: #fff4d6;
+  border: 1px solid #e3be74;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+  pointer-events: auto;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 3px #6c4a1b40);
+}
+.building-work-bubble {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 10px;
+  color: #72531d;
+  background: #fff9e5;
+  border: 1px solid #e3be74;
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+/* 관리자: 건물 공사 등록 */
+.work-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 10px;
+  color: #967244;
+}
+.work-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.work-form label:first-child,
+.work-form .work-note,
+.work-form button {
+  grid-column: 1 / -1;
+}
+.work-form select,
+.work-form input {
+  font-size: 11px;
+  padding: 7px;
+  border: 1px solid #eee0c5;
+  border-radius: 6px;
+  min-width: 0;
+}
+.work-form button {
+  padding: 9px;
+  border-radius: 6px;
+  border: 1px solid #b48025;
+  background: #b48025;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+#work-empty {
+  font-size: 10px;
+  color: #ae9c84;
+}

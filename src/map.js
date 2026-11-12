@@ -19,6 +19,7 @@ import {
   groupReportsByEdge,
   edgeStatus,
 } from "./reports.mjs";
+import { buildingLabel, worksPeriod } from "./buildings.mjs";
 import { createGraphOverlay } from "./graph-overlay.js";
 const VIOLET = 0x7950ff;
 
@@ -260,7 +261,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     if (b.name !== "교내 건물") {
       const element = document.createElement("button");
       element.className = "building-label";
-      element.textContent = b.name;
+      element.textContent = buildingLabel(b);
       element.setAttribute("aria-label", `${b.name} 출발지 또는 도착지 선택`);
       element.onclick = (e) => {
         e.stopPropagation();
@@ -426,7 +427,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     }
     routeLength = route.meters;
   }
-  // 신고는 1건부터 바로 주의(노란색)로 뜨고, 관리자가 확정한 구간만 빨간색으로 막습니다.
+  // 신고가 3건(REPORT_THRESHOLD) 이상 쌓이면 주의(노란색)로 뜨고, 관리자가 확정한 구간만 빨간색으로 막습니다.
   function setReports(reports, confirmedEdges = []) {
     clearReportSelection();
     clearGroup(warningGroup);
@@ -437,8 +438,9 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     warningLabels.length = 0;
     const groups = groupReportsByEdge(reports);
     for (const group of groups.values()) {
-      const confirmed =
-        edgeStatus(group.edgeId, groups, confirmedEdges) === "confirmed";
+      const status = edgeStatus(group.edgeId, groups, confirmedEdges);
+      if (status === "pending") continue; // 아직 기준 미만: 지도에 표시하지 않음
+      const confirmed = status === "confirmed";
       const edge = EDGES.find((e) => edgeId(e) === group.edgeId);
       if (edge)
         segment(
@@ -473,6 +475,41 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       label.visible = !homeMode;
       scene.add(label);
       warningLabels.push(label);
+    }
+  }
+  // 관리자가 등록한 건물 공사: 건물 위에 🚧 표시. 누르면 공사 기간이 몇 초 보였다가 사라집니다.
+  const workLabels = [];
+  function setWorks(works) {
+    for (const label of workLabels) {
+      scene.remove(label);
+      label.element.remove();
+    }
+    workLabels.length = 0;
+    for (const work of works) {
+      const b = buildingGroups.get(work.buildingId)?.b;
+      if (!b) continue;
+      const el = document.createElement("button"),
+        bubble = document.createElement("span");
+      el.className = "building-work";
+      el.setAttribute("aria-label", `${b.name} 공사 중 · 기간 보기`);
+      el.innerHTML = '<span aria-hidden="true">🚧</span>';
+      bubble.className = "building-work-bubble";
+      bubble.setAttribute("role", "status");
+      bubble.hidden = true;
+      bubble.textContent = `${b.name} 공사 ${worksPeriod(work)}${work.note ? ` · ${work.note}` : ""}`;
+      el.append(bubble);
+      let timer;
+      el.onclick = (e) => {
+        e.stopPropagation();
+        bubble.hidden = false;
+        clearTimeout(timer);
+        timer = setTimeout(() => (bubble.hidden = true), 3000);
+      };
+      const label = new CSS2DObject(el);
+      label.position.set(b.x, b.h + 26, b.z);
+      label.visible = !homeMode;
+      scene.add(label);
+      workLabels.push(label);
     }
   }
   function setReporting(value) {
@@ -565,7 +602,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       if (label.element.tagName === "BUTTON")
         label.element.tabIndex = value || reporting ? -1 : 0;
     }
-    for (const label of warningLabels) label.visible = !value;
+    for (const label of [...warningLabels, ...workLabels])
+      label.visible = !value;
     warningGroup.visible = !value;
     resize();
   }
@@ -962,6 +1000,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     focusTop,
     setRoute,
     setReports,
+    setWorks,
     setReporting,
     clearReportSelection,
     setUserLocation,
