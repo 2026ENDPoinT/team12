@@ -4,10 +4,8 @@ import {
   edgeId,
   reportLocation,
   availableEdges,
-  groupReportsByEdge,
-  edgeStatus,
-  reviewGroups,
-  reviewAlertCount,
+  clusterReports,
+  clusterOf,
   sanitizeReports,
   rowToReport,
   confirmedEdgesFromRows,
@@ -70,7 +68,9 @@ let reports = [],
   selectedPhotoFile = null,
   photoPreviewUrl = null,
   // 관리자가 등록한 건물 공사 (Supabase building_works, 종료일 안 지난 것만)
-  works = [];
+  works = [],
+  // 30m 안 신고를 묶은 구역 (loadReports에서 다시 계산)
+  clusters = [];
 // TODO(백엔드): 지금은 코드만 맞으면 누구나 여는 시연용 잠금입니다.
 // 실제 배포 전 서버에서 관리자 로그인/권한을 검증하도록 교체하세요.
 const ADMIN_DEMO_CODE = "team12admin";
@@ -338,7 +338,7 @@ if (!map) {
     '<div class="hero-fallback"><span>✦</span><b>사이로 이어지는 캠퍼스.</b><p>WebGL을 지원하는 브라우저에서<br>3D 미리보기를 볼 수 있어요.</p></div>';
   $("#map-error").hidden = false;
 } else {
-  map.setReports(reports, confirmedEdges);
+  map.setReports(reports);
   map.setRoute(
     shortestPath(
       "gate",
@@ -647,8 +647,9 @@ function openRoadReport(selection) {
   if (!existing && (!selection?.point || !selection?.edgeId)) return;
   selectedReport = existing || selection;
   $("#report-location").textContent = reportLocation(selectedReport);
-  const mine = existing && isMyReport(existing),
-    locked = existing && confirmedEdges.includes(existing.edgeId);
+  const cluster = existing && clusterOf(existing.id, clusters),
+    mine = existing && isMyReport(existing),
+    locked = cluster?.status === "confirmed";
   $("#report-title").textContent = !existing
     ? "선택한 도로 구간이 공사 중인가요?"
     : mine
@@ -669,7 +670,10 @@ function openRoadReport(selection) {
   $("#report-reason-note").value = "";
   $("#report-reason-note").hidden = true;
   updateReportSubmit();
-  const existingPhotoUrl = existing && photoUrlFor(existing.photoPath);
+  // 사진은 내 신고이거나, 확정된 구역의 대표 사진일 때만 사용자에게 보여 줍니다.
+  // 노란색(검토 전) 단계의 다른 사람 사진은 관리자만 봅니다.
+  const showPhoto = mine || (locked && cluster.cover.id === existing.id);
+  const existingPhotoUrl = showPhoto && photoUrlFor(existing.photoPath);
   $("#report-existing-photo").hidden = !existingPhotoUrl;
   if (existingPhotoUrl) $("#report-existing-photo").src = existingPhotoUrl;
   $("#report-dialog .report-scope").textContent = existing
@@ -722,7 +726,8 @@ async function loadReports() {
   }
   reports = sanitizeReports(rows.map(rowToReport));
   confirmedEdges = confirmedEdgesFromRows(rows);
-  map?.setReports(reports, confirmedEdges);
+  clusters = clusterReports(reports);
+  map?.setReports(reports);
   renderReportList();
   renderAdminAlert();
   renderAdminPanel();
@@ -775,7 +780,7 @@ function isMyReport(report) {
 $("#report-remove").onclick = async () => {
   if (
     !isMyReport(selectedReport) ||
-    confirmedEdges.includes(selectedReport.edgeId)
+    clusterOf(selectedReport.id, clusters)?.status === "confirmed"
   )
     return;
   try {
@@ -790,13 +795,9 @@ $("#report-remove").onclick = async () => {
 $("#report-dialog").addEventListener("close", () => {
   if (!selectedReport?.id) map?.clearReportSelection();
 });
-// 신고 상태를 사람이 읽을 문구로 바꿉니다: 주의(노란색) → 관리자 확정(빨간색).
+// 신고 상태를 사람이 읽을 문구로 바꿉니다: 접수 → 주의(노란색) → 관리자 확정(빨간색).
 function reportStatusLabel(report) {
-  const status = edgeStatus(
-    report.edgeId,
-    groupReportsByEdge(reports),
-    confirmedEdges,
-  );
+  const status = clusterOf(report.id, clusters)?.status;
   if (status === "confirmed") return "관리자 확정 · 통행 막힘";
   if (status === "caution") return "주의 표시 중 · 관리자 검토 대기";
   return `접수됨 · ${REPORT_THRESHOLD}건 이상 모이면 지도에 주의 표시`;
@@ -820,88 +821,167 @@ function renderReportList() {
 }
 
 // ===== 관리자 검토 (시연용 — 실제 배포 전 서버 인증으로 교체) =====
-// 보기 편하게 "검토 필요(3건 이상)"와 "참고용(3건 미만)" 두 섹션으로 나눠서 보여줍니다.
-function renderAdminSection(listId, emptyId, groups) {
-  $(emptyId).hidden = groups.length > 0;
+// 30m 안 신고를 구역으로 묶어 보여 줍니다. 구역마다 신고 사진을 모두 보고, 엉뚱한 신고는 하나씩 빼고,
+// 대표 사진을 골라 확정합니다(대표 사진은 사용자에게 빨간색 표시와 함께 보입니다).
+// 사용자 입력(기타 사유 글)이 들어가므로 innerHTML 대신 textContent만 씁니다.
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+function adminButton(label, act, onClick) {
+  const button = el("button", "", label);
+  button.type = "button";
+  button.dataset.act = act;
+  button.onclick = onClick;
+  return button;
+}
+async function adminAction(work, failMessage) {
+  try {
+    await work();
+  } catch {
+    toast(failMessage);
+    return;
+  }
+  await loadReports();
+}
+function clusterHeading(li, cluster, summary) {
+  li.append(
+    el("b", "", reportLocation(cluster.cover)),
+    el("small", "", summary),
+  );
+}
+// 사진 한 장: 고르기(라디오) + 사유·시각 + 크게 보기 + 이 신고만 빼기
+function photoCard(cluster, report, { selectable }) {
+  const card = el("li", "admin-photo");
+  const label = el("label");
+  if (selectable) {
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = `cover-${cluster.id}`;
+    radio.value = report.id;
+    radio.checked = report.id === cluster.cover.id;
+    radio.setAttribute("aria-label", "대표 사진으로 고르기");
+    label.append(radio);
+  }
+  const url = photoUrlFor(report.photoPath);
+  if (url) {
+    const img = el("img");
+    img.src = url;
+    img.alt = `${reasonLabel(report)} 신고 사진`;
+    img.loading = "lazy";
+    label.append(img);
+  } else label.append(el("span", "admin-photo-empty", "사진 없음"));
+  card.append(
+    label,
+    el(
+      "small",
+      "",
+      `${reasonLabel(report)} · ${new Date(report.createdAt).toLocaleString("ko-KR")}`,
+    ),
+  );
+  const actions = el("div", "admin-photo-actions");
+  if (url) {
+    const open = el("a", "", "크게 보기");
+    open.href = url;
+    open.target = "_blank";
+    open.rel = "noopener";
+    actions.append(open);
+  }
+  if (selectable && cluster.reports.length > 1)
+    actions.append(
+      adminButton("이 신고 빼기", "remove-one", () =>
+        adminAction(
+          () => deleteReportRows([report.id]),
+          "신고를 빼지 못했어요. 다시 시도해주세요.",
+        ),
+      ),
+    );
+  card.append(actions);
+  return card;
+}
+function renderAdminSection(listId, emptyId, list) {
+  $(emptyId).hidden = list.length > 0;
   $(listId).replaceChildren();
-  for (const group of groups) {
-    const li = document.createElement("li");
-    li.className = "admin-item";
-    li.innerHTML =
-      "<b></b><small></small>" +
-      '<div class="admin-actions">' +
-      '<button type="button" data-act="confirm">확정 · 통행 막힘</button>' +
-      '<button type="button" data-act="dismiss">반려 · 신고 취소</button>' +
-      "</div>";
-    li.querySelector("b").textContent = reportLocation(group.reports[0]);
-    li.querySelector("small").textContent =
-      `신고 ${group.count}건 · 최근 ${new Date(group.latestAt).toLocaleString("ko-KR")}`;
-    li.querySelector('[data-act="confirm"]').onclick = async () => {
-      try {
-        await confirmReportRows(group.reports.map((r) => r.id));
-      } catch {
-        toast("확정 처리에 실패했어요. 다시 시도해주세요.");
-        return;
-      }
-      await loadReports();
-    };
-    li.querySelector('[data-act="dismiss"]').onclick = async () => {
-      try {
-        await deleteReportRows(group.reports.map((r) => r.id));
-      } catch {
-        toast("반려 처리에 실패했어요. 다시 시도해주세요.");
-        return;
-      }
-      await loadReports();
-    };
+  for (const cluster of list) {
+    const li = el("li", "admin-item");
+    clusterHeading(
+      li,
+      cluster,
+      `신고 ${cluster.count}건 · 최근 ${new Date(cluster.latestAt).toLocaleString("ko-KR")}`,
+    );
+    const photos = el("ul", "admin-photos");
+    for (const report of cluster.reports)
+      photos.append(photoCard(cluster, report, { selectable: true }));
+    const ids = cluster.reports.map((r) => r.id);
+    const actions = el("div", "admin-actions");
+    actions.append(
+      adminButton("고른 사진으로 확정 · 통행 막힘", "confirm", () => {
+        const coverId =
+          li.querySelector(`input[name="cover-${cluster.id}"]:checked`)
+            ?.value || cluster.cover.id;
+        adminAction(
+          () => confirmReportRows(ids, coverId),
+          "확정 처리에 실패했어요. 다시 시도해주세요.",
+        );
+      }),
+      adminButton("반려 · 신고 취소", "dismiss", () =>
+        adminAction(
+          () => deleteReportRows(ids),
+          "반려 처리에 실패했어요. 다시 시도해주세요.",
+        ),
+      ),
+    );
+    li.append(photos, actions);
     $(listId).append(li);
   }
 }
-// 확정된(빨간색) 구간: 공사가 끝나면 해제해서 신고를 지우고 경로를 다시 엽니다.
+// 확정된(빨간색) 구역: 사용자에게 보이는 대표 사진과 함께 보여 주고, 공사가 끝나면 해제합니다.
 function renderConfirmedSection() {
-  const groups = [...groupReportsByEdge(reports).values()].filter((g) =>
-    confirmedEdges.includes(g.edgeId),
-  );
-  $("#admin-empty-confirmed").hidden = groups.length > 0;
+  const list = clusters.filter((c) => c.status === "confirmed");
+  $("#admin-empty-confirmed").hidden = list.length > 0;
   $("#admin-list-confirmed").replaceChildren();
-  for (const group of groups) {
-    const li = document.createElement("li");
-    li.className = "admin-item";
-    li.innerHTML =
-      '<b></b><small></small><div class="admin-actions"><button type="button" data-act="release">해제 · 공사 끝남</button></div>';
-    li.querySelector("b").textContent = reportLocation(group.reports[0]);
-    li.querySelector("small").textContent =
-      `통행 막힘(확정) · 신고 ${group.count}건`;
-    li.querySelector("button").onclick = async () => {
-      try {
-        await deleteReportRows(group.reports.map((r) => r.id));
-      } catch {
-        toast("확정 해제에 실패했어요. 다시 시도해주세요.");
-        return;
-      }
-      toast("확정을 해제했어요. 이 구간은 다시 경로에 포함돼요.");
-      await loadReports();
-    };
+  for (const cluster of list) {
+    const li = el("li", "admin-item");
+    clusterHeading(
+      li,
+      cluster,
+      `통행 막힘(확정) · 신고 ${cluster.count}건 · 사용자에게 보이는 대표 사진`,
+    );
+    const photos = el("ul", "admin-photos");
+    photos.append(photoCard(cluster, cluster.cover, { selectable: false }));
+    const actions = el("div", "admin-actions");
+    actions.append(
+      adminButton("해제 · 공사 끝남", "release", async () => {
+        await adminAction(
+          () => deleteReportRows(cluster.reports.map((r) => r.id)),
+          "확정 해제에 실패했어요. 다시 시도해주세요.",
+        );
+        toast("확정을 해제했어요. 이 구간은 다시 경로에 포함돼요.");
+      }),
+    );
+    li.append(photos, actions);
     $("#admin-list-confirmed").append(li);
   }
 }
 function renderAdminPanel() {
   renderConfirmedSection();
-  const groups = reviewGroups(reports, confirmedEdges);
+  const open = clusters.filter((c) => c.status !== "confirmed");
   renderAdminSection(
     "#admin-list-urgent",
     "#admin-empty-urgent",
-    groups.filter((g) => g.needsReview),
+    open.filter((c) => c.needsReview),
   );
   renderAdminSection(
     "#admin-list-minor",
     "#admin-empty-minor",
-    groups.filter((g) => !g.needsReview),
+    open.filter((c) => !c.needsReview),
   );
 }
-// threshold 이상 쌓여 검토가 필요한 구간 수를 관리자 버튼 배지로 보여줍니다.
+// threshold 이상 쌓여 검토가 필요한 구역 수를 관리자 버튼 배지로 보여줍니다.
 function renderAdminAlert() {
-  const count = reviewAlertCount(reports, confirmedEdges);
+  const count = clusters.filter((c) => c.needsReview).length;
   $("#admin-alert-count").textContent = count;
   $("#admin-alert-count").hidden = count === 0;
 }

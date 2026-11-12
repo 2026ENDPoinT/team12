@@ -3403,3 +3403,62 @@ body.exploring .header {
     border-color: #c9b8ff;
   }
 }
+/* 관리자: 구역별 신고 사진. 라디오로 대표 사진을 고릅니다. */
+.admin-photos {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+.admin-photo {
+  font-size: 9px;
+  color: #967244;
+}
+.admin-photo label {
+  position: relative;
+  display: block;
+  cursor: pointer;
+}
+.admin-photo input[type="radio"] {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  margin: 0;
+  accent-color: #d43f3f;
+}
+.admin-photo img,
+.admin-photo-empty {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 2px solid #eee0c5;
+  background: #fffaf0;
+}
+.admin-photo label:has(input:checked) img {
+  border-color: #d43f3f;
+}
+.admin-photo small {
+  display: block;
+  margin-top: 3px;
+  line-height: 1.4;
+}
+.admin-photo-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+.admin-photo-actions a,
+.admin-photo-actions button {
+  font-size: 9px;
+  color: #a27a3c;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}

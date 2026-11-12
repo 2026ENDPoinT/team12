@@ -54,15 +54,25 @@ export async function insertReportRow({
   if (error) throw error;
 }
 
-// 관리자 확정: 같은 구간의 모든 신고를 confirmed로 바꿉니다 (행은 지우지 않고 기록으로 남김).
-export async function confirmReportRows(ids) {
+// 관리자 확정: 구역의 모든 신고를 confirmed로 바꾸고(행은 기록으로 남김), 고른 사진 하나를
+// 대표(is_cover)로 표시합니다. 대표 사진은 사용자에게 빨간색 표시와 함께 보입니다.
+export async function confirmReportRows(ids, coverId) {
   const { data, error } = await supabase
     .from("road_reports")
-    .update({ status: "confirmed", confirmed_at: new Date().toISOString() })
+    .update({
+      status: "confirmed",
+      confirmed_at: new Date().toISOString(),
+      is_cover: false,
+    })
     .in("id", ids)
     .select("id");
   if (error) throw error;
   if (!data?.length) throw new Error("확정 권한이 없어 바뀐 신고가 없습니다.");
+  const cover = await supabase
+    .from("road_reports")
+    .update({ is_cover: true })
+    .eq("id", coverId);
+  if (cover.error) throw cover.error;
 }
 
 // 관리자 반려·확정 해제: 그 구간 신고를 행 id로 전부 지워 집계를 처음부터 다시 시작합니다.

@@ -7,10 +7,9 @@ import {
   availableEdges,
   sanitizeReports,
   locateReportPoint,
-  groupReportsByEdge,
-  edgeStatus,
-  reviewGroups,
-  reviewAlertCount,
+  clusterReports,
+  pickCover,
+  CLUSTER_RADIUS,
   sanitizeConfirmedEdges,
   rowToReport,
   confirmedEdgesFromRows,
@@ -93,26 +92,58 @@ test("several reports on one edge remain separate points and don't block routing
   assert.equal(sanitizeReports([one, two]).length, 2);
   assert.ok(availableEdges([]).some((e) => edgeId(e) === edgeId(edge)));
 });
-test("caution (yellow) only appears once THRESHOLD distinct devices report the edge", () => {
+test("caution (yellow) only appears once THRESHOLD distinct devices report the area", () => {
   const edge = EDGES[0],
     device = (i) => reportFor(edge, { id: `r${i}`, deviceId: `device-${i}` });
-  const one = groupReportsByEdge([device(0)]);
-  assert.equal(edgeStatus(edgeId(edge), one, []), "pending");
-  assert.equal(edgeStatus("no-such-edge--id", one, []), "none");
+  assert.equal(clusterReports([device(0)])[0].status, "pending");
+  assert.equal(clusterReports([]).length, 0);
   const many = Array.from({ length: REPORT_THRESHOLD }, (_, i) => device(i));
-  assert.equal(
-    edgeStatus(edgeId(edge), groupReportsByEdge(many), []),
-    "caution",
-  );
+  assert.equal(clusterReports(many)[0].status, "caution");
+  assert.equal(clusterReports(many)[0].needsReview, true);
 });
-test("the same device reporting one edge several times counts once", () => {
+test("the same device reporting one area several times counts once", () => {
   const edge = EDGES[0],
     reports = Array.from({ length: REPORT_THRESHOLD }, (_, i) =>
       reportFor(edge, { id: `r${i}`, deviceId: "same-device" }),
     ),
-    groups = groupReportsByEdge(reports);
-  assert.equal(groups.get(edgeId(edge)).count, 1);
-  assert.equal(edgeStatus(edgeId(edge), groups, []), "pending");
+    [cluster] = clusterReports(reports);
+  assert.equal(cluster.count, 1);
+  assert.equal(cluster.status, "pending");
+});
+// 긴 간선 위 a에서 meters만큼 떨어진 점
+function along(edge, meters) {
+  const a = NODES[edge.a],
+    b = NODES[edge.b],
+    t = meters / Math.hypot(b.x - a.x, b.z - a.z);
+  return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
+}
+test("reports within CLUSTER_RADIUS join one area, even across neighbouring edges and via chains", () => {
+  const long = EDGES.find(
+      (e) =>
+        Math.hypot(NODES[e.b].x - NODES[e.a].x, NODES[e.b].z - NODES[e.a].z) >
+        CLUSTER_RADIUS * 2 + 10,
+    ),
+    at = (id, m) =>
+      reportFor(long, { id, deviceId: id, point: along(long, m) });
+  const step = CLUSTER_RADIUS - 5;
+  // A–B, B–C는 반경 안, A–C는 밖 → 이어져서 한 구역
+  const chain = clusterReports([at("A", 0), at("B", step), at("C", step * 2)]);
+  assert.equal(chain.length, 1);
+  assert.equal(chain[0].count, 3);
+  // 반경보다 멀면 다른 구역
+  const apart = clusterReports([at("A", 0), at("Z", CLUSTER_RADIUS * 2)]);
+  assert.equal(apart.length, 2);
+  // 이웃한 다른 간선의 신고도 가까우면 같은 구역
+  const node = NODES[long.a],
+    other = EDGES.find((e) => e !== long && (e.a === long.a || e.b === long.a)),
+    near = (id, e) =>
+      reportFor(e, {
+        id,
+        deviceId: id,
+        point: { x: node.x + 1, z: node.z + 1 },
+      });
+  const mixed = clusterReports([near("P", long), near("Q", other)]);
+  assert.equal(mixed.length, 1);
 });
 test("'other' reason needs a written note; the note is trimmed and capped", () => {
   const edge = EDGES[0];
@@ -130,37 +161,39 @@ test("'other' reason needs a written note; the note is trimmed and capped", () =
     0,
   );
 });
-test("reviewGroups lists every reported edge, flagging needsReview once the threshold is hit", () => {
-  const edge = EDGES[0],
-    base = reportFor(edge),
-    nearbyPoint = (offset) => ({ x: base.point.x + offset, z: base.point.z }),
-    reports = Array.from({ length: REPORT_THRESHOLD - 1 }, (_, i) =>
-      reportFor(edge, { id: `r${i}`, point: nearbyPoint(i * 0.1) }),
-    );
-  assert.equal(reviewGroups(reports, [])[0].needsReview, false);
-  assert.equal(reviewAlertCount(reports, []), 0);
-  reports.push(reportFor(edge, { id: "last", point: nearbyPoint(0.5) }));
-  assert.equal(reviewGroups(reports, [])[0].count, REPORT_THRESHOLD);
-  assert.equal(reviewGroups(reports, [])[0].needsReview, true);
-  assert.equal(reviewAlertCount(reports, []), 1);
+test("a single report still shows up as its own pending area for admin review", () => {
+  const [cluster] = clusterReports([reportFor(EDGES[0])]);
+  assert.equal(cluster.count, 1);
+  assert.equal(cluster.needsReview, false);
 });
-test("a single report still shows up for admin review, just not flagged as needing review yet", () => {
+test("a confirmed report makes its whole area confirmed; routing blocks confirmed edges", () => {
   const edge = EDGES[0],
-    reports = [reportFor(edge)],
-    groups = reviewGroups(reports, []);
-  assert.equal(groups.length, 1);
-  assert.equal(groups[0].count, 1);
-  assert.equal(groups[0].needsReview, false);
-});
-test("admin confirmation overrides report count and blocks the edge regardless", () => {
-  const edge = EDGES[0],
-    reports = [reportFor(edge)],
-    groups = groupReportsByEdge(reports);
-  assert.equal(edgeStatus(edgeId(edge), groups, [edgeId(edge)]), "confirmed");
-  assert.equal(reviewGroups(reports, [edgeId(edge)]).length, 0);
+    reports = [
+      reportFor(edge, { id: "a", confirmed: true }),
+      reportFor(edge, { id: "b" }),
+    ],
+    [cluster] = clusterReports(reports);
+  assert.equal(cluster.status, "confirmed");
+  assert.deepEqual(cluster.edgeIds, [edgeId(edge)]);
   assert.ok(
     !availableEdges([edgeId(edge)]).some((e) => edgeId(e) === edgeId(edge)),
   );
+});
+test("pickCover prefers the admin's choice, then the newest report with a photo", () => {
+  const edge = EDGES[0],
+    old = reportFor(edge, {
+      id: "old",
+      photoPath: "p/old.png",
+      createdAt: "2026-11-01T00:00:00Z",
+    }),
+    mid = reportFor(edge, {
+      id: "mid",
+      photoPath: "p/mid.png",
+      createdAt: "2026-11-05T00:00:00Z",
+    }),
+    noPhoto = reportFor(edge, { id: "new", createdAt: "2026-11-09T00:00:00Z" });
+  assert.equal(pickCover([old, mid, noPhoto]).id, "mid");
+  assert.equal(pickCover([{ ...old, isCover: true }, mid, noPhoto]).id, "old");
 });
 test("sanitizeReports passes through an optional photoPath and drops non-string ones", () => {
   const withPhoto = reportFor(EDGES[0], { photoPath: "device-1/123-x.jpg" }),
@@ -206,6 +239,13 @@ test("rowToReport maps Supabase snake_case rows to the client report shape", () 
       photoPath: "device-1/photo.jpg",
     },
   );
+  const confirmed = rowToReport({
+    ...row,
+    status: "confirmed",
+    is_cover: true,
+  });
+  assert.equal(confirmed.confirmed, true);
+  assert.equal(confirmed.isCover, true);
 });
 test("confirmedEdgesFromRows collects only status='confirmed' rows, deduped", () => {
   const edge = EDGES[0],
