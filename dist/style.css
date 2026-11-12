@@ -2198,15 +2198,15 @@ body {
   display: block;
   margin-top: 12px;
 }
-#report-list {
+.report-list {
   list-style: none;
   margin: 12px 0 0;
   padding: 0;
 }
-#report-list li + li {
+.report-list li + li {
   margin-top: 7px;
 }
-#report-list button {
+.report-list button {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -2217,25 +2217,118 @@ body {
   border-radius: 8px;
   padding: 10px;
 }
-#report-list button > span:first-child {
+.report-list button > span:first-child {
   color: #bd8b2d;
   font-size: 19px;
 }
-#report-list b {
+.report-list b {
   display: block;
   font-size: 9px;
   color: #967244;
   line-height: 1.6;
 }
-#report-list small {
+.report-list small {
   display: block;
   font-size: 8px;
   color: #ba9a6d;
   margin-top: 4px;
 }
-#report-list button > span:last-child {
+.report-list button > span:last-child {
   margin-left: auto;
   color: #b58a45;
+}
+/* 관리자 검토 목록: report-list 틀을 그대로 쓰고 항목 안쪽만 다릅니다. */
+.admin-item {
+  border: 1px solid #eee0c5;
+  background: #fffaf0;
+  border-radius: 8px;
+  padding: 10px;
+}
+.admin-section {
+  margin-top: 16px;
+}
+.admin-section h3 {
+  font-size: 11px;
+  margin: 0 0 8px;
+}
+.admin-section-urgent {
+  padding: 10px;
+  background: #fdeceb;
+  border: 1px solid #f1b3ae;
+  border-radius: 10px;
+}
+.admin-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.admin-actions button {
+  flex: 1;
+  font-size: 9px;
+  padding: 7px;
+  border-radius: 6px;
+  border: 1px solid #eee0c5;
+  background: #fff;
+  cursor: pointer;
+}
+.admin-actions button[data-act="confirm"] {
+  background: #fdeceb;
+  border-color: #f1b3ae;
+  color: #b3362c;
+}
+.road-warning-confirmed .warning-triangle {
+  background: #e2453c;
+  color: #fff;
+}
+.road-warning-confirmed:hover .warning-triangle {
+  background: #c93328;
+}
+.road-warning-confirmed small {
+  color: #8a2420;
+  background: #ffecea;
+  border-color: #f1b3ae;
+}
+/* 관리자 버튼 위 "검토 필요" 건수 배지 */
+.admin-toggle {
+  position: relative;
+}
+.admin-alert-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e2453c;
+  color: #fff;
+  font-size: 9px;
+  line-height: 16px;
+  text-align: center;
+}
+/* 신고 사진 첨부 */
+.report-photo-field {
+  display: block;
+  margin: 14px 0;
+  font-size: 10px;
+  color: #967244;
+}
+.report-photo-field span {
+  display: block;
+  margin-bottom: 6px;
+}
+.report-photo-field input {
+  font-size: 10px;
+}
+#report-photo-preview,
+.report-existing-photo {
+  display: block;
+  margin-top: 8px;
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: 8px;
+  border: 1px solid #eee0c5;
+  object-fit: cover;
 }
 .no-route-message {
   padding: 17px 14px;
