@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CAMPUS_GEOMETRY, ENTRANCES } from "../src/data.mjs";
+import { CAMPUS_GEOMETRY } from "../src/data.mjs";
+import { SAMPLE_DOORS } from "./fixtures.mjs";
+
+// 시험용 출입구(등록 출입구와 같은 모양)
+const ENTRANCES = Object.entries(SAMPLE_DOORS).map(([id, d]) => ({ id, ...d }));
 import { campusToGps, createCampusGeoJson, gisSummary } from "../src/gis.mjs";
 import { gpsToCampus } from "../src/geo.mjs";
 

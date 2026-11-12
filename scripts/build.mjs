@@ -13,6 +13,15 @@ await build({
   target: "es2020",
   outfile: "dist/app.js",
 });
+// 편집기는 ?edit=1에서만 불러오는 별도 파일입니다(src/edit-mode.js 참고).
+await build({
+  entryPoints: ["src/editor/index.js"],
+  bundle: true,
+  minify: true,
+  format: "iife",
+  target: "es2020",
+  outfile: "dist/editor.js",
+});
 await mkdir("dist/data", { recursive: true });
 await copyFile("data/seoultech.json", "dist/data/seoultech.json");
 await copyFile(

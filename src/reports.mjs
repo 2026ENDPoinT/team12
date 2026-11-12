@@ -44,8 +44,21 @@ export function reportLocation(report) {
   );
   return `${b?.name || "캠퍼스"} 인근 · 선택한 도로 구간`;
 }
-export function sanitizeReports(value) {
+// 신고가 가리키던 간선이 팀 조사 데이터로 잘려 id가 바뀌어도, 저장된 클릭 좌표에서
+// 가장 가까운 간선을 다시 찾아 신고를 유지합니다.
+function nearestEdge(point, edges, nodes, maxDistance) {
+  let best = null;
+  for (const edge of edges) {
+    const { distance } = projectToSegment(point, nodes[edge.a], nodes[edge.b]);
+    if (distance <= maxDistance && (!best || distance < best.distance))
+      best = { edge, distance };
+  }
+  return best?.edge ?? null;
+}
+export function sanitizeReports(value, edges = EDGES, nodes = NODES) {
   if (!Array.isArray(value)) return [];
+  const lookup =
+    edges === EDGES ? edgeLookup : new Map(edges.map((e) => [edgeId(e), e]));
   const unique = new Map();
   for (const report of value.slice(0, 500)) {
     if (
@@ -53,7 +66,7 @@ export function sanitizeReports(value) {
       typeof report.id !== "string" ||
       report.id.length > 100 ||
       !report.id ||
-      !edgeLookup.has(report.edgeId) ||
+      typeof report.edgeId !== "string" ||
       !["construction", "blocked"].includes(report.reason)
     )
       continue;
@@ -64,12 +77,16 @@ export function sanitizeReports(value) {
       continue;
     const p = report.point;
     if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) continue;
-    const edge = edgeLookup.get(report.edgeId);
-    if (projectToSegment(p, NODES[edge.a], NODES[edge.b]).distance > 20)
-      continue;
+    let edge = lookup.get(report.edgeId);
+    if (
+      !edge ||
+      projectToSegment(p, nodes[edge.a], nodes[edge.b]).distance > 20
+    )
+      edge = nearestEdge(p, edges, nodes, 20);
+    if (!edge) continue;
     unique.set(report.id, {
       id: report.id,
-      edgeId: report.edgeId,
+      edgeId: edgeId(edge),
       point: { x: p.x, z: p.z },
       reason: report.reason,
       createdAt: report.createdAt,
@@ -95,26 +112,41 @@ export function rowToReport(row) {
     ...(row.photo_path ? { photoPath: row.photo_path } : {}),
   };
 }
-// status='confirmed'인 행들의 edge_id만 모읍니다.
-export function confirmedEdgesFromRows(rows) {
-  return [
-    ...new Set(
-      (rows || [])
-        .filter((row) => row.status === "confirmed")
-        .map((row) => row.edge_id),
-    ),
-  ];
+// status='confirmed'인 행들의 edge_id를 모읍니다. 팀 조사 데이터가 그 구간을
+// 쪼개서 원래 edge_id가 사라졌으면, 저장된 클릭 좌표로 가장 가까운 edge를 다시 찾습니다
+// (sanitizeReports의 재매핑과 같은 방식 — 안 그러면 확정 차단이 조용히 풀려버립니다).
+export function confirmedEdgesFromRows(rows, edges = EDGES, nodes = NODES) {
+  const lookup =
+    edges === EDGES ? edgeLookup : new Map(edges.map((e) => [edgeId(e), e]));
+  const result = new Set();
+  for (const row of rows || []) {
+    if (row.status !== "confirmed") continue;
+    const point = { x: row.point_x, z: row.point_z };
+    let edge = lookup.get(row.edge_id);
+    if (
+      !edge ||
+      (Number.isFinite(point.x) &&
+        Number.isFinite(point.z) &&
+        projectToSegment(point, nodes[edge.a], nodes[edge.b]).distance > 20)
+    )
+      edge =
+        Number.isFinite(point.x) && Number.isFinite(point.z)
+          ? (nearestEdge(point, edges, nodes, 20) ?? edge)
+          : edge;
+    if (edge) result.add(edgeId(edge));
+  }
+  return [...result];
 }
 // 신고는 1건부터 바로 지도에 "주의"(노란색)로 뜹니다.
 // 이 값 이상 쌓이면 관리자에게 검토 알림이 갑니다. 관리자가 확정하기 전까지는 경로를 막지 않습니다.
 export const REPORT_THRESHOLD = 3;
 
-export function sanitizeConfirmedEdges(value) {
+export function sanitizeConfirmedEdges(value, edges = EDGES) {
   if (!Array.isArray(value)) return [];
+  const lookup =
+    edges === EDGES ? edgeLookup : new Set(edges.map((e) => edgeId(e)));
   return [
-    ...new Set(
-      value.filter((id) => typeof id === "string" && edgeLookup.has(id)),
-    ),
+    ...new Set(value.filter((id) => typeof id === "string" && lookup.has(id))),
   ].slice(0, 500);
 }
 
@@ -178,6 +210,6 @@ export function reviewAlertCount(
 
 // 관리자가 확정한 구간만 경로에서 제외합니다. 신고가 쌓인 것만으로는 막지 않습니다.
 export function availableEdges(confirmedEdges, edges = EDGES) {
-  const blocked = new Set(sanitizeConfirmedEdges(confirmedEdges));
+  const blocked = new Set(sanitizeConfirmedEdges(confirmedEdges, edges));
   return edges.filter((edge) => !blocked.has(edgeId(edge)));
 }

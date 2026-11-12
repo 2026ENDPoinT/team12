@@ -40,7 +40,10 @@ test("toScene and toLngLat round-trip across the campus", () => {
 
 test("older entry points use the same conversion", () => {
   const lngLat = [127.0812884, 37.6297845];
-  assert.deepEqual(gpsToCampus(lngLat[1], lngLat[0], origin), toScene(lngLat, origin));
+  assert.deepEqual(
+    gpsToCampus(lngLat[1], lngLat[0], origin),
+    toScene(lngLat, origin),
+  );
   assert.equal(campusToGps, toLngLat);
   assert.equal(toScene([NaN, 37.6], origin), null);
   assert.equal(toLngLat({ x: 1, z: 1 }, {}), null);

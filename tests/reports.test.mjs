@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { NODES, EDGES } from "../src/data.mjs";
+import { NODES, EDGES, CAMPUS_GEOMETRY } from "../src/data.mjs";
 import { shortestPath } from "../src/routing.mjs";
 import {
   edgeId,
@@ -56,19 +56,29 @@ test("GPS coordinates convert to the campus east/south meter axes", () => {
   assert.equal(gpsToCampus(NaN, origin.lon, origin), null);
 });
 test("only admin-confirmed edges are removed from routing", () => {
-  const edge = EDGES.find((e) => e.a === "futureDoor" || e.b === "futureDoor");
+  // 자동 생성 그래프에서 futureDoor는 간선 하나로만 이어진 끝 노드입니다.
+  // 팀 조사 데이터가 근처에 길을 더하면 달라지므로, 조사 데이터 없는 그래프로 확인합니다.
+  const nodes = CAMPUS_GEOMETRY.nodes,
+    edges = CAMPUS_GEOMETRY.edges,
+    edge = edges.find((e) => e.a === "futureDoor" || e.b === "futureDoor");
   assert.equal(
     shortestPath(
       "gate",
       "futureDoor",
       "shortest",
-      NODES,
-      availableEdges([edgeId(edge)]),
+      nodes,
+      availableEdges([edgeId(edge)], edges),
     ),
     null,
   );
   assert.ok(
-    shortestPath("gate", "futureDoor", "shortest", NODES, availableEdges([])),
+    shortestPath(
+      "gate",
+      "futureDoor",
+      "shortest",
+      nodes,
+      availableEdges([], edges),
+    ),
   );
 });
 test("several reports on one edge remain separate points and don't block routing by themselves", () => {
@@ -149,14 +159,49 @@ test("rowToReport maps Supabase snake_case rows to the client report shape", () 
   });
 });
 test("confirmedEdgesFromRows collects only status='confirmed' rows, deduped", () => {
-  const rows = [
-    { edge_id: "a--b", status: "confirmed" },
-    { edge_id: "a--b", status: "confirmed" },
-    { edge_id: "c--d", status: "reported" },
-  ];
-  assert.deepEqual(confirmedEdgesFromRows(rows), ["a--b"]);
+  const edge = EDGES[0],
+    base = reportFor(edge),
+    rows = [
+      {
+        edge_id: edgeId(edge),
+        point_x: base.point.x,
+        point_z: base.point.z,
+        status: "confirmed",
+      },
+      {
+        edge_id: edgeId(edge),
+        point_x: base.point.x,
+        point_z: base.point.z,
+        status: "confirmed",
+      },
+      { edge_id: edgeId(EDGES[1]), status: "reported" },
+    ];
+  assert.deepEqual(confirmedEdgesFromRows(rows), [edgeId(edge)]);
   assert.deepEqual(confirmedEdgesFromRows([]), []);
   assert.deepEqual(confirmedEdgesFromRows(undefined), []);
+});
+test("confirmedEdgesFromRows remaps a confirmed edge that got split, using the stored point", () => {
+  const edge = EDGES[0],
+    base = reportFor(edge),
+    splitEdges = [
+      { a: edge.a, b: "mid-node", meters: 1 },
+      { a: "mid-node", b: edge.b, meters: 1 },
+    ],
+    splitNodes = {
+      ...NODES,
+      "mid-node": { x: base.point.x, z: base.point.z },
+    },
+    rows = [
+      {
+        edge_id: edgeId(edge), // 분할 전 id, 이제 splitEdges엔 존재하지 않음
+        point_x: base.point.x,
+        point_z: base.point.z,
+        status: "confirmed",
+      },
+    ];
+  assert.deepEqual(confirmedEdgesFromRows(rows, splitEdges, splitNodes), [
+    edgeId(splitEdges[0]),
+  ]);
 });
 test("sanitizeConfirmedEdges drops unknown edges, duplicates, and non-string values", () => {
   const edge = EDGES[0];
