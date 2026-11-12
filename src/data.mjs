@@ -23,7 +23,12 @@ export const CAMPUS = {
   location: "서울 노원구 · 공릉캠퍼스",
   verified: false,
   source: "https://github.com/Hong-Iron/SMASH-SEOULTECH",
-  interior: { building: "future", gaussianUrl: null, arUrl: null },
+  // 미래관 실내 지도·AR 길안내 (dist/indoor). from=futureDoor: 캠퍼스 경로의 미래관 도착 노드
+  interior: {
+    building: "future",
+    indoorUrl: "indoor/?from=futureDoor",
+    arUrl: "indoor/?from=futureDoor&demo=1",
+  },
 };
 export const BUILDINGS = geometry.buildings;
 // 공개 도로를 분할한 자동 생성 그래프(seoultech.json) 위에 팀 조사 데이터(team-survey.json)를
