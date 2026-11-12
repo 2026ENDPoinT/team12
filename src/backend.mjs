@@ -15,7 +15,12 @@ export function getDeviceId() {
   try {
     let id = localStorage.getItem(DEVICE_ID_KEY);
     if (!id) {
-      id = crypto.randomUUID();
+      // randomUUID는 https·localhost에서만 있습니다. 같은 와이파이 http 주소에서도 되도록 대체합니다.
+      id =
+        crypto.randomUUID?.() ??
+        Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+          b.toString(16).padStart(2, "0"),
+        ).join("");
       localStorage.setItem(DEVICE_ID_KEY, id);
     }
     return id;

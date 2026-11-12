@@ -986,3 +986,15 @@ $("#work-form").onsubmit = async (e) => {
   await loadWorks();
 };
 loadWorks();
+
+// 다른 사람(사용자↔관리자)이 바꾼 내용을 가져옵니다. 10초마다, 그리고 탭으로 돌아올 때 다시 읽습니다.
+// 신고 창이 열려 있거나 위치를 고르는 중에는 선택이 지워지지 않게 건너뜁니다.
+// ponytail: 10초 폴링. 즉시 반영이 필요하면 Supabase Realtime 구독으로 바꾸세요.
+function refreshShared() {
+  if (document.hidden || reporting || document.querySelector("dialog[open]"))
+    return;
+  loadReports();
+  loadWorks();
+}
+setInterval(refreshShared, 10000);
+document.addEventListener("visibilitychange", refreshShared);
