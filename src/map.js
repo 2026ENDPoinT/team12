@@ -37,7 +37,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   renderer.domElement.tabIndex = 0;
   renderer.domElement.setAttribute(
     "aria-label",
-    "서울과기대 3D 지도. 드래그 회전, 스크롤 확대. 터치: 한 손가락 이동, 두 손가락 벌리기 확대, 비틀기 회전, 함께 위아래로 밀기 기울이기. 신고 모드에서 지도 위치 클릭. 방향키 회전, Enter로 지도 가운데 위치 신고.",
+    "서울과기대 3D 지도. 드래그 이동, 휠·두 손가락 스크롤 확대, 더블클릭 확대, 오른쪽 드래그 회전·기울이기. 터치: 한 손가락 이동, 두 손가락 벌리기 확대, 비틀기 회전, 함께 위아래로 밀기 기울이기. 신고 모드에서 지도 위치 클릭. 방향키 회전, Enter로 지도 가운데 위치 신고.",
   );
   const scene = new THREE.Scene(),
     camera = new THREE.OrthographicCamera(-600, 600, 600, -600, 1, 3500);
@@ -49,6 +49,10 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   controls.minZoom = 0.5;
   controls.maxZoom = 12;
   controls.zoomToCursor = true;
+  // 휠·트랙패드는 아래 wheel 처리에서 직접 다룹니다(이동·확대·회전·기울이기).
+  controls.enableZoom = false;
+  // 끌어서 이동할 때 화면 평면이 아니라 지면을 따라 움직이게 합니다.
+  controls.screenSpacePanning = false;
   // 터치: 한 손가락은 지도 이동, 두 손가락은 아래 touchGesture가 직접 처리합니다.
   // (OrbitControls 기본값은 두 손가락 확대·이동뿐이라 비틀어 회전·기울이기가 없습니다.)
   controls.touches = { ONE: THREE.TOUCH.PAN, TWO: null };
@@ -518,6 +522,10 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     controls.enablePan = !value;
     // 첫 화면 미리보기는 이동 대신 한 손가락으로 둘러보기를 유지합니다.
     controls.touches.ONE = value ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN;
+    // 마우스도 같은 규칙: 지도 화면은 왼쪽 드래그 이동·오른쪽 드래그 회전(네이버지도 웹 방식),
+    // 첫 화면 미리보기는 왼쪽 드래그로 둘러보기.
+    controls.mouseButtons.LEFT = value ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN;
+    controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
     entranceGroup.visible = !value;
     for (const { id, label } of labelObjects) {
       label.visible =
@@ -638,21 +646,19 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       .copy(controls.target)
       .add(new THREE.Vector3().setFromSpherical(s));
   }
-  function transform(previous, next) {
-    // 손가락 사이에 있던 지면 지점을 기준으로 확대·회전한 뒤, 새 손가락 위치로 옮깁니다.
-    const anchor = groundAt(previous.mid.x, previous.mid.y);
+  // 화면 좌표 from에 있던 지면 지점을 기준으로 확대(scale)·회전(turn, 시계 방향 +)한 뒤
+  // 그 지점이 화면 좌표 to에 오도록 옮깁니다. 터치와 트랙패드가 함께 씁니다.
+  function moveCamera(from, to, scale = 1, turn = 0) {
+    const anchor = groundAt(from.x, from.y);
     if (!anchor) return;
-    if (previous.distance > 0) {
+    if (scale !== 1) {
       camera.zoom = THREE.MathUtils.clamp(
-        camera.zoom * (next.distance / previous.distance),
+        camera.zoom * scale,
         controls.minZoom,
         controls.maxZoom,
       );
       camera.updateProjectionMatrix();
     }
-    let turn = next.angle - previous.angle;
-    if (turn > Math.PI) turn -= Math.PI * 2;
-    if (turn < -Math.PI) turn += Math.PI * 2;
     if (turn) {
       for (const point of [camera.position, controls.target]) {
         point.sub(anchor).applyAxisAngle(upAxis, turn).add(anchor);
@@ -660,13 +666,25 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       camera.lookAt(controls.target);
     }
     camera.updateMatrixWorld();
-    const moved = groundAt(next.mid.x, next.mid.y);
+    const moved = groundAt(to.x, to.y);
     // 첫 화면 미리보기는 지도가 화면 밖으로 밀리지 않도록 이동하지 않습니다.
     if (moved && !homeMode) {
       const shift = anchor.sub(moved).setY(0);
       camera.position.add(shift);
       controls.target.add(shift);
     }
+    controls.update();
+  }
+  function transform(previous, next) {
+    let turn = next.angle - previous.angle;
+    if (turn > Math.PI) turn -= Math.PI * 2;
+    if (turn < -Math.PI) turn += Math.PI * 2;
+    moveCamera(
+      previous.mid,
+      next.mid,
+      previous.distance > 0 ? next.distance / previous.distance : 1,
+      turn,
+    );
   }
   function chooseMode(f) {
     const { start } = gesture,
@@ -719,6 +737,90 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   }
   canvas.addEventListener("pointerup", endTouch);
   canvas.addEventListener("pointercancel", endTouch);
+
+  // ===== 마우스·트랙패드 (네이버지도 웹 방식) =====
+  // 왼쪽 드래그 = 이동, 휠·트랙패드 두 손가락 스크롤·오므리기 = 커서 기준 확대·축소,
+  // 더블클릭 = 확대, 오른쪽 드래그(트랙패드 두 손가락 클릭 드래그) = 회전·기울이기.
+  let lastTrackpadWheel = -Infinity,
+    safariGesture = null,
+    zoomAnimation = null;
+  function isMouseWheel(e) {
+    if (e.deltaMode !== 0) return true;
+    // 트랙패드는 짧은 간격으로 이벤트가 이어지므로, 직전에 트랙패드로 판정됐으면 그대로 봅니다.
+    if (performance.now() - lastTrackpadWheel < 400) return false;
+    // Chrome·Safari 트랙패드는 wheelDeltaY가 deltaY의 -3배입니다. 마우스 휠은 120 단위입니다.
+    const legacy = e.wheelDeltaY;
+    if (legacy && legacy !== -3 * e.deltaY && legacy % 120 === 0) return true;
+    return !e.deltaX && Math.abs(e.deltaY) >= 50 && !legacy;
+  }
+  function canvasCenter() {
+    const r = canvas.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+  canvas.addEventListener(
+    "wheel",
+    (e) => {
+      const point = { x: e.clientX, y: e.clientY };
+      // 트랙패드 오므리기·벌리기는 브라우저가 Ctrl+휠로 보냅니다.
+      if (e.ctrlKey) {
+        e.preventDefault();
+        if (!safariGesture)
+          moveCamera(point, point, Math.exp(-e.deltaY * 0.01));
+        return;
+      }
+      const mouseWheel = isMouseWheel(e);
+      if (!mouseWheel) lastTrackpadWheel = performance.now();
+      // 첫 화면 미리보기에서는 트랙패드 스크롤로 페이지가 내려가게 둡니다.
+      if (homeMode && !mouseWheel) return;
+      e.preventDefault();
+      cancelAnimationFrame(zoomAnimation);
+      // 마우스 휠은 한 칸이 크고, 트랙패드는 작은 값이 촘촘히 들어옵니다.
+      moveCamera(
+        point,
+        point,
+        Math.exp(-e.deltaY * (mouseWheel ? 0.0015 : 0.005)),
+      );
+    },
+    { passive: false },
+  );
+  // 더블클릭한 자리를 기준으로 두 배 확대합니다(0.25초 동안 부드럽게).
+  canvas.addEventListener("dblclick", (e) => {
+    if (homeMode || reporting) return;
+    e.preventDefault();
+    cancelAnimationFrame(zoomAnimation);
+    const point = { x: e.clientX, y: e.clientY },
+      startTime = performance.now();
+    let applied = 1;
+    const step = (now) => {
+      const t = Math.min(1, (now - startTime) / 250),
+        target = Math.pow(2, 1 - Math.pow(1 - t, 3));
+      moveCamera(point, point, target / applied);
+      applied = target;
+      if (t < 1) zoomAnimation = requestAnimationFrame(step);
+    };
+    zoomAnimation = requestAnimationFrame(step);
+  });
+  // Safari는 트랙패드 오므리기를 전용 제스처 이벤트로도 보냅니다. 확대·축소만 반영합니다.
+  // 휴대폰 터치는 위의 터치 처리가 맡으므로 건너뜁니다.
+  canvas.addEventListener("gesturestart", (e) => {
+    if (touchPoints.size) return;
+    e.preventDefault();
+    safariGesture = { scale: e.scale };
+  });
+  canvas.addEventListener("gesturechange", (e) => {
+    if (!safariGesture || touchPoints.size) return;
+    e.preventDefault();
+    const point = Number.isFinite(e.clientX)
+      ? { x: e.clientX, y: e.clientY }
+      : canvasCenter();
+    moveCamera(point, point, e.scale / safariGesture.scale);
+    safariGesture = { scale: e.scale };
+  });
+  canvas.addEventListener("gestureend", (e) => {
+    if (!safariGesture) return;
+    e.preventDefault();
+    safariGesture = null;
+  });
   renderer.domElement.addEventListener("pointerdown", (e) => {
     down = { x: e.clientX, y: e.clientY };
   });
