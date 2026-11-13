@@ -18,6 +18,7 @@ test("north crossing interpolates over the shortest arc", () => {
 
 test("GPS fallback rejects stationary drift and uses reliable movement", () => {
   assert.equal(gpsHeading({ heading: 0, speed: 1 }, null, null), 0);
+  assert.equal(gpsHeading({ heading: 90, speed: .7 }, null, null), null);
   assert.equal(gpsHeading({ heading: 90, speed: 0, accuracy: 20 }, { x: 0, z: 0, accuracy: 20 }, { x: 3, z: 0 }), null);
   assert.equal(gpsHeading({ heading: null, accuracy: 5 }, { x: 0, z: 0 }, { x: 10, z: 0 }), 90);
 });

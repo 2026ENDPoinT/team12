@@ -65,6 +65,15 @@ function turns(points) {
   return result;
 }
 
+function routeHeading(points, lookAhead) {
+  let along = 0;
+  for (let i = 1; i < points.length; i++) {
+    along += distance(points[i - 1], points[i]);
+    if (along > lookAhead) return bearing(points[i - 1], points[i]);
+  }
+  return bearing(points.at(-2), points.at(-1));
+}
+
 export function guidanceAt(points, point) {
   if (points.length < 2) return null;
   const at = projectOnRoute(points, point),
@@ -74,6 +83,7 @@ export function guidanceAt(points, point) {
   const turn = turns(points).find((item) => item.along > at.along + 3);
   return {
     remaining,
+    heading: routeHeading(points, at.along + 3),
     nextPoint: turn?.point ?? points.at(-1),
     next: turn
       ? { direction: turn.direction, distance: turn.along - at.along }

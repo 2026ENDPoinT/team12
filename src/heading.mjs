@@ -16,7 +16,7 @@ export function orientationHeading(event, screenAngle = 0) {
   return null;
 }
 export function gpsHeading(coords, previous, point) {
-  if (Number.isFinite(coords.heading) && Number.isFinite(coords.speed) && coords.speed >= .5)
+  if (Number.isFinite(coords.heading) && Number.isFinite(coords.speed) && coords.speed >= .8)
     return normalizeHeading(coords.heading);
   if (!previous || !point) return null;
   const dx = point.x - previous.x, dz = point.z - previous.z;

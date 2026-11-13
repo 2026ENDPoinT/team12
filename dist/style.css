@@ -8023,3 +8023,8 @@ body {
   background: var(--night-control);
   border-color: var(--v2-stroke);
 }
+
+#navigation-compass[aria-pressed="true"] {
+  color: #15212b;
+  background: var(--lime);
+}

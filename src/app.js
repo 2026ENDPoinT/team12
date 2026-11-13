@@ -83,14 +83,14 @@ let region = "전체",
   guidanceOriginName = "",
   guidanceTotalMeters = 0;
 let sensorHeading = null, movementHeading = null;
-function navigationHeading() {
+function navigationHeading(guide = null) {
   if (sensorHeading !== null) return sensorHeading;
   if (movementHeading !== null) return movementHeading;
   const points = currentRoute && routePoints(currentRoute.path, currentRouteNodes);
-  return points?.length > 1 ? (Math.atan2(points[1].x - points[0].x, points[0].z - points[1].z) * 180 / Math.PI + 360) % 360 : null;
+  return (guide ?? (gpsPosition && points && guidanceAt(points, gpsPosition)))?.heading ?? null;
 }
-function syncNavigationHeading() {
-  map?.setNavigationHeading(navigationHeading(), guidanceActive && guidanceFollowing);
+function syncNavigationHeading(guide = null) {
+  map?.setNavigationHeading(navigationHeading(guide), guidanceActive && guidanceFollowing);
 }
 const headingTracker = createHeadingTracker(window, (heading) => {
   if (!guidanceActive && !guidancePending) return;
@@ -415,10 +415,10 @@ function showPopover(place) {
   $(".map-canvas-wrap").classList.add("has-building-popover");
 }
 let map = createCampusMap($("#hero-map"), buildingSelect, openRoadReport, () => {
-  if (!guidanceActive) return;
+  if (!guidanceActive || !guidanceFollowing) return;
   guidanceFollowing = false;
-  map?.setNavigationFollowing(false);
-  $("#navigation-recenter").hidden = false;
+  map?.clearGuidanceHeading();
+  syncNavigationCameraButtons();
 });
 if (!map) {
   $("#hero-map").innerHTML =
@@ -985,7 +985,14 @@ function renderMobileNavigation(guide = null) {
   const landmark = point && BUILDINGS.filter((b) => b.name !== "교내 건물").reduce((best, b) =>
     !best || Math.hypot(point.x - b.x, point.z - b.z) < Math.hypot(point.x - best.x, point.z - best.z) ? b : best, null);
   $("#navigation-detail").textContent = guidancePending ? "현재 위치를 확인하고 있어요." : direction === "arrive" ? "경로를 따라 목적지까지 이동하세요" : landmark ? `${landmark.name} 인근에서 ${direction === "left" ? "왼쪽" : "오른쪽"}으로` : "표시된 경로를 따라 이동하세요";
+  syncNavigationCameraButtons();
+}
+function syncNavigationCameraButtons() {
   $("#navigation-recenter").hidden = !guidanceActive || guidanceFollowing;
+  $("#navigation-compass").setAttribute(
+    "aria-pressed",
+    String(guidanceActive && guidanceFollowing),
+  );
 }
 function endGuidance({ silent = false } = {}) {
   const wasRunning = guidanceActive || guidancePending;
@@ -994,6 +1001,7 @@ function endGuidance({ silent = false } = {}) {
   guidanceTotalMeters = 0;
   headingTracker.stop();
   sensorHeading = null;
+  map?.clearGuidanceHeading();
   map?.setRouteMascotVisible(true);
   renderGuidanceButton();
   if (wasRunning && gpsPosition)
@@ -1015,6 +1023,12 @@ function updateGuidanceStatus() {
     setGpsStatus("도착지에 도착했어요.");
     toast("도착지에 도착했어요.");
     return;
+  }
+  if (!isDesktop.matches && guidanceFollowing) {
+    syncNavigationHeading(guide);
+    map?.setUserLocation(gpsPosition, {
+      follow: true,
+    });
   }
   const meters = Math.max(1, Math.round(guide.next.distance));
   setGpsStatus(
@@ -1072,10 +1086,14 @@ $("#route-card-start").onclick = startGuidance;
 $("#navigation-stop").onclick = () => endGuidance();
 $("#navigation-layers").onclick = () => side("layers").click();
 $("#navigation-compass").onclick = () => {
+  if (!guidanceActive) return;
+  if (!guidanceFollowing) {
+    $("#navigation-recenter").click();
+    return;
+  }
   guidanceFollowing = false;
-  map?.setNavigationFollowing(false);
-  map?.reset();
-  renderMobileNavigation();
+  map?.clearGuidanceHeading();
+  syncNavigationCameraButtons();
 };
 $("#navigation-back").onclick = () => {
   endGuidance();
@@ -1438,7 +1456,11 @@ function startGps() {
       const nearest = nearestGraphNode(point);
       const course = gpsHeading(coords, gpsPosition, point);
       if (course !== null) movementHeading = course;
-      gpsPosition = { ...point, accuracy: coords.accuracy };
+      gpsPosition = {
+        ...point,
+        accuracy: coords.accuracy,
+        heading: course,
+      };
       if (guidanceActive) syncNavigationHeading();
       if (!nearest || nearest.distance > 350) {
         gpsStartNode = null;

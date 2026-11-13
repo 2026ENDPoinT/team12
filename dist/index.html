@@ -365,7 +365,11 @@
           <button id="navigation-recenter" hidden><svg class="icon" aria-hidden="true"><use href="#i-locate" /></svg>내 위치로</button>
           <button id="navigation-layers" aria-label="지도 범례 보기"><svg class="icon" aria-hidden="true"><use href="#i-layers" /></svg></button>
           <button id="navigation-route" aria-label="경로 상세 보기"><svg class="icon" aria-hidden="true"><use href="#i-route" /></svg></button>
-          <button id="navigation-compass" aria-label="지도 시점 초기화"><svg class="icon" aria-hidden="true"><use href="#i-locate" /></svg></button>
+          <button id="navigation-compass" aria-label="진행 방향 따라가기" aria-pressed="false">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m12 3 7 17-7-4-7 4 7-17Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            </svg>
+          </button>
           <div class="navigation-bottom"><span class="navigation-bottom-grip" aria-hidden="true"></span><div class="navigation-arrival"><b id="navigation-minutes"></b><strong id="navigation-distance"></strong><span id="navigation-eta"></span><button id="navigation-stop" aria-label="길안내 종료">✕</button></div><progress id="navigation-progress" max="1" value="0" aria-label="경로 진행률"></progress></div>
         </section>
         <aside class="route-panel">

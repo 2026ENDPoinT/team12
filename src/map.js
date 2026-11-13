@@ -1,5 +1,5 @@
 import { createStreetLights, windowLights } from "./map/night-lighting.mjs";
-import { touchGestureMode } from "./map/touch-gesture.mjs";
+import { touchGestureMode, touchTurn } from "./map/touch-gesture.mjs";
 import { cameraOffsetForHeading, smoothHeading, headingDelta } from "./heading.mjs";
 import { createNavigationBounds } from "./map/navigation-bounds.mjs";
 import { createKeyboardPan } from "./map/keyboard-pan.mjs";
@@ -624,6 +624,9 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   function clearReportSelection() {
     clearGroup(reportPreviewGroup);
   }
+  function clearGuidanceHeading() {
+    navigationFollowing = false;
+  }
   function setUserLocation(position, { follow = false } = {}) {
     if (!position) {
       userLocationGroup.visible = false;
@@ -854,6 +857,13 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
         gesture.start.mid,
         gesture.start.mid,
         gesture.last.distance > 0 ? f.distance / gesture.last.distance : 1,
+      );
+    } else if (gesture.mode === "twist") {
+      moveCamera(
+        gesture.last.mid,
+        f.mid,
+        1,
+        touchTurn(gesture.last.angle, f.angle),
       );
     } else {
       tilt(f.mid.y - gesture.last.mid.y, f.mid.x - gesture.last.mid.x);
@@ -1268,7 +1278,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     controls.update();
     if (!homeMode) constrainNavigation(camera, controls);
     if (navigationMode && userLocationGroup.visible && navigationHeading !== null) {
-      const weight = 1 - Math.exp(-10 * Math.min(.1, deltaSeconds));
+      const weight = reduceMotion ? 1 : 1 - Math.exp(-10 * Math.min(.1, deltaSeconds));
       displayedHeading = smoothHeading(displayedHeading, navigationHeading, weight);
       if (navigationFollowing) {
         const offset = camera.position.clone().sub(controls.target);
@@ -1330,6 +1340,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     previewReportSelection,
     clearReportSelection,
     setUserLocation,
+    clearGuidanceHeading,
     setNavigationMode(enabled) {
       if (!enabled) {
         navigationFollowing = false;
