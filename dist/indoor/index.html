@@ -14,7 +14,7 @@
     <title>미래관 실내 · 사이</title>
     <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="indoor.css" />
-    <link rel="stylesheet" href="indoor-ui.css?v=route-selection-5" />
+    <link rel="stylesheet" href="indoor-ui.css?v=mobile-panels-6" />
   </head>
   <body>
     <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg">
@@ -145,6 +145,8 @@
           class="sheet-handle"
           type="button"
           aria-label="패널 접기·펴기"
+          aria-expanded="true"
+          aria-controls="sheet-place sheet-route"
         >
           <i></i>
         </button>
@@ -374,8 +376,18 @@
         </label>
       </div>
       <div class="search-panel">
-        <p id="search-hint" class="search-hint" role="status"></p>
-        <ul id="search-results" class="results"></ul>
+        <button
+          id="search-handle"
+          class="sheet-handle"
+          type="button"
+          aria-label="패널 접기"
+          aria-expanded="true"
+          aria-controls="search-content"
+        ><i></i></button>
+        <div id="search-content" class="search-content">
+          <p id="search-hint" class="search-hint" role="status"></p>
+          <ul id="search-results" class="results"></ul>
+        </div>
       </div>
     </section>
 
