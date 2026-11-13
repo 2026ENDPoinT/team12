@@ -1103,6 +1103,50 @@ $("#v2-minus").onclick = () => map?.zoom(1 / 1.18);
 $("#v2-locate").onclick = () => $("#gps-toggle").click();
 $("#v2-reset").onclick = () => setDimension(false);
 
+// ===== 트랙패드 확대 제스처로 페이지가 커지지 않게 합니다(표지·지도 화면 모두) =====
+// 트랙패드 오므리기/벌리기(Ctrl+휠)를 그냥 두면 브라우저가 페이지 전체를 확대해
+// 메뉴·패널이 커지고 화면 밖으로 밀려납니다. 이 제스처로는 페이지를 확대하지 않고,
+// 지도 화면에서는 그 확대를 지도로 보냅니다.
+const onMapView = () => !$("#map-view").hidden;
+const mapCanvas = () => $("#campus-map canvas");
+document.addEventListener(
+  "wheel",
+  (e) => {
+    if (!e.ctrlKey) return;
+    const canvas = mapCanvas();
+    // 지도 위는 지도가 직접 처리합니다(같은 이벤트를 두 번 보내지 않음).
+    if (onMapView() && canvas && e.target === canvas) return;
+    e.preventDefault();
+    if (!onMapView() || !canvas) return;
+    canvas.dispatchEvent(
+      new WheelEvent("wheel", {
+        deltaX: e.deltaX,
+        deltaY: e.deltaY,
+        deltaMode: e.deltaMode,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        ctrlKey: true,
+        cancelable: true,
+      }),
+    );
+  },
+  { passive: false },
+);
+// Safari 트랙패드 제스처: 페이지는 확대하지 않고, 지도 화면이면 지도를 확대합니다.
+let pageGestureScale = null;
+for (const type of ["gesturestart", "gesturechange", "gestureend"])
+  document.addEventListener(type, (e) => {
+    if (onMapView() && e.target === mapCanvas()) return;
+    e.preventDefault();
+    if (!onMapView()) return;
+    if (type === "gesturestart") pageGestureScale = e.scale;
+    else if (type === "gesturechange" && pageGestureScale) {
+      map?.zoom(e.scale / pageGestureScale);
+      pageGestureScale = e.scale;
+    } else pageGestureScale = null;
+  });
+// Ctrl·⌘ + / − / 0 키 확대는 막지 않습니다(글자를 키워 보는 접근성 기능, 사용자 결정).
+
 // ===== GPS 현재 위치 추적 =====
 // 공개 데이터의 중심 위·경도를 로컬 미터 좌표로 변환합니다.
 // 실서비스 전에는 학교에서 기준점을 실측해 좌표 오차를 보정해야 합니다.
