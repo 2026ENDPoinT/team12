@@ -752,6 +752,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     camera.updateProjectionMatrix();
     controls.update();
   }
+  let shortcutPicker = null;
   const raycaster = new THREE.Raycaster(),
     mouse = new THREE.Vector2(),
     groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.8);
@@ -1035,9 +1036,9 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     const r = renderer.domElement.getBoundingClientRect(),
       x = ((e.clientX - r.left) / r.width) * 2 - 1,
       y = (-(e.clientY - r.top) / r.height) * 2 + 1;
-    if (editHandler) {
+    if (shortcutPicker || editHandler) {
       const hit = groundAt(e.clientX, e.clientY);
-      if (hit) editHandler.click?.({ x: hit.x, z: hit.z });
+      if (hit) (shortcutPicker || editHandler.click)?.({ x: hit.x, z: hit.z });
       return;
     }
     if (reporting) {
@@ -1056,6 +1057,14 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     isEnabled: () => !homeMode && !reporting && !editHandler,
   });
   renderer.domElement.addEventListener("keydown", (e) => {
+    if (shortcutPicker && e.key === "Enter") {
+      e.preventDefault();
+      mouse.set(0, 0);
+      raycaster.setFromCamera(mouse, camera);
+      const point = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3());
+      if (point) shortcutPicker({ x: point.x, z: point.z });
+      return;
+    }
     if (reporting && e.key === "Enter") {
       e.preventDefault();
       pickPoint(0, 0);
@@ -1326,6 +1335,10 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     // 편집 모드 전용: 미리보기 도형(점·선)과 클릭·이동 처리기. null이면 지웁니다.
     setEditPreview: (spec) => graphOverlay.setPreview(spec),
     setEditHandler,
+    setShortcutPicker(handler) {
+      shortcutPicker = handler;
+      host.classList.toggle("shortcut-picking", Boolean(handler));
+    },
     setEntrances,
     setEntrancesVisible,
     focusTop,

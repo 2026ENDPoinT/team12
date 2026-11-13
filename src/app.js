@@ -1,3 +1,4 @@
+import { shortcutEdge, shortcutNodes, withApprovedShortcuts } from "./shortcuts.mjs";
 import { normalizeSearch, suggestMatches } from "./search-suggestions.mjs";
 import { shortestPath } from "./routing.mjs";
 import { routeBetween, routeStartEntries } from "./route-target.mjs";
@@ -213,6 +214,7 @@ function setRoutePlace(selector, id) {
 // 경로 계산에 쓰는 보행 그래프입니다. 평소에는 data.mjs의 합친 그래프이고,
 // 편집 모드에서는 편집 중인 조사 데이터를 합친 그래프로 바뀝니다.
 let graph = { nodes: NODES, edges: EDGES, entrances: SURVEY.entrances };
+let shortcutRows = [];
 function selectedPlace(selector, g = graph) {
   const id = routePlaceId(selector);
   // 현재 위치는 routeOn에서 길 위의 점으로 붙입니다(placeGps). entries는 붙이기 전 기본값입니다.
@@ -245,7 +247,7 @@ function routeOn(g, routeMode = mode) {
   // 확정된 공사 구간을 먼저 빼서, 막힌 길 위에는 출발점이 생기지 않게 합니다.
   let routeGraph = {
     nodes: g.nodes,
-    edges: availableEdges(confirmedEdges, g.edges),
+    edges: availableEdges(confirmedEdges, withApprovedShortcuts(g, shortcutRows, BUILDINGS)),
   };
   [start, routeGraph] = placeGps(start, routeGraph, g, "gps-start");
   [destination, routeGraph] = placeGps(destination, routeGraph, g, "gps-goal");
@@ -1531,6 +1533,7 @@ window.addEventListener("pagehide", () => {
   if (gpsWatchId !== null) navigator.geolocation?.clearWatch(gpsWatchId);
 });
 function routeView() {
+  stopShortcutPicking();
   setReporting(false);
   const isMap = location.hash.startsWith("#campus/");
   if (isMap && location.hash !== "#campus/seoultech") {
@@ -1652,10 +1655,203 @@ document.addEventListener("keydown", (e) => {
     $("#school-search").focus();
   }
 });
+// 지름길 제보는 현재 배포된 보행 그래프의 연결점에 맞춥니다.
+const shortcutDialog = $("#shortcut-dialog");
+const shortcutForm = $("#shortcut-form");
+const shortcutSubmit = $("#shortcut-submit");
+const shortcutBase = { nodes: NODES, edges: EDGES };
+const shortcutEndpoints = shortcutNodes(EDGES);
+let shortcutSelection = [];
+let reviewingShortcut = false;
+let shortcutLoad = 0;
+
+function previewShortcut(points) {
+  const color = 0x7950ff;
+  map?.setEditPreview({
+    dots: points.map((point) => ({ ...point, color, radius: 3 })),
+    lines: [{ points, color, width: 2, dashed: true }],
+  });
+}
+
+function stopShortcutPicking() {
+  if ($("#shortcut-picker").hidden && !shortcutSelection.length && !reviewingShortcut) return;
+  $("#shortcut-picker").hidden = true;
+  shortcutSelection = [];
+  reviewingShortcut = false;
+  map?.setShortcutPicker(null);
+  map?.setEditPreview(null);
+}
+
+function startShortcutPicking() {
+  if (!map || EDIT_MODE) return toast("캠퍼스 지도에서 지름길을 제보해주세요.");
+  stopShortcutPicking();
+  setReporting(false);
+  setReportsPanel(false);
+  closeBuildingPopover();
+  closeBuildingCard();
+  $("#shortcut-picker").hidden = false;
+  $("#shortcut-picker-close").textContent = "취소";
+  $("#shortcut-picker-status").textContent = "지름길의 시작점을 눌러주세요.";
+  map.setShortcutPicker(pickShortcutPoint);
+  $("#campus-map canvas")?.focus({ preventScroll: true });
+}
+
+function pickShortcutPoint(point) {
+  let nearest = null;
+  let distance = 15;
+  for (const id of shortcutEndpoints) {
+    const node = NODES[id];
+    const meters = Math.hypot(point.x - node.x, point.z - node.z);
+    if (meters < distance) {
+      nearest = id;
+      distance = meters;
+    }
+  }
+  if (!nearest) return toast("기존 보행로 가까이에서 선택해주세요.");
+  if (!shortcutSelection.length) {
+    shortcutSelection.push(nearest);
+    previewShortcut([NODES[nearest]]);
+    $("#shortcut-picker-status").textContent = "지름길의 끝점을 눌러주세요.";
+    return;
+  }
+  const [node_a] = shortcutSelection;
+  const edge = shortcutEdge({ node_a, node_b: nearest }, shortcutBase, BUILDINGS, shortcutEndpoints);
+  if (!edge) return toast("건물을 지나지 않는 다른 끝점을 선택해주세요.");
+  if (EDGES.some((candidate) => edgeId(candidate) === edgeId(edge)))
+    return toast("이미 연결된 구간이에요. 다른 끝점을 선택해주세요.");
+  shortcutSelection.push(nearest);
+  previewShortcut(shortcutSelection.map((id) => NODES[id]));
+  map.setShortcutPicker(null);
+  $("#shortcut-picker").hidden = true;
+  shortcutForm.reset();
+  $("#shortcut-error").hidden = true;
+  $("#shortcut-summary").textContent = `선택한 두 지점 사이 약 ${Math.round(edge.meters)}m`;
+  shortcutDialog.showModal();
+}
+
+$("#shortcut-start").onclick = startShortcutPicking;
+$("#shortcut-picker-close").onclick = () => {
+  const returnToReview = reviewingShortcut;
+  stopShortcutPicking();
+  if (returnToReview && adminAuthenticated) openAdminPanel();
+};
+shortcutDialog.addEventListener("cancel", (event) => {
+  if (shortcutSubmit.disabled) event.preventDefault();
+});
+shortcutDialog.addEventListener("close", () => {
+  if ($("#shortcut-picker").hidden) stopShortcutPicking();
+});
+$("#shortcut-repick").onclick = () => {
+  shortcutDialog.close();
+  startShortcutPicking();
+};
+shortcutForm.onsubmit = async (event) => {
+  event.preventDefault();
+  if (shortcutSubmit.disabled || shortcutSelection.length !== 2) return;
+  const [node_a, node_b] = shortcutSelection;
+  const note = $("#shortcut-note").value.trim();
+  const errorMessage = $("#shortcut-error");
+  if (!note) {
+    errorMessage.textContent = "지름길 설명을 입력해주세요.";
+    errorMessage.hidden = false;
+    return;
+  }
+  shortcutSubmit.disabled = true;
+  $("#shortcut-repick").disabled = true;
+  try {
+    const { error } = await supabase.from("shortcut_reports").insert({
+      node_a, node_b, note, has_stairs: $("#shortcut-stairs").value === "yes",
+    });
+    if (error) throw error;
+    shortcutDialog.close();
+    toast("지름길 제보가 접수됐어요. 관리자가 확인한 뒤 길찾기에 반영돼요.");
+  } catch {
+    errorMessage.textContent = "제보를 보내지 못했어요. 다시 시도해주세요.";
+    errorMessage.hidden = false;
+  } finally {
+    shortcutSubmit.disabled = false;
+    $("#shortcut-repick").disabled = false;
+  }
+};
+
+async function loadShortcuts() {
+  const request = ++shortcutLoad;
+  let query = supabase.from("shortcut_reports").select("*").order("created_at");
+  if (!adminAuthenticated) query = query.eq("status", "approved");
+  const { data, error } = await query;
+  if (request !== shortcutLoad) return;
+  if (error) {
+    $("#shortcut-admin-status").textContent = "지름길 제보를 불러오지 못했어요.";
+    return;
+  }
+  const approvedIds = (rows) => rows.filter((row) => row.status === "approved").map((row) => row.id).join(",");
+  const changed = approvedIds(shortcutRows) !== approvedIds(data);
+  shortcutRows = data;
+  if ($("#admin-dialog").open) renderShortcutReviews();
+  if (changed && routePlaceId("#origin") && routePlaceId("#destination")) updateRoute();
+}
+
+function renderShortcutReviews() {
+  const list = $("#shortcut-admin-list");
+  const rows = shortcutRows.filter((row) => row.status !== "rejected");
+  $("#shortcut-admin-status").textContent = rows.length ? "" : "검토할 지름길 제보가 없어요.";
+  list.replaceChildren();
+  for (const row of rows) {
+    const edge = shortcutEdge(row, shortcutBase, BUILDINGS, shortcutEndpoints);
+    const approved = row.status === "approved";
+    const item = el("li", "shortcut-review");
+    item.append(
+      el("b", "", approved ? "등록됨" : "검토 대기"),
+      el("p", "", row.note),
+      el("small", "", edge
+        ? `약 ${Math.round(edge.meters)}m · ${edge.stairs ? "계단 있음" : "계단 없음"}`
+        : "현재 지도에서 연결점을 확인할 수 없어요."),
+    );
+    const actions = el("div", "admin-actions");
+    const preview = el("button", "", "지도에서 보기");
+    preview.disabled = !edge || !map || EDIT_MODE;
+    preview.onclick = () => {
+      const points = [NODES[edge.a], NODES[edge.b]];
+      const [a, b] = points;
+      setReporting(false);
+      $("#admin-dialog").close();
+      reviewingShortcut = true;
+      $("#shortcut-picker").hidden = false;
+      $("#shortcut-picker-status").textContent = "제보된 지름길";
+      $("#shortcut-picker-close").textContent = "검토로 돌아가기";
+      previewShortcut(points);
+      map.focusTop({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 }, Math.min(5, 170 / edge.meters));
+    };
+    actions.append(preview);
+    for (const [status, label] of approved
+      ? [["rejected", "등록 취소"]]
+      : [["approved", "승인 및 등록"], ["rejected", "반려"]]) {
+      const button = el("button", "", label);
+      button.disabled = status === "approved" && !edge;
+      if (status === "approved") button.dataset.act = "confirm";
+      button.onclick = async () => {
+        for (const control of actions.children) control.disabled = true;
+        const { data, error } = await supabase.from("shortcut_reports")
+          .update({ status }).eq("id", row.id).eq("status", row.status).select("id");
+        for (const control of actions.children) control.disabled = false;
+        await loadShortcuts();
+        if (error || !data?.length)
+          $("#shortcut-admin-status").textContent = error?.code === "23505"
+            ? "이미 등록된 지름길이에요."
+            : "검토 상태를 저장하지 못했어요. 다시 시도해주세요.";
+      };
+      actions.append(button);
+    }
+    item.append(actions);
+    list.append(item);
+  }
+}
+
 renderSchools();
 renderReportList();
 renderAdminAlert();
 routeView();
+loadShortcuts();
 loadReports(); // Supabase에서 신고 목록을 비동기로 불러와 위 렌더를 다시 채웁니다.
 
 // ===== 현장 공사 신고 (GPS 위치 + 앱 안 카메라) =====
@@ -1666,6 +1862,7 @@ const REPORT_MAX_ACCURACY = 50,
   REPORT_ADJUST_RADIUS = 30;
 let reportOrigin = null; // 신고를 시작할 때 잡은 GPS 위치 {x, z, accuracy}
 function setReporting(value) {
+  if (value) stopShortcutPicking();
   reporting = value;
   $("#report-start").classList.toggle("active", value);
   $("#report-start").setAttribute("aria-pressed", String(value));
@@ -2275,6 +2472,7 @@ function openAdminPanel() {
   renderAdminPanel();
   renderWorkList();
   $("#admin-dialog").showModal();
+  loadShortcuts();
 }
 // ===== 관리자·편집기 진입 (사이드바·모바일 버튼) =====
 // 관리자 계정으로 로그인한 뒤 편집기(?edit)와 관리자 검토 중 하나를 고릅니다.
@@ -2501,6 +2699,7 @@ function refreshShared() {
   if (document.hidden || reporting || $("#report-dialog").open) return;
   loadReports();
   loadWorks();
+  loadShortcuts();
 }
 setInterval(refreshShared, 10000);
 document.addEventListener("visibilitychange", refreshShared);
