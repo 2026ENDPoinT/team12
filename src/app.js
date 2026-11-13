@@ -1296,6 +1296,7 @@ function routeView() {
     // 학교를 열 때마다 이전 선택과 경로를 지우고 지도만 보여 줍니다.
     // 지도부터 보여 주고, 길찾기 버튼을 누르면 패널이 열립니다(데스크톱·모바일 공통).
     setPanelClosed(true);
+    setEntranceLayer(false);
     $("#origin").value = "";
     $("#destination").value = "";
     routeShown = false;
@@ -1767,17 +1768,23 @@ function reportStatusLabel(report) {
   return `접수됨 · ${REPORT_THRESHOLD}건 이상 모이면 지도에 주의 표시`;
 }
 function renderReportList() {
-  $("#report-count").textContent = reports.length;
-  $("#report-empty").hidden = reports.length > 0;
+  const visible = clusters.filter(
+    (cluster) => cluster.count >= REPORT_THRESHOLD,
+  );
+  $("#report-count").textContent = `주의 (${visible.length})`;
+  $("#report-empty").hidden = visible.length > 0;
   $("#report-list").replaceChildren();
-  for (const report of reports) {
+  for (const cluster of visible) {
+    const report = cluster.cover;
     const li = document.createElement("li"),
       button = document.createElement("button");
     button.innerHTML =
       '<span aria-hidden="true">⚠</span><span><b></b><small></small></span><span>↗</span>';
     button.querySelector("b").textContent = reportLocation(report);
     button.querySelector("small").textContent =
-      reasonLabel(report) + " · " + reportStatusLabel(report);
+      cluster.status === "confirmed"
+        ? `${reasonLabel(report)} · 관리자 확정 · 통행 우회`
+        : `${reasonLabel(report)} · 주의 (${cluster.count}건)`;
     button.onclick = () => openRoadReport({ reportId: report.id });
     li.append(button);
     $("#report-list").append(li);
