@@ -7413,3 +7413,45 @@ body {
 #admin-dialog .admin-photo {
   max-width: 220px;
 }
+
+/* 관리자 검토 창: 적당한 글래스모피즘 (뒤 지도가 은은히 비치되, 사진·글자는 읽히게) */
+#admin-dialog {
+  border: 0.75px solid rgba(255, 255, 255, 0.6);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.66) 0%,
+    rgba(255, 255, 255, 0.42) 100%
+  );
+  box-shadow:
+    inset 0 0.75px 0 rgba(255, 255, 255, 0.8),
+    0 24px 70px rgba(21, 33, 43, 0.2);
+  backdrop-filter: blur(26px) saturate(180%);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+}
+#admin-dialog::backdrop {
+  background: rgba(21, 33, 43, 0.16);
+  backdrop-filter: blur(2px);
+}
+#admin-dialog .admin-section {
+  border: 0.75px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.4);
+}
+#admin-dialog .admin-section-urgent {
+  border-color: rgba(229, 72, 77, 0.3);
+  background: rgba(253, 236, 236, 0.5);
+}
+#admin-dialog .admin-item {
+  border: 0.75px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.72);
+}
+#admin-dialog .dialog-close,
+#admin-dialog .admin-logout,
+#admin-dialog .admin-photo-actions a,
+#admin-dialog .admin-photo-actions button,
+#admin-dialog .admin-actions button:not([data-act="confirm"]):not([data-act="release"]) {
+  background: rgba(255, 255, 255, 0.6);
+}
+#admin-dialog .work-form input,
+#admin-dialog .work-form select {
+  background: rgba(255, 255, 255, 0.78);
+}
