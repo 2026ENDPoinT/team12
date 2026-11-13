@@ -580,7 +580,18 @@ $("#reports-panel-start").onclick = () => {
 };
 
 // ===== 경로 방식 카드: 두 방식의 시간·거리를 함께 보여 줍니다 =====
+// 출발지와 도착지를 둘 다 고른 상태인지 표시합니다.
+// 모바일은 이때부터 아래 경로 시트(경로 방식 · 결과)를 띄웁니다.
+function syncPlacesReady() {
+  $("#map-view").classList.toggle(
+    "places-ready",
+    Boolean(routePlaceId("#origin") && routePlaceId("#destination")),
+  );
+}
+for (const selector of ["#origin", "#destination"])
+  $(selector).addEventListener("input", syncPlacesReady);
 function updateModeOptions() {
+  syncPlacesReady();
   for (const m of ["shortest", "stepfree"]) {
     const { start, destination, route } = routeOn(graph, m);
     const meta = $(`[data-mode-meta="${m}"]`),

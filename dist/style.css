@@ -6632,3 +6632,9 @@ body {
     display: none;
   }
 }
+@media (max-width: 760px) {
+  /* 길찾기 중에는 출발지·도착지를 둘 다 고른 뒤에야 아래 경로 시트를 띄웁니다(사용자 요청). */
+  .map-view:not(.panel-closed):not(.places-ready) .route-panel {
+    display: none;
+  }
+}
