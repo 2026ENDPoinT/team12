@@ -30,6 +30,8 @@ import {
   getAdminSession,
   signInAdmin,
   signOutAdmin,
+  isAdminUser,
+  supabase,
 } from "./backend.mjs";
 import {
   activeWorks,
@@ -53,7 +55,7 @@ import {
 } from "./data.mjs";
 import { createCampusMap } from "./map.js";
 import { buildingInfo } from "./building-info.mjs";
-import { setupEditMode } from "./edit-mode.js";
+import { setupEditMode, EDIT_MODE } from "./edit-mode.js";
 import { gpsToCampus } from "./geo.mjs";
 import { gisSummary } from "./gis.mjs";
 import { routePoints, guidanceAt, INSTRUCTION } from "./guidance.mjs";
@@ -76,6 +78,7 @@ let region = "전체",
   guidancePending = false;
 // Supabase에서 비동기로 채워집니다 (아래 loadReports 참고). 처음엔 빈 상태로 시작합니다.
 let reports = [],
+  adminAuthenticated = false,
   confirmedEdges = [],
   reporting = false,
   selectedReport = null,
@@ -406,20 +409,22 @@ if (!map) {
     "gate",
     "future",
   );
-  setupEditMode({
-    map,
-    survey: SURVEY,
-    geometry: CAMPUS_GEOMETRY,
-    buildings: BUILDINGS,
-    getGraph: () => graph,
-    // 편집기가 조사 데이터를 바꿀 때마다 합친 그래프를 넘겨받아 경로를 다시 그립니다.
-    applyGraph(next) {
-      graph = next;
-      updateRoute();
-    },
-    // 주어진 그래프에서 지금 고른 출발지·도착지 경로를 계산만 합니다(화면은 그대로).
-    routeOn,
-  });
+  // 편집기는 관리자 로그인을 확인한 뒤에만 켭니다(주소에 ?edit를 직접 붙여도 마찬가지).
+  if (EDIT_MODE)
+    startEditModeAfterLogin({
+      map,
+      survey: SURVEY,
+      geometry: CAMPUS_GEOMETRY,
+      buildings: BUILDINGS,
+      getGraph: () => graph,
+      // 편집기가 조사 데이터를 바꿀 때마다 합친 그래프를 넘겨받아 경로를 다시 그립니다.
+      applyGraph(next) {
+        graph = next;
+        updateRoute();
+      },
+      // 주어진 그래프에서 지금 고른 출발지·도착지 경로를 계산만 합니다(화면은 그대로).
+      routeOn,
+    });
 }
 for (const selector of ["#origin", "#destination"]) {
   const input = $(selector);
@@ -1074,11 +1079,8 @@ side("settings").onclick = () => {
   $("#map-view").classList.toggle("show-instructions", on);
   side("settings").setAttribute("aria-pressed", String(on));
 };
-side("alerts").onclick = () => {
-  if ($("#admin-toggle").hidden)
-    toast("관리자 검토는 관리자 기기에서만 열 수 있어요.");
-  else $("#admin-toggle").click();
-};
+// 관리자·편집기 버튼: 관리자 계정으로 로그인하면 편집기 / 관리자 검토를 고르는 메뉴를 엽니다.
+side("alerts").onclick = () => openAdminEntry();
 // 신고 모드와 내 위치 상태를 사이드바·지도 컨트롤 버튼에도 똑같이 보여 줍니다.
 new MutationObserver(() => {
   $("#v2-locate").setAttribute(
@@ -1162,20 +1164,11 @@ placeJourneyForm();
 isDesktop.addEventListener("change", placeJourneyForm);
 $("#mobile-route-back").onclick = () => setPanelClosed(true);
 
-// 모바일 오른쪽 둥근 버튼: 길 막힘 제보 패널, 관리자 검토(관리자 기기에서만 보임)
+// 모바일 오른쪽 둥근 버튼: 길 막힘 제보 패널, 관리자·편집기 진입(공개 버튼)
 $("#v2-report").onclick = () =>
   setReportsPanel($("#reports-panel").hidden);
 $("#v2-admin").onclick = () => $("#admin-toggle").click();
-function syncAdminButton() {
-  const hidden = $("#admin-toggle").hidden;
-  $("#v2-admin").hidden = hidden;
-  side("alerts").hidden = hidden;
-}
-syncAdminButton();
-new MutationObserver(syncAdminButton).observe($("#admin-toggle"), {
-  attributes: true,
-  attributeFilter: ["hidden"],
-});
+
 
 
 // ===== GPS 현재 위치 추적 =====
@@ -1957,15 +1950,20 @@ function renderAdminPanel() {
     open.filter((c) => !c.needsReview),
   );
 }
-// threshold 이상 쌓여 검토가 필요한 구역 수를 관리자 버튼 배지로 보여줍니다.
+// 진입 버튼은 누구나 보지만 검토 건수는 관리자 세션이 확인된 뒤에만 보여줍니다.
 function renderAdminAlert() {
-  const count = clusters.filter((c) => c.needsReview).length;
-  $("#admin-alert-count").textContent = count;
-  $("#admin-alert-count").hidden = count === 0;
-  $("#v2-admin-count").textContent = count;
-  $("#v2-admin-count").hidden = count === 0;
-  $("#side-alert-count").textContent = count;
-  $("#side-alert-count").hidden = count === 0;
+  const count = adminAuthenticated
+    ? clusters.filter((c) => c.needsReview).length
+    : 0;
+  for (const id of [
+    "#admin-alert-count",
+    "#v2-admin-count",
+    "#side-alert-count",
+    "#admin-menu-count",
+  ]) {
+    $(id).textContent = count;
+    $(id).hidden = count === 0;
+  }
 }
 // 관리자 화면은 ?admin=1에서만 노출하고, 실제 권한은 Supabase Auth + RLS가 검사합니다.
 $("#admin-toggle").hidden = !new URLSearchParams(location.search).has("admin");
@@ -1974,9 +1972,89 @@ function openAdminPanel() {
   renderWorkList();
   $("#admin-dialog").showModal();
 }
+// ===== 관리자·편집기 진입 (사이드바·모바일 버튼) =====
+// 관리자 계정으로 로그인한 뒤 편집기(?edit)와 관리자 검토 중 하나를 고릅니다.
+// 권한은 Supabase Auth(관리자 역할)가 확인합니다.
+let afterAdminLogin = openAdminPanel;
+function openAdminMenu() {
+  $("#admin-menu-editor-title").textContent = EDIT_MODE
+    ? "편집기 닫기"
+    : "편집기 열기";
+  const count = $("#admin-alert-count").textContent;
+  $("#admin-menu-count").textContent = count;
+  $("#admin-menu-count").hidden = !Number(count);
+  $("#admin-menu-dialog").showModal();
+}
+async function openAdminEntry() {
+  try {
+    if (await getAdminSession()) return openAdminMenu();
+  } catch {
+    toast("관리자 로그인 상태를 확인하지 못했어요.");
+    return;
+  }
+  afterAdminLogin = openAdminMenu;
+  $("#admin-login-error").hidden = true;
+  $("#admin-login-dialog").showModal();
+}
+$("#v2-admin").onclick = () => openAdminEntry();
+// ?edit 주소로 들어오면 관리자 로그인부터 확인하고, 관리자일 때만 편집기를 켭니다.
+// 로그인 창을 그냥 닫으면 편집기 없이 일반 지도 화면으로 둡니다.
+async function startEditModeAfterLogin(ctx) {
+  // 편집기가 켜지면 관리자·편집기 버튼을 눌린(active) 상태로 보여 줍니다.
+  const start = () => {
+    setupEditMode(ctx);
+    if (!$("#graph-overlay-toggle")) return;
+    side("alerts").setAttribute("aria-pressed", "true");
+    $("#v2-admin").setAttribute("aria-pressed", "true");
+  };
+  try {
+    if (await getAdminSession()) return start();
+  } catch {
+    toast("관리자 로그인 상태를 확인하지 못해 편집기를 열지 않았어요.");
+    return;
+  }
+  afterAdminLogin = start;
+  $("#admin-login-error").hidden = true;
+  $("#admin-login-dialog").showModal();
+  // 로그인 창이 닫히는 순간(open 속성이 빠질 때)을 지켜보다가, 편집기가 켜지지 않았으면 안내합니다.
+  const watcher = new MutationObserver(() => {
+    if ($("#admin-login-dialog").open) return;
+    watcher.disconnect();
+    setTimeout(() => {
+      if (!$("#graph-overlay-toggle"))
+        toast("편집기는 관리자 로그인 후에 쓸 수 있어요.");
+    });
+  });
+  watcher.observe($("#admin-login-dialog"), {
+    attributes: true,
+    attributeFilter: ["open"],
+  });
+}
+$("#admin-menu-editor").onclick = () => {
+  // 편집기는 주소의 ?edit로 켜고 끕니다(지금 보던 화면 주소는 그대로).
+  const url = new URL(location.href);
+  if (EDIT_MODE) url.searchParams.delete("edit");
+  else url.searchParams.set("edit", "1");
+  location.assign(url.href);
+};
+$("#admin-menu-review").onclick = () => {
+  $("#admin-menu-dialog").close();
+  openAdminPanel();
+};
+$("#admin-menu-logout").onclick = async () => {
+  try {
+    await signOutAdmin();
+  } catch {
+    toast("로그아웃하지 못했어요. 다시 시도해 주세요.");
+    return;
+  }
+  $("#admin-menu-dialog").close();
+  toast("관리자 계정에서 로그아웃했어요.");
+};
 $("#admin-toggle").onclick = async () => {
   try {
     if (await getAdminSession()) return openAdminPanel();
+    afterAdminLogin = openAdminPanel;
   } catch {
     toast("관리자 로그인 상태를 확인하지 못했어요.");
     return;
@@ -2001,7 +2079,7 @@ $("#admin-login-form").onsubmit = async (event) => {
   }
   $("#admin-password").value = "";
   $("#admin-login-dialog").close();
-  openAdminPanel();
+  afterAdminLogin();
 };
 $("#admin-logout").onclick = async () => {
   try {
@@ -2013,6 +2091,13 @@ $("#admin-logout").onclick = async () => {
   $("#admin-dialog").close();
   toast("관리자 계정에서 로그아웃했어요.");
 };
+
+// 초기 세션 복원·로그인·로그아웃·토큰 갱신 때 같은 권한 기준으로 배지를 갱신합니다.
+// 콜백에서는 Auth API를 다시 호출하지 않고 전달받은 세션만 확인합니다.
+supabase.auth.onAuthStateChange((_event, session) => {
+  adminAuthenticated = isAdminUser(session?.user);
+  renderAdminAlert();
+});
 
 // ===== 건물 공사 (관리자가 건물을 골라 기간과 함께 등록 → 지도에 🚧 표시만, 경로는 그대로) =====
 async function loadWorks() {

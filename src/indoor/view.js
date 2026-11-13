@@ -8,6 +8,7 @@ import {
   CSS2DObject,
 } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { floorViewPose } from "./camera.mjs";
 import {
   texturize,
   glassMaterial,
@@ -75,6 +76,7 @@ export function createView(el, indoor, { onPick } = {}) {
     firstPerson = false,
     dirty = true;
   const nodes = {};
+  const floorBounds = new Map();
   const labels = [];
   const routeGroup = new THREE.Group();
   scene.add(routeGroup);
@@ -162,6 +164,15 @@ export function createView(el, indoor, { onPick } = {}) {
       nodes[o.name] = o;
     });
     scene.add(g.scene);
+    g.scene.updateMatrixWorld(true);
+    for (const f of M.floors) {
+      const bounds = new THREE.Box3();
+      for (const [name, node] of Object.entries(nodes)) {
+        if (name[0] !== "C" && name[0] !== "X" && +name.slice(1) === f.n)
+          bounds.expandByObject(node);
+      }
+      if (!bounds.isEmpty()) floorBounds.set(f.n, bounds);
+    }
     buildFacilities();
     buildLabels();
     setFloor(floor, true);
@@ -261,8 +272,7 @@ export function createView(el, indoor, { onPick } = {}) {
   let selectedKey = null;
   function updateLabels() {
     const dist = cam.position.distanceTo(ctl.target);
-    // The desktop panel reduces the map viewport: keep room labels visible
-    // at the correspondingly larger distance used to frame the whole floor.
+    // Keep labels readable at the distance needed for narrow viewports.
     const roomLabelDistance = Math.max(
       130,
       Math.min(200, (130 * 1440) / el.clientWidth),
@@ -377,31 +387,38 @@ export function createView(el, indoor, { onPick } = {}) {
         floorAnim.tgt1.y += dz;
       }
     }
-    if (reframe) frame();
+    if (reframe) frame({ animate });
     applyVisibility();
     updateLabels();
   }
-  // 층 전체가 화면에 들어오도록. 세로 화면이면 건물의 긴 축(동서)을 화면 세로로 돌립니다.
-  function frame() {
-    const z = FL(floor).z;
-    const portrait = el.clientWidth < el.clientHeight;
-    const halfW = portrait ? 32 : 46,
-      halfH = portrait ? 46 : 32; // 화면 가로·세로에 들어갈 건물 반폭(m)
-    const vf = (cam.fov * Math.PI) / 360,
-      hf = Math.atan(Math.tan(vf) * cam.aspect);
-    const dist =
-      Math.max(halfH / Math.tan(vf), halfW / Math.tan(hf)) * 1.05 + 10;
-    const tilt = 0.5; // 기울기(라디안)
-    ctl.target.copy(T(0, -1, z));
-    const back = portrait
-      ? new THREE.Vector3(-1, 0, 0)
-      : new THREE.Vector3(0, 0, 1); // 세로: 서쪽에서, 가로: 남쪽에서
-    cam.position
-      .copy(ctl.target)
-      .addScaledVector(back, Math.sin(tilt) * dist)
-      .add(new THREE.Vector3(0, Math.cos(tilt) * dist, 0));
-    ctl.maxDistance = Math.max(170, dist * 1.4);
+  // 현재 층 모델의 실제 중심·크기로 맞춤. 초기화 시 기울기와 방향도 복원합니다.
+  function frame({ resetOrientation = true, animate = false } = {}) {
+    const bounds = floorBounds.get(floor);
+    if (!bounds) return;
+    const direction = resetOrientation
+      ? undefined
+      : floorAnim
+        ? floorAnim.cam1.clone().sub(floorAnim.tgt1)
+        : cam.position.clone().sub(ctl.target);
+    const pose = floorViewPose(bounds, {
+      width: el.clientWidth,
+      height: el.clientHeight,
+      fov: cam.fov,
+      direction,
+    });
+    // Clear residual drag/zoom damping before restoring or animating a view.
+    const damping = ctl.enableDamping;
+    ctl.enableDamping = false;
     ctl.update();
+    ctl.enableDamping = damping;
+    floorAnim = null;
+    ctl.maxDistance = Math.max(170, pose.distance * 1.4);
+    if (animate) flyTo(pose.position, pose.target);
+    else {
+      cam.position.copy(pose.position);
+      ctl.target.copy(pose.target);
+      ctl.update();
+    }
     dirty = true;
   }
   // 영역이 화면(아래 시트에 가린 부분 제외)에 들어오도록 맞춤

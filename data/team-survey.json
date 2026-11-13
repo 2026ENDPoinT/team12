@@ -1700,6 +1700,336 @@
         "source_kind": "team_input",
         "verification_status": "candidate"
       }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0786977,
+            37.6320453
+          ],
+          [
+            127.0786977,
+            37.6320453
+          ],
+          [
+            127.0787729,
+            37.6320283
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-8",
+        "campus_id": "SEOULTECH",
+        "feature_type": "stairs",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0793118,
+            37.6319912
+          ],
+          [
+            127.0793695,
+            37.6319363
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-10",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0802756,
+          37.631708
+        ]
+      },
+      "properties": {
+        "id": "ent-admin-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "admin",
+        "name": "대학본부 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0797049,
+            37.6314606
+          ],
+          [
+            127.0796494,
+            37.6313236
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-11",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0795814,
+            37.6314209
+          ],
+          [
+            127.0796765,
+            37.6313906
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-12",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.079595,
+            37.6313461
+          ],
+          [
+            127.0796267,
+            37.63132
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-13",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0799235,
+            37.6314425
+          ],
+          [
+            127.0799208,
+            37.6313877
+          ],
+          [
+            127.0802441,
+            37.631411
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-14",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0802509,
+            37.6313705
+          ],
+          [
+            127.0800765,
+            37.6313669
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-15",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0802045,
+            37.6313281
+          ],
+          [
+            127.080081,
+            37.6313209
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-16",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0798635,
+            37.6313542
+          ],
+          [
+            127.0798941,
+            37.6314389
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-17",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0787634,
+            37.631702
+          ],
+          [
+            127.0788416,
+            37.6316813
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-18",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0787729,
+            37.6320283
+          ],
+          [
+            127.0791169,
+            37.6316822
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-9",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0791169,
+            37.6316822
+          ],
+          [
+            127.0791248,
+            37.6316372
+          ],
+          [
+            127.0791441,
+            37.6316002
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-19",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0787464,
+            37.631657
+          ],
+          [
+            127.0788235,
+            37.6316381
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-20",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
     }
   ]
 }
