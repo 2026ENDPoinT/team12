@@ -406,20 +406,22 @@ if (!map) {
     "gate",
     "future",
   );
-  setupEditMode({
-    map,
-    survey: SURVEY,
-    geometry: CAMPUS_GEOMETRY,
-    buildings: BUILDINGS,
-    getGraph: () => graph,
-    // 편집기가 조사 데이터를 바꿀 때마다 합친 그래프를 넘겨받아 경로를 다시 그립니다.
-    applyGraph(next) {
-      graph = next;
-      updateRoute();
-    },
-    // 주어진 그래프에서 지금 고른 출발지·도착지 경로를 계산만 합니다(화면은 그대로).
-    routeOn,
-  });
+  // 편집기는 관리자 로그인을 확인한 뒤에만 켭니다(주소에 ?edit를 직접 붙여도 마찬가지).
+  if (EDIT_MODE)
+    startEditModeAfterLogin({
+      map,
+      survey: SURVEY,
+      geometry: CAMPUS_GEOMETRY,
+      buildings: BUILDINGS,
+      getGraph: () => graph,
+      // 편집기가 조사 데이터를 바꿀 때마다 합친 그래프를 넘겨받아 경로를 다시 그립니다.
+      applyGraph(next) {
+        graph = next;
+        updateRoute();
+      },
+      // 주어진 그래프에서 지금 고른 출발지·도착지 경로를 계산만 합니다(화면은 그대로).
+      routeOn,
+    });
 }
 for (const selector of ["#origin", "#destination"]) {
   const input = $(selector);
@@ -1980,6 +1982,32 @@ async function openAdminEntry() {
   $("#admin-login-dialog").showModal();
 }
 $("#v2-admin").onclick = () => openAdminEntry();
+// ?edit 주소로 들어오면 관리자 로그인부터 확인하고, 관리자일 때만 편집기를 켭니다.
+// 로그인 창을 그냥 닫으면 편집기 없이 일반 지도 화면으로 둡니다.
+async function startEditModeAfterLogin(ctx) {
+  try {
+    if (await getAdminSession()) return setupEditMode(ctx);
+  } catch {
+    toast("관리자 로그인 상태를 확인하지 못해 편집기를 열지 않았어요.");
+    return;
+  }
+  afterAdminLogin = () => setupEditMode(ctx);
+  $("#admin-login-error").hidden = true;
+  $("#admin-login-dialog").showModal();
+  // 로그인 창이 닫히는 순간(open 속성이 빠질 때)을 지켜보다가, 편집기가 켜지지 않았으면 안내합니다.
+  const watcher = new MutationObserver(() => {
+    if ($("#admin-login-dialog").open) return;
+    watcher.disconnect();
+    setTimeout(() => {
+      if (!$("#graph-overlay-toggle"))
+        toast("편집기는 관리자 로그인 후에 쓸 수 있어요.");
+    });
+  });
+  watcher.observe($("#admin-login-dialog"), {
+    attributes: true,
+    attributeFilter: ["open"],
+  });
+}
 $("#admin-menu-editor").onclick = () => {
   // 편집기는 주소의 ?edit로 켜고 끕니다(지금 보던 화면 주소는 그대로).
   const url = new URL(location.href);
