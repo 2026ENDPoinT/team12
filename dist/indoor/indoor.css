@@ -540,7 +540,7 @@ a {
   color: var(--muted);
   font-size: 12px;
 }
-.steps img {
+.steps > li > img {
   width: 72px;
   height: 41px;
   object-fit: cover;

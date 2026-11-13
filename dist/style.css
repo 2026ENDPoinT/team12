@@ -5122,6 +5122,9 @@ body.exploring .header {
   font-size: 13px;
   cursor: pointer;
 }
+  .map-sidebar > button[hidden] {
+    display: none;
+  }
 .place-suggestions li:hover,
 .place-suggestions li[aria-selected="true"] {
   background: #f1eafd;

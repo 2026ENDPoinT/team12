@@ -78,6 +78,8 @@ export function createView(el, indoor, { onPick } = {}) {
   const labels = [];
   const routeGroup = new THREE.Group();
   scene.add(routeGroup);
+  const facilityGroup = new THREE.Group();
+  scene.add(facilityGroup);
   const me = makeMe();
   me.visible = false;
   scene.add(me);
@@ -93,7 +95,7 @@ export function createView(el, indoor, { onPick } = {}) {
     }
     dirty = true;
   }
-  addEventListener("resize", resize);
+  new ResizeObserver(resize).observe(el);
   resize();
   ctl.addEventListener("change", () => (dirty = true));
 
@@ -160,6 +162,7 @@ export function createView(el, indoor, { onPick } = {}) {
       nodes[o.name] = o;
     });
     scene.add(g.scene);
+    buildFacilities();
     buildLabels();
     setFloor(floor, true);
   }
@@ -185,7 +188,24 @@ export function createView(el, indoor, { onPick } = {}) {
               ? d.id
               : d.title;
       div.className = "room-label" + (d.numbered ? "" : " icon-only");
-      div.textContent = short;
+      if (d.cat === "toilet") {
+        div.classList.add("restroom-label");
+        div.dataset.gender = /女|여/.test(d.title)
+          ? "여"
+          : /男|남/.test(d.title)
+            ? "남"
+            : "";
+        div.setAttribute("role", "img");
+        div.setAttribute(
+          "aria-label",
+          `${d.f === 0 ? "지하 1" : d.f}층 ${d.title}`,
+        );
+        div.title = `${d.title}${d.name ? " · " + d.name : ""}`;
+        const icon = document.createElement("img");
+        icon.src = "ui/restroom.svg";
+        icon.alt = "";
+        div.append(icon);
+      } else div.textContent = short;
       const o = new CSS2DObject(div);
       o.position.copy(T(p[0], p[1], FL(d.f).z + 0.6));
       o.userData = { d };
@@ -194,9 +214,59 @@ export function createView(el, indoor, { onPick } = {}) {
       labels.push(o);
     }
   }
+  // Color the actual restroom footprints in plan view, independently of the
+  // architectural model and route materials.
+  function buildFacilities() {
+    const fill = new THREE.MeshBasicMaterial({
+      color: 0x1684b8,
+      transparent: true,
+      opacity: 0.3,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    });
+    const outline = new THREE.MeshBasicMaterial({
+      color: 0x1675a9,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    });
+    for (const f of M.floors) {
+      const group = new THREE.Group();
+      group.userData.f = f.n;
+      for (const room of f.rooms.filter((r) => r.cat === "toilet")) {
+        const shape = new THREE.Shape(
+          room.poly.map(([x, y]) => new THREE.Vector2(x, y)),
+        );
+        const area = new THREE.Mesh(new THREE.ShapeGeometry(shape), fill);
+        area.rotation.x = -Math.PI / 2;
+        area.position.y = f.z + 0.1;
+        area.renderOrder = 1;
+        group.add(area);
+        const edge = new THREE.Mesh(
+          ribbon(
+            room.poly.map(([x, y]) => [x, y, f.z + 0.11]),
+            0.12,
+          ),
+          outline,
+        );
+        edge.renderOrder = 2;
+        group.add(edge);
+      }
+      facilityGroup.add(group);
+    }
+  }
   let selectedKey = null;
   function updateLabels() {
     const dist = cam.position.distanceTo(ctl.target);
+    // The desktop panel reduces the map viewport: keep room labels visible
+    // at the correspondingly larger distance used to frame the whole floor.
+    const roomLabelDistance = Math.max(
+      130,
+      Math.min(200, (130 * 1440) / el.clientWidth),
+    );
     for (const o of labels) {
       const d = o.userData.d;
       const sel = d.key === selectedKey;
@@ -207,11 +277,18 @@ export function createView(el, indoor, { onPick } = {}) {
           d.f === walkPose.f &&
           Math.hypot(p[0] - walkPose.x, p[1] - walkPose.y) < 12;
       } else
-        o.visible = d.f === floor && (sel || dist < (d.numbered ? 130 : 200));
+        o.visible =
+          d.f === floor &&
+          (sel ||
+            d.cat === "toilet" ||
+            dist < (d.numbered ? roomLabelDistance : 200));
     }
   }
 
   function applyVisibility() {
+    facilityGroup.visible = !firstPerson;
+    for (const group of facilityGroup.children)
+      group.visible = group.userData.f === floor;
     for (const key in nodes) {
       const kind = key[0],
         n = +key.slice(1);
@@ -577,10 +654,10 @@ export function createView(el, indoor, { onPick } = {}) {
     }
     for (const r of runs) {
       if (r.pts.length < 2) continue;
-      // 지도 보기: 미리 걷기와 같은 모양(얇은 선 + 은은한 테두리 + 작은 '>')을 멀리서 보이게 크게
+      // Figma 실내 UI의 보라색 경로 띠와 흰색 방향 표시.
       for (const [geo, mat, order] of [
         [ribbon(r.pts, 1.3), matMapHalo, 1],
-        [ribbon(r.pts, 0.36), matMain, 2],
+        [ribbon(r.pts, 0.6), matMain, 2],
         [chevronsV(r.pts, 3.2, 0.34, 0.09), matChev, 3],
       ]) {
         const m = new THREE.Mesh(geo, mat);
@@ -588,12 +665,12 @@ export function createView(el, indoor, { onPick } = {}) {
         m.userData = { f: r.f, mode: "map" };
         routeGroup.add(m);
       }
-      // 걸어 보기: 얇은 선 + 은은한 테두리 + 작은 '>' 화살표 (눈높이에서 복도를 덮지 않게)
+      // 미리 걷기: 눈높이에서도 진행 방향을 읽을 수 있는 경로 띠.
       const walkPts = r.pts.map((p) => [p[0], p[1], p[2] - 0.05]);
       for (const [geo, mat, order] of [
-        [ribbon(walkPts, 0.5), matWalkHalo, 1],
-        [ribbon(walkPts, 0.14), matWalkLine, 2],
-        [chevronsV(walkPts), matWalkChev, 3],
+        [ribbon(walkPts, 1), matWalkHalo, 1],
+        [ribbon(walkPts, 0.8), matWalkLine, 2],
+        [chevronsV(walkPts, 1.4, 0.34, 0.07), matWalkChev, 3],
       ]) {
         const m = new THREE.Mesh(geo, mat);
         m.renderOrder = order;
@@ -926,6 +1003,7 @@ export function createView(el, indoor, { onPick } = {}) {
 
   return {
     load,
+    resize,
     setFloor,
     get floor() {
       return floor;

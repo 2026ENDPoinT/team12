@@ -11,26 +11,12 @@ import {
 import { createView } from "./view.js";
 import { openAR } from "./ar/ar.js";
 import { playLift, voice } from "./lift.js";
+import { uiIcon, setDirectionIcon } from "./ui.mjs";
 
 const A = "assets/";
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const params = new URLSearchParams(location.search);
-
-export const STEP_ICON = {
-  start: "↑",
-  straight: "↑",
-  left: "←",
-  right: "→",
-  "slight-left": "↖",
-  "slight-right": "↗",
-  "u-left": "↶",
-  "u-right": "↷",
-  "stair-up": "⇡",
-  "stair-down": "⇣",
-  elev: "⇅",
-  arrive: "✦",
-};
 
 const state = {
   start: null, // {kind:'entrance'|'place', id, name, f, x, y}
@@ -104,7 +90,7 @@ async function init() {
   if (d) {
     state.dest = d;
     computeRoute();
-  }
+  } else openSearch("dest", false);
   if (params.has("demo")) startDemo();
   updateVoiceButtons();
 }
@@ -167,12 +153,12 @@ function syncFloors() {
   for (const b of $$("#floors button")) {
     b.classList.toggle("on", +b.dataset.f === view.floor);
     b.classList.toggle("has-route", rf.has(+b.dataset.f));
+    b.setAttribute("aria-pressed", +b.dataset.f === view.floor);
   }
+  for (const tag of $$(".floor-tag[data-f]"))
+    tag.classList.toggle("current-floor", +tag.dataset.f === view.floor);
+  if (!$("#search").hidden) renderResults($("#search-input").value);
 }
-$("#recenter").onclick = () => {
-  if (state.route) frameRoute();
-  else view.frame();
-};
 
 // ---------- 지도에서 방 탭
 function onPick(x, y, f) {
@@ -200,18 +186,23 @@ function setSheet(name) {
     $(`#sheet-${k}`).hidden = k !== name;
   $("#sheet").classList.remove("collapsed");
   $("#sheet").classList.toggle("route-mode", name === "route");
+  $("#sheet").classList.toggle("place-mode", name === "place");
+  $("#sheet").hidden = name === "home";
+  if (name === "home") openSearch("dest", false);
 }
-$("#sheet-handle").onclick = () => $("#sheet").classList.toggle("collapsed");
+$("#sheet-handle").onclick = () => {
+  const collapsed = $("#sheet").classList.toggle("collapsed");
+  $("#sheet-handle").setAttribute("aria-expanded", !collapsed);
+  if (state.route) frameRoute();
+};
 function showPlace(d) {
   state.pending = d;
   view.select(d);
   $("#place-floor").textContent = floorLabel(d.f);
+  $("#place-floor").dataset.f = d.f;
+  $("#place-floor").classList.toggle("b1", d.f === 0);
   $("#place-title").textContent = d.title;
-  $("#place-sub").textContent = [
-    d.name,
-    d.catLabel && d.catLabel !== d.name ? d.catLabel : "",
-    floorName(d.f),
-  ]
+  $("#place-sub").textContent = [d.name || d.catLabel, floorName(d.f)]
     .filter(Boolean)
     .join(" · ");
   setSheet("place");
@@ -222,14 +213,22 @@ function showPlace(d) {
 }
 $("#place-close").onclick = () => {
   view.select(null);
+  if (!$("#search").hidden && !state.route) {
+    state.sheet = "home";
+    $("#sheet").hidden = true;
+    $("#sheet").classList.remove("place-mode");
+    return;
+  }
   setSheet(state.route ? "route" : "home");
 };
 $("#place-route").onclick = () => {
+  closeSearch();
   state.dest = state.pending;
   remember(state.dest);
   computeRoute();
 };
 $("#place-from").onclick = () => {
+  closeSearch();
   setStart(placeStart(state.pending));
   toast(`${state.pending.title}에서 출발해요. 이제 도착지를 검색해 주세요.`);
   if (state.dest && state.dest.key !== state.pending.key) computeRoute();
@@ -264,23 +263,44 @@ function remember(d) {
 }
 
 // ---------- 검색
-function openSearch(mode = "dest") {
+function openSearch(mode = "dest", focus = true) {
+  if (!indoor) return;
   state.searchMode = mode;
   $("#search").hidden = false;
+  document.body.classList.add("searching");
   $("#search-input").value = "";
   $("#search-input").placeholder =
     mode === "origin"
       ? "어디에서 출발하나요? (호실·이름)"
-      : "313, 네트워크, 화장실, 교수 이름";
+      : "호실 번호, 실 이름, 교수 이름";
   renderResults("");
-  setTimeout(() => $("#search-input").focus(), 50);
+  if (focus) setTimeout(() => $("#search-input").focus(), 50);
 }
 function closeSearch() {
   $("#search").hidden = true;
+  document.body.classList.remove("searching");
   $("#search-input").blur();
+  view?.redraw();
 }
 $("#search-open").onclick = () => openSearch();
 $("#search-close").onclick = closeSearch;
+document.addEventListener("keydown", (event) => {
+  if (
+    event.key !== "/" ||
+    event.isComposing ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey
+  )
+    return;
+  if (
+    event.target.closest?.("input, textarea, select, [contenteditable='true']")
+  )
+    return;
+  if (!$("#walk").hidden || !$("#ar").hidden) return;
+  event.preventDefault();
+  openSearch();
+});
 $("#search-input").addEventListener("input", (e) =>
   renderResults(e.target.value),
 );
@@ -292,20 +312,25 @@ $("#search-input").addEventListener("keydown", (e) => {
 function resultItem(d) {
   const li = el("li");
   li.dataset.key = d.key;
+  li.dataset.f = d.f;
   const tag = el(
     "span",
-    "floor-tag" + (d.f === 0 ? " b1" : ""),
+    "floor-tag" +
+      (d.f === 0 ? " b1" : "") +
+      (d.f === view.floor ? " current-floor" : ""),
     floorLabel(d.f),
   );
+  tag.dataset.f = d.f;
+  tag.title = `${floorName(d.f)}${d.f === view.floor ? " · 현재 층" : ""}`;
   const box = el("div");
   box.append(
     el("b", "", d.title),
     el(
       "small",
       "",
-      [d.name, d.numbered ? d.catLabel : floorName(d.f)]
-        .filter(Boolean)
-        .join(" · "),
+      d.cat === "toilet"
+        ? [d.name, floorName(d.f)].filter(Boolean).join(" · ")
+        : d.name || d.catLabel || floorName(d.f),
     ),
   );
   const button = el("button", "search-result-button");
@@ -327,14 +352,23 @@ function renderResults(q) {
   const ul = $("#search-results");
   ul.replaceChildren();
   if (q.trim()) {
-    const matches = indoor.search(q, 40);
-    const suggestions = matches.length ? [] : indoor.suggest(q);
+    const context = {
+      floor: view.floor,
+      origin: state.start,
+      mode: state.mode,
+    };
+    const matches = indoor.search(q, 40, context);
+    const suggestions = matches.length ? [] : indoor.suggest(q, 40, context);
     const list = matches.length ? matches : suggestions;
-    $("#search-hint").textContent = suggestions.length
-      ? `추천 장소 ${suggestions.length}곳`
+    const summary = suggestions.length
+      ? `비슷한 장소 ${suggestions.length}곳`
       : matches.length
         ? `${matches.length}곳`
         : "검색 결과가 없어요. 호실 번호나 이름 일부로 찾아보세요.";
+    $("#search-hint").textContent =
+      list.length && list.every((d) => d.cat === "toilet")
+        ? `${summary} · ${floorName(view.floor)} 우선 · 출발 위치에서 가까운 순`
+        : summary;
     for (const d of list) ul.append(resultItem(d));
     return;
   }
@@ -574,8 +608,8 @@ async function renderSteps() {
           : "",
     );
     li.dataset.i = i;
-    const ico = el("span", "ico", STEP_ICON[st.dir] || "•");
-    if (i && st.kind !== "arrive") ico.append(el("i", "num", String(i)));
+    const ico = el("span", "ico");
+    setDirectionIcon(ico, st.dir);
     const txt = el("div", "txt");
     txt.append(el("b", "", st.text));
     const meta = [floorName(st.f)];
@@ -583,7 +617,7 @@ async function renderSteps() {
     if (st.sub && st.kind !== "start") meta.push(st.sub);
     txt.append(el("small", "", meta.join(" · ")));
     li.append(ico, txt);
-    if (st.kind !== "arrive" && st.kind !== "elev") {
+    if (st.kind !== "start" && st.kind !== "arrive" && st.kind !== "elev") {
       const ph = photoNear(st.at[0], st.at[1], st.f, stepHeading(st));
       if (ph) {
         const img = el("img");
@@ -594,6 +628,15 @@ async function renderSteps() {
       }
     }
     li.onclick = () => focusStep(i);
+    li.tabIndex = 0;
+    li.setAttribute("role", "button");
+    li.setAttribute("aria-label", `${st.text} · ${meta.join(" · ")}`);
+    li.onkeydown = (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        focusStep(i);
+      }
+    };
     ol.append(li);
   });
 }
@@ -615,7 +658,7 @@ function updateVoiceButtons() {
     b.hidden = !voice.supported;
     b.classList.toggle("on", voice.on);
     b.setAttribute("aria-pressed", voice.on);
-    b.textContent = voice.on ? "🔊" : "🔈";
+    if (!b.querySelector("img")) b.replaceChildren(uiIcon("volume"));
     b.title = voice.on ? "음성 안내 끄기" : "음성 안내 켜기";
   }
 }
@@ -663,8 +706,9 @@ $("#walk-open").onclick = async () => {
     skipLiftsBefore(walking);
   }
   $("#walk").hidden = false;
-  for (const s of ["#sheet", ".topbar", "#floors", ".map-tools"])
-    $(s).hidden = true;
+  document.body.classList.add("walking");
+  view.resize();
+  for (const s of ["#sheet", ".topbar", "#floors"]) $(s).hidden = true;
   view.setFirstPerson(true);
   syncWalkButtons();
   requestAnimationFrame(walkStep);
@@ -679,8 +723,9 @@ function endWalk() {
   walking = null;
   if (voice.supported) speechSynthesis.cancel();
   $("#walk").hidden = true;
-  for (const s of ["#sheet", ".topbar", "#floors", ".map-tools"])
-    $(s).hidden = false;
+  document.body.classList.remove("walking");
+  view.resize();
+  for (const s of ["#sheet", ".topbar", "#floors"]) $(s).hidden = false;
   view.setFirstPerson(false);
   if (state.route) {
     const f = state.route.pts[state.route.pts.length - 1].f;
@@ -690,7 +735,7 @@ function endWalk() {
 }
 function syncWalkButtons() {
   if (!walking) return;
-  $("#walk-play").textContent = walking.playing ? "❚❚" : "▶";
+  $("#walk-play").replaceChildren(uiIcon(walking.playing ? "pause" : "play"));
   $("#walk-play").setAttribute(
     "aria-label",
     walking.playing ? "일시정지" : "재생",
@@ -809,10 +854,13 @@ function walkStep(now) {
     ),
     el("small", "", `${floorName(p.f)} · ${steps[cur].text}`),
   );
-  card.append(
-    el("div", "hud-arrow", STEP_ICON[done ? "arrive" : nx.step.dir] || "↑"),
-    t,
+  const arrow = el("div", "hud-arrow");
+  setDirectionIcon(
+    arrow,
+    done ? "arrive" : nx.dist < 3 ? nx.step.dir : "straight",
+    true,
   );
+  card.append(arrow, t);
   // 실제 사진
   const ph = photoNear(p.x, p.y, p.f, w.yaw, 3, 40);
   const fig = $("#walk-photo");
