@@ -9,25 +9,6 @@
       "geometry": {
         "type": "Point",
         "coordinates": [
-          127.081715,
-          37.6292035
-        ]
-      },
-      "properties": {
-        "id": "ent-future-1",
-        "campus_id": "SEOULTECH",
-        "feature_type": "entrance",
-        "building_id": "future",
-        "name": "미래관 출입구 1",
-        "source_kind": "team_input",
-        "verification_status": "candidate"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
           127.0795266,
           37.629447
         ]
@@ -57,98 +38,6 @@
         "feature_type": "entrance",
         "building_id": "future",
         "name": "미래관 출입구 2",
-        "source_kind": "team_input",
-        "verification_status": "candidate"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            127.081715,
-            37.6292035
-          ],
-          [
-            127.0814907,
-            37.6293362
-          ]
-        ]
-      },
-      "properties": {
-        "id": "pass-1",
-        "campus_id": "SEOULTECH",
-        "feature_type": "building_passage",
-        "building_id": "future",
-        "from": "ent-future-1",
-        "to": "ent-future-2",
-        "length_m": 20,
-        "source_kind": "team_input",
-        "verification_status": "candidate"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          127.081414,
-          37.6295928
-        ]
-      },
-      "properties": {
-        "id": "ent-future-3",
-        "campus_id": "SEOULTECH",
-        "feature_type": "entrance",
-        "building_id": "future",
-        "name": "미래관 출입구 3",
-        "source_kind": "team_input",
-        "verification_status": "candidate"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "Point",
-        "coordinates": [
-          127.0814968,
-          37.6297456
-        ]
-      },
-      "properties": {
-        "id": "ent-future-4",
-        "campus_id": "SEOULTECH",
-        "feature_type": "entrance",
-        "building_id": "future",
-        "name": "미래관 출입구 4",
-        "source_kind": "team_input",
-        "verification_status": "candidate"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            127.0814968,
-            37.6297456
-          ],
-          [
-            127.081414,
-            37.6295928
-          ]
-        ]
-      },
-      "properties": {
-        "id": "pass-2",
-        "campus_id": "SEOULTECH",
-        "feature_type": "building_passage",
-        "building_id": "future",
-        "from": "ent-future-4",
-        "to": "ent-future-3",
-        "length_m": 18,
         "source_kind": "team_input",
         "verification_status": "candidate"
       }
@@ -195,6 +84,1619 @@
         "feature_type": "entrance",
         "building_id": "future",
         "name": "미래관 출입구 5",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0815375,
+          37.629738
+        ]
+      },
+      "properties": {
+        "id": "ent-future-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "future",
+        "name": "미래관 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.081493,
+          37.6295762
+        ]
+      },
+      "properties": {
+        "id": "ent-future-4",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "future",
+        "name": "미래관 출입구 4",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.081493,
+            37.6295762
+          ],
+          [
+            127.0815376,
+            37.629738
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "future",
+        "from": "ent-future-4",
+        "to": "ent-future-3",
+        "length_m": 18,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0807071,
+          37.6292542
+        ]
+      },
+      "properties": {
+        "id": "ent-way-470639154-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-470639154",
+        "name": "대륙관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0807132,
+          37.6292959
+        ]
+      },
+      "properties": {
+        "id": "ent-way-470639154-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-470639154",
+        "name": "대륙관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0807131,
+            37.6292959
+          ],
+          [
+            127.0807071,
+            37.6292542
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "way-470639154",
+        "from": "ent-way-470639154-2",
+        "to": "ent-way-470639154-1",
+        "length_m": 5,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0803829,
+          37.6291998
+        ]
+      },
+      "properties": {
+        "id": "ent-way-470639154-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-470639154",
+        "name": "대륙관 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0804276,
+          37.6293996
+        ]
+      },
+      "properties": {
+        "id": "ent-way-470639154-4",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-470639154",
+        "name": "대륙관 출입구 4",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0803829,
+            37.6291998
+          ],
+          [
+            127.0804277,
+            37.6293996
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-4",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "way-470639154",
+        "from": "ent-way-470639154-3",
+        "to": "ent-way-470639154-4",
+        "length_m": 23,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0800892,
+          37.6293603
+        ]
+      },
+      "properties": {
+        "id": "ent-way-470639154-5",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-470639154",
+        "name": "대륙관 출입구 5",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0800996,
+          37.6293979
+        ]
+      },
+      "properties": {
+        "id": "ent-way-470639154-6",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-470639154",
+        "name": "대륙관 출입구 6",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0800996,
+            37.6293979
+          ],
+          [
+            127.0800891,
+            37.6293603
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-5",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "way-470639154",
+        "from": "ent-way-470639154-6",
+        "to": "ent-way-470639154-5",
+        "length_m": 4,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0797859,
+          37.6291987
+        ]
+      },
+      "properties": {
+        "id": "ent-gym-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "gym",
+        "name": "체육관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0791654,
+          37.6292914
+        ]
+      },
+      "properties": {
+        "id": "ent-gym-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "gym",
+        "name": "체육관 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0807864,
+          37.6295839
+        ]
+      },
+      "properties": {
+        "id": "ent-way-382499351-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-382499351",
+        "name": "아름관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0803119,
+          37.6298154
+        ]
+      },
+      "properties": {
+        "id": "ent-way-382499351-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-382499351",
+        "name": "아름관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0808883,
+          37.6300096
+        ]
+      },
+      "properties": {
+        "id": "ent-way-382499351-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-382499351",
+        "name": "아름관 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0811056,
+          37.6302605
+        ]
+      },
+      "properties": {
+        "id": "ent-way-382499351-4",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-382499351",
+        "name": "아름관 출입구 4",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0804779,
+          37.6303598
+        ]
+      },
+      "properties": {
+        "id": "ent-way-382499351-5",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-382499351",
+        "name": "아름관 출입구 5",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0798316,
+          37.6296995
+        ]
+      },
+      "properties": {
+        "id": "ent-cube-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "cube",
+        "name": "테크노큐브 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0795788,
+          37.6299079
+        ]
+      },
+      "properties": {
+        "id": "ent-cube-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "cube",
+        "name": "테크노큐브 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0798784,
+          37.6300017
+        ]
+      },
+      "properties": {
+        "id": "ent-cube-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "cube",
+        "name": "테크노큐브 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0798316,
+            37.6296995
+          ],
+          [
+            127.0798784,
+            37.6300017
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-6",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "cube",
+        "from": "ent-cube-1",
+        "to": "ent-cube-3",
+        "length_m": 34,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0798316,
+            37.6296995
+          ],
+          [
+            127.0795788,
+            37.6299079
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-7",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "cube",
+        "from": "ent-cube-1",
+        "to": "ent-cube-2",
+        "length_m": 32,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0795788,
+            37.6299079
+          ],
+          [
+            127.0798784,
+            37.6300017
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-8",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "cube",
+        "from": "ent-cube-2",
+        "to": "ent-cube-3",
+        "length_m": 28,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0799501,
+          37.6309711
+        ]
+      },
+      "properties": {
+        "id": "ent-way-579071105-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-579071105",
+        "name": "상상관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0807249,
+          37.6310379
+        ]
+      },
+      "properties": {
+        "id": "ent-way-579071105-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-579071105",
+        "name": "상상관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0807249,
+            37.6310379
+          ],
+          [
+            127.0799501,
+            37.6309711
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-9",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "way-579071105",
+        "from": "ent-way-579071105-2",
+        "to": "ent-way-579071105-1",
+        "length_m": 69,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0804778,
+            37.6303598
+          ],
+          [
+            127.0811056,
+            37.6302605
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-10",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "way-382499351",
+        "from": "ent-way-382499351-5",
+        "to": "ent-way-382499351-4",
+        "length_m": 56,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0811056,
+            37.6302605
+          ],
+          [
+            127.0808883,
+            37.6300096
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-11",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "way-382499351",
+        "from": "ent-way-382499351-4",
+        "to": "ent-way-382499351-3",
+        "length_m": 34,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0808883,
+            37.6300096
+          ],
+          [
+            127.0807864,
+            37.6295839
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-12",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "way-382499351",
+        "from": "ent-way-382499351-3",
+        "to": "ent-way-382499351-1",
+        "length_m": 48,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0803119,
+            37.6298154
+          ],
+          [
+            127.0807864,
+            37.6295839
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-13",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "way-382499351",
+        "from": "ent-way-382499351-2",
+        "to": "ent-way-382499351-1",
+        "length_m": 49,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0817251,
+          37.6292447
+        ]
+      },
+      "properties": {
+        "id": "ent-future-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "future",
+        "name": "미래관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0814907,
+            37.6293362
+          ],
+          [
+            127.0817251,
+            37.6292447
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "future",
+        "from": "ent-future-2",
+        "to": "ent-future-1",
+        "length_m": 23,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0814907,
+            37.6293362
+          ],
+          [
+            127.0815376,
+            37.629738
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-14",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "future",
+        "from": "ent-future-2",
+        "to": "ent-future-3",
+        "length_m": 45,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0817251,
+            37.6292447
+          ],
+          [
+            127.0815376,
+            37.629738
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-15",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "future",
+        "from": "ent-future-1",
+        "to": "ent-future-3",
+        "length_m": 57,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0812076,
+          37.6307828
+        ]
+      },
+      "properties": {
+        "id": "ent-mugung-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "mugung",
+        "name": "무궁관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0816314,
+          37.6308326
+        ]
+      },
+      "properties": {
+        "id": "ent-mugung-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "mugung",
+        "name": "무궁관 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0814964,
+            37.6305131
+          ],
+          [
+            127.0815268,
+            37.6306578
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0814974,
+          37.6305143
+        ]
+      },
+      "properties": {
+        "id": "ent-vw-99-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "vw-99",
+        "name": "건축설계관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0815294,
+          37.6306573
+        ]
+      },
+      "properties": {
+        "id": "ent-mugung-4",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "mugung",
+        "name": "무궁관 출입구 4",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0814568,
+          37.6303537
+        ]
+      },
+      "properties": {
+        "id": "ent-vw-99-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "vw-99",
+        "name": "건축설계관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0816314,
+            37.6308326
+          ],
+          [
+            127.0815294,
+            37.6306573
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-16",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "mugung",
+        "from": "ent-mugung-3",
+        "to": "ent-mugung-4",
+        "length_m": 21,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0812077,
+            37.6307828
+          ],
+          [
+            127.0815294,
+            37.6306573
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-18",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "mugung",
+        "from": "ent-mugung-1",
+        "to": "ent-mugung-4",
+        "length_m": 32,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0816314,
+            37.6308326
+          ],
+          [
+            127.0812077,
+            37.6307828
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-19",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "mugung",
+        "from": "ent-mugung-3",
+        "to": "ent-mugung-1",
+        "length_m": 38,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0814975,
+            37.6305143
+          ],
+          [
+            127.0814568,
+            37.6303537
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-20",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "vw-99",
+        "from": "ent-vw-99-1",
+        "to": "ent-vw-99-2",
+        "length_m": 18,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0797859,
+            37.6291987
+          ],
+          [
+            127.0791654,
+            37.6292914
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-21",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "gym",
+        "from": "ent-gym-2",
+        "to": "ent-gym-3",
+        "length_m": 56,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0795265,
+            37.629447
+          ],
+          [
+            127.0791654,
+            37.6292914
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-22",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "gym",
+        "from": "ent-gym-1",
+        "to": "ent-gym-3",
+        "length_m": 36,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0795265,
+            37.629447
+          ],
+          [
+            127.0797859,
+            37.6291987
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-23",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "gym",
+        "from": "ent-gym-1",
+        "to": "ent-gym-2",
+        "length_m": 36,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0788564,
+          37.6308295
+        ]
+      },
+      "properties": {
+        "id": "ent-memorial-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "memorial",
+        "name": "100주년기념관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0783686,
+          37.6306831
+        ]
+      },
+      "properties": {
+        "id": "ent-memorial-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "memorial",
+        "name": "100주년기념관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0781007,
+            37.6304812
+          ],
+          [
+            127.0781233,
+            37.6307217
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "stairs",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0788564,
+            37.6308295
+          ],
+          [
+            127.0783686,
+            37.6306831
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-24",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "memorial",
+        "from": "ent-memorial-1",
+        "to": "ent-memorial-2",
+        "length_m": 46,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0794716,
+          37.6307802
+        ]
+      },
+      "properties": {
+        "id": "ent-student2-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "student2",
+        "name": "제2학생회관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0791389,
+          37.63088
+        ]
+      },
+      "properties": {
+        "id": "ent-student2-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "student2",
+        "name": "제2학생회관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0760652,
+          37.6310994
+        ]
+      },
+      "properties": {
+        "id": "ent-frontier-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "frontier",
+        "name": "프론티어관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0760652,
+            37.6310994
+          ],
+          [
+            127.0760864,
+            37.631093
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-5",
+        "campus_id": "SEOULTECH",
+        "feature_type": "stairs",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0761284,
+          37.6312852
+        ]
+      },
+      "properties": {
+        "id": "ent-frontier-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "frontier",
+        "name": "프론티어관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0764777,
+          37.6313372
+        ]
+      },
+      "properties": {
+        "id": "ent-frontier-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "frontier",
+        "name": "프론티어관 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0759043,
+          37.6313257
+        ]
+      },
+      "properties": {
+        "id": "ent-frontier-4",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "frontier",
+        "name": "프론티어관 출입구 4",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.076514,
+          37.6315001
+        ]
+      },
+      "properties": {
+        "id": "ent-frontier-5",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "frontier",
+        "name": "프론티어관 출입구 5",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0759043,
+            37.6313257
+          ],
+          [
+            127.0761284,
+            37.6312852
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-25",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "frontier",
+        "from": "ent-frontier-4",
+        "to": "ent-frontier-2",
+        "length_m": 20,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0760652,
+            37.6310994
+          ],
+          [
+            127.0759043,
+            37.6313257
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-26",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "frontier",
+        "from": "ent-frontier-1",
+        "to": "ent-frontier-4",
+        "length_m": 29,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0760652,
+            37.6310994
+          ],
+          [
+            127.0761284,
+            37.6312852
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-27",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "frontier",
+        "from": "ent-frontier-1",
+        "to": "ent-frontier-2",
+        "length_m": 21,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0764777,
+            37.6313372
+          ],
+          [
+            127.0765139,
+            37.6315001
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-28",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "frontier",
+        "from": "ent-frontier-3",
+        "to": "ent-frontier-5",
+        "length_m": 18,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0814939,
+            37.6308569
+          ],
+          [
+            127.0815261,
+            37.631037
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-4",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          127.0814928,
+          37.6308539
+        ]
+      },
+      "properties": {
+        "id": "ent-mugung-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "mugung",
+        "name": "무궁관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0814928,
+            37.6308539
+          ],
+          [
+            127.0815294,
+            37.6306573
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-17",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "mugung",
+        "from": "ent-mugung-2",
+        "to": "ent-mugung-4",
+        "length_m": 22,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0814928,
+            37.6308539
+          ],
+          [
+            127.0812077,
+            37.6307828
+          ]
+        ]
+      },
+      "properties": {
+        "id": "pass-29",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "mugung",
+        "from": "ent-mugung-2",
+        "to": "ent-mugung-1",
+        "length_m": 26,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0810836,
+            37.6307947
+          ],
+          [
+            127.0812077,
+            37.6307828
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-6",
+        "campus_id": "SEOULTECH",
+        "feature_type": "stairs",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            127.0812048,
+            37.6307758
+          ],
+          [
+            127.0811714,
+            37.6306792
+          ],
+          [
+            127.0815189,
+            37.6306202
+          ],
+          [
+            127.0814964,
+            37.6305131
+          ]
+        ]
+      },
+      "properties": {
+        "id": "path-7",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
         "source_kind": "team_input",
         "verification_status": "candidate"
       }
