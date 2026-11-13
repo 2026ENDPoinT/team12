@@ -283,6 +283,30 @@ export function clusterReports(
 export const clusterOf = (reportId, clusters) =>
   clusters.find((c) => c.reports.some((r) => r.id === reportId));
 
+// 사진 정리: Storage에 있지만 어떤 신고(photo_path)와도 연결되지 않은 사진을 고릅니다.
+// 사진을 먼저 올리고 신고를 저장하므로, 방금 올라온 사진은 아직 신고가 없을 수 있습니다.
+// 그래서 minAgeMs(기본 24시간)보다 오래된 것만 지웁니다.
+// files: [{ path: "기기ID/1731500000000.jpg", createdAt: ISO 문자열 }]
+export const ORPHAN_PHOTO_MIN_AGE_MS = 24 * 60 * 60 * 1000;
+export function orphanPhotos(
+  files,
+  referencedPaths,
+  { now = Date.now(), minAgeMs = ORPHAN_PHOTO_MIN_AGE_MS } = {},
+) {
+  const used = new Set((referencedPaths || []).filter(Boolean));
+  return (files || [])
+    .filter((file) => {
+      const created = Date.parse(file?.createdAt);
+      return (
+        file?.path &&
+        !used.has(file.path) &&
+        Number.isFinite(created) &&
+        now - created >= minAgeMs
+      );
+    })
+    .map((file) => file.path);
+}
+
 // 관리자가 확정한 구간만 경로에서 제외합니다. 신고가 쌓인 것만으로는 막지 않습니다.
 export function availableEdges(confirmedEdges, edges = EDGES) {
   const blocked = new Set(sanitizeConfirmedEdges(confirmedEdges, edges));

@@ -22,6 +22,7 @@ import {
   getDeviceId,
   confirmReportRows,
   deleteReportRows,
+  cleanupOrphanPhotos,
   uploadReportPhoto,
   photoUrlFor,
   fetchWorkRows,
@@ -2330,6 +2331,26 @@ $("#work-form").onsubmit = async (e) => {
   await loadWorks();
 };
 loadWorks();
+
+// 관리자 "사진 정리": 신고와 연결되지 않은 지 하루 넘은 사진을 Storage에서 지웁니다.
+$("#photo-cleanup").onclick = async () => {
+  const button = $("#photo-cleanup"),
+    status = $("#photo-cleanup-status");
+  button.disabled = true;
+  status.hidden = false;
+  status.textContent = "사진을 확인하고 있어요…";
+  try {
+    const { checked, removed } = await cleanupOrphanPhotos();
+    status.textContent = removed
+      ? `사진 ${checked}장 중 남아 있던 ${removed}장을 지웠어요.`
+      : `사진 ${checked}장을 확인했어요. 지울 사진이 없어요.`;
+  } catch {
+    status.textContent =
+      "사진 정리에 실패했어요. 관리자 로그인을 확인해주세요.";
+  } finally {
+    button.disabled = false;
+  }
+};
 
 // 다른 사람(사용자↔관리자)이 바꾼 내용을 가져옵니다. 10초마다, 그리고 탭으로 돌아올 때 다시 읽습니다.
 // 신고 창이 열려 있거나 위치를 고르는 중에는 선택이 지워지지 않게 건너뜁니다.

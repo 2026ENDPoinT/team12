@@ -7467,13 +7467,23 @@ body {
   font: inherit;
   font-size: 13px;
 }
-#admin-dialog .work-form button {
+#admin-dialog .work-form button,
+#admin-dialog #photo-cleanup {
   min-height: 46px;
   border: 0;
   border-radius: 999px;
   background: var(--lime);
   color: var(--v2-ink);
   font-weight: 800;
+}
+/* 사진 정리 (관리자): 공사 등록 버튼과 같은 모양 */
+#admin-dialog #photo-cleanup {
+  width: 100%;
+  margin-top: 4px;
+}
+#admin-dialog #photo-cleanup:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 
 @media (max-width: 760px) {
