@@ -4,76 +4,48 @@ import * as THREE from "three";
 import { createRoadLayer } from "../src/map/landscape/road-layer.mjs";
 import { createBroadleafTrees } from "../src/map/landscape/broadleaf-trees.mjs";
 
-test("batched road boxes preserve endpoints, height, width and material separation", () => {
+test("road surfaces fill bends and separate crossing materials without changing source lines", () => {
   const roads = [
     {
       kind: "service",
       points: [
-        [10, 20],
-        [40, 60],
+        [-10, 0],
+        [0, 0],
+        [0, 10],
       ],
     },
     {
       kind: "footway",
       points: [
-        [-5, -10],
-        [15, -10],
+        [-5, -5],
+        [-5, 5],
       ],
     },
     {
       kind: "steps",
       points: [
-        [0, 0],
-        [0, 0],
-        [0, 8],
+        [0, 7],
+        [0, 7],
+        [4, 7],
       ],
     },
   ];
-  const before = JSON.stringify(roads),
-    layer = createRoadLayer(roads);
+  const before = JSON.stringify(roads);
+  const layer = createRoadLayer(roads);
+  const hit = (x, z) =>
+    new THREE.Raycaster(
+      new THREE.Vector3(x, 5, z),
+      new THREE.Vector3(0, -1, 0),
+    ).intersectObject(layer)[0]?.object.name;
+
   assert.equal(layer.children.length, 4);
-  const matrix = new THREE.Matrix4(),
-    point = new THREE.Vector3();
-  for (const [name, ends, width] of [
-    [
-      "vehicle",
-      [
-        [10, 20],
-        [40, 60],
-      ],
-      5.8,
-    ],
-    [
-      "walk",
-      [
-        [-5, -10],
-        [15, -10],
-      ],
-      2.8,
-    ],
-    [
-      "steps",
-      [
-        [0, 0],
-        [0, 8],
-      ],
-      2,
-    ],
-  ]) {
-    const mesh = layer.getObjectByName(`roads-${name}`);
-    assert.equal(mesh.count, 1);
-    mesh.getMatrixAt(0, matrix);
-    for (let i = 0; i < 2; i++) {
-      point.set(0, 0, i - 0.5).applyMatrix4(matrix);
-      assert.ok(Math.abs(point.x - ends[i][0]) < 1e-5);
-      assert.ok(Math.abs(point.z - ends[i][1]) < 1e-5);
-      assert.ok(Math.abs(point.y - 0.55) < 1e-5);
-    }
-    point.set(1, 0, 0).transformDirection(matrix);
-    const scale = new THREE.Vector3().setFromMatrixScale(matrix);
-    assert.ok(Math.abs(scale.x - width) < 1e-5);
-  }
-  assert.equal(layer.getObjectByName("roads-curb").count, 3);
+  assert.equal(hit(1, -1), "roads-vehicle");
+  assert.equal(hit(1, 3), "roads-vehicle");
+  assert.equal(hit(3.1, 3), "roads-curb");
+  assert.equal(hit(4, 3), undefined);
+  assert.equal(hit(-5, 0), "roads-vehicle");
+  assert.equal(hit(-5, 4), "roads-walk");
+  assert.equal(hit(1, 7), "roads-steps");
   assert.equal(JSON.stringify(roads), before);
 });
 
