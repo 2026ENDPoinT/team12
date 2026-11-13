@@ -1137,3 +1137,51 @@ button.ar-status::after {
     flex-direction: row;
   }
 }
+
+.floor-overview {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: calc(100% + 12px);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: var(--glass-border-width) solid var(--glass-stroke);
+  border-radius: 14px;
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-filter);
+  box-shadow: var(--panel-shadow);
+  font-size: 13px;
+  font-weight: 700;
+}
+.floor-overview-open .floor-overview {
+  background: var(--lime);
+}
+.floor-overview-open .view {
+  left: 0;
+}
+.floor-overview-open .sheet:not(.place-mode):not(.route-mode),
+body.searching .floor-overview {
+  display: none;
+}
+.floor-overview-open .view canvas {
+  cursor: grab;
+}
+.floor-overview-open .view canvas:active {
+  cursor: grabbing;
+}
+
+/* Keep the stacked model visible above the search results on narrow screens. */
+@media (max-width: 819px) {
+  body.searching.floor-overview-open .view,
+  body.searching.floor-overview-open .floor-controls {
+    visibility: visible;
+  }
+  .searching.floor-overview-open .search-panel {
+    flex: 0 1 38dvh;
+    margin-top: auto;
+  }
+}
