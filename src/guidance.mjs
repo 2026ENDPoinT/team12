@@ -48,19 +48,50 @@ function projectOnRoute(points, point) {
   return best && { ...best, total: along };
 }
 
+const TURN_DEGREES = 35, // 이만큼 이상 방향이 바뀌어야 회전으로 안내
+  BEND_DEGREES = 3, // 이보다 작게 꺾이는 점은 곧은 길로 봄
+  BEND_GAP = 20; // 이 거리(m) 안에 이어진 꺾임은 하나의 굽은 구간으로 묶음
+
+const angleBetween = (from, to) => ((to - from + 540) % 360) - 180;
+
+// 회전은 꺾이는 점 하나의 각도가 아니라, 가까이 이어진 꺾임들을 묶은 "굽은 구간"에
+// 들어가기 전과 나온 뒤의 방향 차이로 판단합니다. 그래서 길이 살짝 옆으로 비켜 갔다가
+// 원래 방향으로 돌아오는 S자 구간은 직진으로, 여러 번에 나눠 크게 도는 모퉁이는 회전 하나로 안내합니다.
 function turns(points) {
-  const result = [];
+  const bends = [];
   let along = 0;
   for (let i = 1; i < points.length - 1; i++) {
     along += distance(points[i - 1], points[i]);
-    const angle =
-      ((bearing(points[i], points[i + 1]) -
-        bearing(points[i - 1], points[i]) +
-        540) %
-        360) -
-      180;
-    if (Math.abs(angle) >= 35)
-      result.push({ along, direction: angle > 0 ? "right" : "left", point: points[i] });
+    bends.push({
+      i,
+      along,
+      angle: angleBetween(bearing(points[i - 1], points[i]), bearing(points[i], points[i + 1])),
+    });
+  }
+  const result = [];
+  for (let k = 0; k < bends.length; k++) {
+    if (Math.abs(bends[k].angle) < BEND_DEGREES) continue;
+    let end = k;
+    while (
+      end + 1 < bends.length &&
+      Math.abs(bends[end + 1].angle) >= BEND_DEGREES &&
+      bends[end + 1].along - bends[end].along <= BEND_GAP
+    )
+      end++;
+    const first = bends[k],
+      last = bends[end],
+      net = angleBetween(
+        bearing(points[first.i - 1], points[first.i]),
+        bearing(points[last.i], points[last.i + 1]),
+      );
+    if (Math.abs(net) >= TURN_DEGREES) {
+      // 안내 지점은 묶음 안에서 가장 크게 꺾이는 점
+      const main = bends
+        .slice(k, end + 1)
+        .reduce((a, b) => (Math.abs(b.angle) > Math.abs(a.angle) ? b : a));
+      result.push({ along: main.along, direction: net > 0 ? "right" : "left", point: points[main.i] });
+    }
+    k = end;
   }
   return result;
 }

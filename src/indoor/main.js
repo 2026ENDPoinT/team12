@@ -16,6 +16,13 @@ import { createRoutePlaces, routePlaceLabel } from "./route-places.mjs";
 import { bindRouteSearch } from "./route-search.mjs";
 import { bindMobilePanel } from "./mobile-panels.mjs";
 
+// 휴대폰: 패널·검색창 위에서 두 손가락으로 벌려도 페이지가 확대되지 않게 합니다.
+// 실내 지도(.view) 위의 제스처는 지도 확대·회전에 그대로 씁니다.
+for (const type of ["gesturestart", "gesturechange", "gestureend"])
+  document.addEventListener(type, (e) => {
+    if (!e.target.closest?.(".view")) e.preventDefault();
+  });
+
 const A = "assets/";
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
