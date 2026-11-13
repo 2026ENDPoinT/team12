@@ -1037,13 +1037,15 @@ function stopGps({ keepStatus = false } = {}) {
   if (changed) updateRoute();
   map?.setUserLocation(null);
   $("#gps-toggle").setAttribute("aria-pressed", "false");
-  $("#gps-toggle span:last-child").textContent = "내 위치";
+  $("#gps-toggle span:last-child").textContent = "내 위치로";
   if (!keepStatus) setGpsStatus("", false);
 }
 $("#gps-toggle").onclick = () => {
   if (gpsWatchId !== null) {
-    stopGps();
-    toast("현재 위치 추적을 종료했어요.");
+    if (gpsPosition) {
+      map?.setUserLocation(gpsPosition, { follow: true });
+      toast("내 위치로 이동했어요.");
+    } else setGpsStatus("현재 위치를 확인하고 있어요…");
     return;
   }
   if (!navigator.geolocation) {
@@ -1052,7 +1054,6 @@ $("#gps-toggle").onclick = () => {
   }
   setGpsStatus("현재 위치 권한을 확인하고 있어요…");
   $("#gps-toggle").setAttribute("aria-pressed", "true");
-  $("#gps-toggle span:last-child").textContent = "추적 중";
   let firstFix = true;
   gpsWatchId = navigator.geolocation.watchPosition(
     ({ coords }) => {
@@ -1073,7 +1074,7 @@ $("#gps-toggle").onclick = () => {
         return;
       }
       gpsStartNode = nearest.id;
-      map?.setUserLocation(gpsPosition, { follow: true });
+      map?.setUserLocation(gpsPosition, { follow: firstFix });
       setGpsStatus(
         `현재 위치 추적 중 · 정확도 약 ${Math.round(coords.accuracy)}m`,
       );

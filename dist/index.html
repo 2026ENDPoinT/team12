@@ -574,9 +574,14 @@
             >
           </div>
           <div class="map-quick-actions" aria-label="지도 빠른 기능">
-            <button id="gps-toggle" class="gps-toggle" aria-pressed="false">
+            <button
+              id="gps-toggle"
+              class="gps-toggle"
+              aria-label="내 위치로 이동"
+              aria-pressed="false"
+            >
               <span class="gps-icon" aria-hidden="true">◎</span>
-              <span>내 위치</span>
+              <span>내 위치로</span>
             </button>
             <button id="report-start" class="report-start" aria-pressed="false">
               ⚠ 공사 구간 신고
@@ -594,9 +599,9 @@
           </div>
           <div id="gps-status" class="gps-status" role="status" hidden></div>
           <div id="report-picker" class="report-picker" hidden>
-            <b>현재 위치(파란 점)에서 신고해요.</b>
+            <b>현재 위치(테크뇽)에서 신고해요.</b>
             <p>
-              다른 길이면 파란 점 30m 안의 길을 눌러 다시 고르세요. 같은 구역에
+              다른 길이면 테크뇽 30m 안의 길을 눌러 다시 고르세요. 같은 구역에
               신고가 쌓이면 주의(노란색), 관리자가 확정하면 통행
               막힘(빨간색)으로 바뀝니다.
             </p>
@@ -678,8 +683,14 @@
               <button id="v2-plus" aria-label="지도 확대">＋</button
               ><button id="v2-minus" aria-label="지도 축소">−</button>
             </div>
-            <button id="v2-locate" aria-label="내 위치" aria-pressed="false">
+            <button
+              id="v2-locate"
+              aria-label="내 위치로 이동"
+              title="내 위치로"
+              aria-pressed="false"
+            >
               <svg class="icon"><use href="#i-locate" /></svg>
+              <span>내 위치로</span>
             </button>
             <button id="v2-reset" aria-label="지도 시점 초기화">
               <svg class="icon"><use href="#i-cube" /></svg>

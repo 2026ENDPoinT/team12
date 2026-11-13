@@ -365,7 +365,30 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   // 경로를 따라 걷는 마스코트(테크뇽). 처음 경로를 그릴 때 한 번만 만들고 재사용합니다.
   const WALKER_SCALE = 8,
     WALKER_Y = 1.9;
-  let technyong = null,
+  // GPS 표시는 파란 점 대신 테크뇽으로 한 번만 만들어 위치만 갱신합니다.
+  const userAccuracy = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0x7950ff,
+        transparent: true,
+        opacity: 0.13,
+        depthWrite: false,
+      }),
+    ),
+    userBase = new THREE.Mesh(
+      new THREE.RingGeometry(4.8, 6.5, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        depthTest: false,
+        depthWrite: false,
+      }),
+    );
+  userAccuracy.rotation.x = userBase.rotation.x = -Math.PI / 2;
+  userAccuracy.position.y = 2.05;
+  userBase.position.y = 2.2;
+  userLocationGroup.add(userAccuracy, userBase);
+  let userTechnyong = null,
+    technyong = null,
     movingDot = null,
     walkerHeading = null,
     routeCurve = null,
@@ -562,37 +585,21 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     clearGroup(reportPreviewGroup);
   }
   function setUserLocation(position, { follow = false } = {}) {
-    clearGroup(userLocationGroup);
     if (!position) {
       userLocationGroup.visible = false;
       return;
     }
     userLocationGroup.visible = true;
+    if (!userTechnyong) {
+      userTechnyong = createTechnyong();
+      userTechnyong.object.scale.setScalar(7.5);
+      userTechnyong.object.position.y = 2.3;
+      userTechnyong.object.rotation.y = Math.PI;
+      userLocationGroup.add(userTechnyong.object);
+    }
     const accuracy = THREE.MathUtils.clamp(position.accuracy || 12, 3, 100);
-    const area = new THREE.Mesh(
-      new THREE.CircleGeometry(accuracy, 48),
-      new THREE.MeshBasicMaterial({
-        color: 0x2f7df4,
-        transparent: true,
-        opacity: 0.16,
-        depthWrite: false,
-      }),
-    );
-    area.rotation.x = -Math.PI / 2;
-    area.position.set(position.x, 2.05, position.z);
-    const halo = new THREE.Mesh(
-      new THREE.RingGeometry(4.3, 6.4, 32),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false }),
-    );
-    halo.rotation.x = -Math.PI / 2;
-    halo.position.set(position.x, 3, position.z);
-    const dot = new THREE.Mesh(
-      new THREE.CircleGeometry(4.5, 32),
-      new THREE.MeshBasicMaterial({ color: 0x2878f0, depthTest: false }),
-    );
-    dot.rotation.x = -Math.PI / 2;
-    dot.position.set(position.x, 3.2, position.z);
-    userLocationGroup.add(area, halo, dot);
+    userLocationGroup.position.set(position.x, 0, position.z);
+    userAccuracy.scale.set(accuracy, accuracy, 1);
     if (follow) {
       const offset = camera.position.clone().sub(controls.target);
       controls.target.set(position.x, 0, position.z);
