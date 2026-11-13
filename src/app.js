@@ -964,7 +964,8 @@ function renderMobileNavigation(guide = null) {
   const running = guidanceActive || guidancePending;
   $("#map-view").classList.toggle("guidance-on", running);
   $(".mobile-navigation").hidden = !running;
-  map?.setNavigationMode(running && !isDesktop.matches);
+  // 데스크톱도 모바일과 같은 최신 추적 로직을 사용하되 UI는 데스크톱 전용 배치를 씁니다.
+  map?.setNavigationMode(running);
   if (!running || !currentRoute) return;
   guide ??= guidanceActive && gpsPosition
     ? guidanceAt(routePoints(currentRoute.path, currentRouteNodes), gpsPosition)
@@ -1033,7 +1034,7 @@ function updateGuidanceStatus() {
     toast("도착지에 도착했어요.");
     return;
   }
-  if (!isDesktop.matches && guidanceFollowing) {
+  if (guidanceFollowing) {
     syncNavigationHeading(guide);
     map?.setUserLocation(gpsPosition, {
       follow: true,
@@ -1093,6 +1094,16 @@ function startGuidance() {
 }
 $("#route-card-start").onclick = startGuidance;
 $("#navigation-stop").onclick = () => endGuidance();
+$("#navigation-layers").onclick = () => side("layers").click();
+// 데스크톱에서 지도를 확대·축소하면 자동 추적을 멈추고 "내 위치로"를 표시합니다.
+function zoomNavigation(factor) {
+  guidanceFollowing = false;
+  map?.clearGuidanceHeading();
+  syncNavigationCameraButtons();
+  map?.zoom(factor);
+}
+$("#navigation-zoom-in").onclick = () => zoomNavigation(1.18);
+$("#navigation-zoom-out").onclick = () => zoomNavigation(1 / 1.18);
 $("#navigation-compass").onclick = () => {
   if (!guidanceActive) return;
   if (!guidanceFollowing) {
@@ -1107,6 +1118,7 @@ $("#navigation-back").onclick = () => {
   endGuidance();
   setPanelClosed(false);
 };
+$("#navigation-route").onclick = () => $("#navigation-back").click();
 $("#navigation-recenter").onclick = () => {
   if (!gpsPosition || !guidanceActive) return;
   guidanceFollowing = true;
