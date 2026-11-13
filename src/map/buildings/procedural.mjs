@@ -1,5 +1,6 @@
+import { applyBuildingFinish } from "./finishes.mjs";
 import * as THREE from "three";
-import { insideBuilding } from "./geo.mjs";
+import { insideBuilding } from "../../geo.mjs";
 
 export function roofRectangleFits(building, x, z, halfX, halfZ) {
   const min = [x - halfX, z - halfZ],
@@ -107,7 +108,7 @@ export function facadeMaterial(appearance, wall, entrance = null) {
     roughness: 0.87,
     metalness: 0,
   });
-  if (!appearance.facade) return material;
+  if (!appearance.facade) return applyBuildingFinish(material, "stone");
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, {
       facadeGlass: { value: new THREE.Color(appearance.glass) },
@@ -178,7 +179,8 @@ export function facadeMaterial(appearance, wall, entrance = null) {
       finish *= 1.0 - reveal * 0.22;
       finish = mix(finish, facadeFrame, frameMask);
       // A restrained vertical glass gradient replaces expensive live reflections.
-      vec3 glazing = facadeGlass * (0.86 + 0.17 * smoothstep(-opening.y, opening.y, p.y));
+      float paneTone = fract(sin(dot(floor(facadeUV / vec2(bay, storey)), vec2(127.1,311.7))) * 43758.5453);
+      vec3 glazing = facadeGlass * (0.84 + 0.20 * smoothstep(-opening.y, opening.y, p.y) + (paneTone - 0.5) * 0.07);
       finish = mix(finish, glazing, glassMask);
       float mullion = jointCoverage(p.x, max(0.7, bay * 0.5), 0.025, aa.x) * glassMask;
       finish = mix(finish, facadeFrame * 0.88, mullion * 0.65);
@@ -220,8 +222,8 @@ export function facadeMaterial(appearance, wall, entrance = null) {
     `,
     );
   };
-  material.customProgramCacheKey = () => "campus-facade-v1";
-  return material;
+  material.customProgramCacheKey = () => "campus-facade-v2";
+  return applyBuildingFinish(material, "facade");
 }
 
 // All roof edges, equipment and verified entrance canopies share four draw calls.

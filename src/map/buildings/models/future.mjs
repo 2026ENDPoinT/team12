@@ -1,3 +1,4 @@
+import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
 
 // Photo-guided approximation within the existing campus footprint, not a survey.
@@ -193,5 +194,6 @@ export function createFutureBuilding(building, wallColor) {
     object.userData.building = building.id;
     pickables.push(object);
   });
+  applyModelFinishes({ stone: [walls], glass: [glass] });
   return { group, body, pickables };
 }

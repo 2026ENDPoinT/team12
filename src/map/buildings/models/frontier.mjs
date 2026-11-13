@@ -1,3 +1,4 @@
+import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
 
 // Photo-guided massing: tall glazed bar and a lower perpendicular wing.
@@ -284,5 +285,6 @@ export function createFrontierBuilding(building, wallColor) {
     object.userData.building = building.id;
     pickables.push(object);
   });
+  applyModelFinishes({ stone: [stone, pale], glass: [glass, darkGlass] });
   return { group, body, pickables };
 }

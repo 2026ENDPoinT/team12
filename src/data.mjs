@@ -1,6 +1,7 @@
 import geometry from "../data/seoultech.json" with { type: "json" };
 
 const officialBuildingNames = {
+  "way-382499369": "국제관",
   "way-382499356": "중앙도서관 별관",
   student: "학생회관",
   "way-470633094": "파워플랜트",
@@ -55,7 +56,7 @@ function nearestPointOnBuilding(building, point) {
 // 사용자가 표시한 초록 점을 현재 공개 건물 외곽선에 맞춘 1차 출입구 데이터입니다.
 const markedEntrances = [
   ["eoui", "어의관 출입구", -220, -302],
-  ["davinci", "다빈치관 출입구", -50, -300],
+  ["davinci", "다빈치관 출입구", -51.2, -313.2],
   ["way-382499356", "중앙도서관 별관 출입구", -215, -134],
   ["library", "중앙도서관 출입구", -198, -87],
   ["dasan", "다산관 북측 출입구", -100, -36],

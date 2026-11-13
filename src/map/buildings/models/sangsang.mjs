@@ -1,3 +1,4 @@
+import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
 
 // Front/left photo study, fitted approximately to the public footprint.
@@ -143,5 +144,6 @@ export function createSangsangBuilding(building, wallColor) {
     object.userData.building = building.id;
     pickables.push(object);
   });
+  applyModelFinishes({ stone: [stone, pale, darkStone], glass: [glazing] });
   return { group, body, pickables };
 }

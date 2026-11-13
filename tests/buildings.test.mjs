@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import * as THREE from "three";
 import { BUILDINGS } from "../src/data.mjs";
 import { insideBuilding } from "../src/geo.mjs";
-import { buildingAppearance } from "../src/building-appearance.mjs";
+import { buildingAppearance } from "../src/map/buildings/appearance.mjs";
 import {
   facadeGeometry,
   createBuildingDetails,
   roofRectangleFits,
-} from "../src/procedural-building.mjs";
+} from "../src/map/buildings/procedural.mjs";
 
 function courtyardBuilding(angle = 0) {
   const rotate = ([x, z]) => [
@@ -106,4 +106,55 @@ test("all campus shapes generate finite facade attributes without changing sourc
     if (building.name === "조형물") assert.equal(look.facade, false);
     geometry.dispose();
   }
+});
+
+// Exercise the complete layer, including photo models, generic models and studies.
+test("building registry creates all visible buildings with valid interaction records", async () => {
+  const { ENTRANCES } = await import("../src/data.mjs");
+  const { BUILDING_DESIGNS } = await import("../src/map/buildings/catalog.mjs");
+  const { createBuildingLayer } = await import(
+    "../src/map/buildings/index.mjs"
+  );
+  const before = JSON.stringify(BUILDINGS);
+  const layer = createBuildingLayer(BUILDINGS, ENTRANCES);
+  const expected = BUILDINGS.filter((b) => !BUILDING_DESIGNS[b.id]?.hidden);
+  assert.deepEqual(
+    layer.records.map((r) => r.b.id),
+    expected.map((b) => b.id),
+  );
+  const ids = new Set(expected.map((b) => b.id));
+  for (const record of layer.records) {
+    assert(record.body.isMesh);
+    assert(
+      record.body.material.userData.buildingFinish,
+      `Missing finish: ${record.b.id}`,
+    );
+    assert(Number.isFinite(record.height) && record.height > 0);
+    assert(Number.isInteger(record.profile.wall));
+    assert(layer.pickables.includes(record.body));
+  }
+  for (const mesh of layer.pickables) assert(ids.has(mesh.userData.building));
+  for (const [id, design] of Object.entries(BUILDING_DESIGNS)) {
+    assert(
+      BUILDINGS.some((b) => b.id === id),
+      `Unknown design ID: ${id}`,
+    );
+    if (design.model)
+      assert(!design.facadeStudy, `Conflicting facade modes: ${id}`);
+  }
+  layer.group.updateMatrixWorld(true);
+  layer.group.traverse((object) => {
+    assert(object.matrixWorld.elements.every(Number.isFinite));
+    if (object.isInstancedMesh)
+      assert(object.instanceMatrix.array.every(Number.isFinite));
+  });
+  assert.equal(JSON.stringify(BUILDINGS), before);
+  const geometries = new Set(),
+    materials = new Set();
+  layer.group.traverse((o) => {
+    if (o.geometry) geometries.add(o.geometry);
+    if (o.material) [].concat(o.material).forEach((m) => materials.add(m));
+  });
+  for (const geometry of geometries) geometry.dispose();
+  for (const material of materials) material.dispose();
 });

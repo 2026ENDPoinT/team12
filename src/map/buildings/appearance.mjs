@@ -1,5 +1,23 @@
+import { getBuildingDesign } from "./catalog.mjs";
 // Schematic campus architecture, not photo-verified building classifications.
 // Keep choices explicit so a later photo correction changes one entry.
+// Illustrative waterproof-roof colors, not sampled geographic measurements.
+const ROOF_PALETTE = [
+  0x527a65, 0x678b70, 0x7f997e, 0x92aa8b, 0x607f75, 0x7f958b, 0x9faf9f,
+  0xaeb9af,
+];
+
+export function roofColorForBuilding(building) {
+  if (getBuildingDesign(building.id).model || building.name === "조형물")
+    return building.roof || 0x82928c;
+  let hash = 2166136261;
+  for (const character of building.id)
+    hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  // Mix the upper bits too, so nearby/sequential IDs need not share a tone.
+  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
+  return ROOF_PALETTE[(hash >>> 0) % ROOF_PALETTE.length];
+}
+
 export const FACADE_FAMILIES = {
   academic: {
     wall: 0xd2d0c2,
@@ -68,7 +86,7 @@ const familiesByName = {
   혜성관: "academic",
   다빈치관: "ribbon",
   동아리실: "warm",
-  어학원: "academic",
+  국제관: "academic",
   성림학사: "residence",
   학생회관: "warm",
   대학본부: "academic",

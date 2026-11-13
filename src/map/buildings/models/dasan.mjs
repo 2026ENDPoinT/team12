@@ -1,3 +1,4 @@
+import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
 
 // Photo-guided four-storey courtyard block and taller central tower.
@@ -19,6 +20,7 @@ export function createDasanBuilding(building, wallColor) {
     new THREE.MeshStandardMaterial({ color, roughness, metalness });
   const stone = material(wallColor);
   const pale = material(0xe3e4dc);
+  const frameMaterial = material(0xa3aaa2, 0.65, 0.12);
   const joints = material(0xb9bcae);
   const glass = material(0x547f83, 0.35, 0.12);
   const shadow = material(0x4d5e59);
@@ -84,16 +86,33 @@ export function createDasanBuilding(building, wallColor) {
         if (centerFront) continue;
         for (let floor = 0; floor < 4; floor++) {
           const y = 2.5 + floor * 4;
-          box(
-            glass,
-            x,
-            y,
-            z,
-            Math.min(0.9, (length / count) * 0.4),
-            2.05,
-            0.32,
-            turn,
-          );
+          const windowWidth = Math.min(0.9, (length / count) * 0.4);
+          box(glass, x, y, z, windowWidth, 2.05, 0.32, turn);
+          // A raised perimeter makes the glazing read as recessed on either side.
+          for (const side of [-1, 1]) {
+            const offset = side * (windowWidth / 2 + 0.045);
+            box(
+              frameMaterial,
+              x + (dx / length) * offset,
+              y,
+              z + (dz / length) * offset,
+              0.09,
+              2.23,
+              0.46,
+              turn,
+            );
+            box(
+              frameMaterial,
+              x,
+              y + side * 1.07,
+              z,
+              windowWidth + 0.18,
+              0.09,
+              0.46,
+              turn,
+            );
+          }
+          box(frameMaterial, x, y - 0.34, z, windowWidth, 0.05, 0.38, turn);
           box(pale, x, y - 1.1, z, 1.2, 0.12, 0.48, turn);
         }
       }
@@ -120,9 +139,17 @@ export function createDasanBuilding(building, wallColor) {
   box(shadow, 45.5, 3.3, 0.55, 10, 6.4, 0.45);
   box(glass, 45.5, 3.0, 0.85, 6.8, 5.5, 0.3);
   for (const x of [42.1, 45.5, 48.9]) box(pale, x, 3, 1.05, 0.18, 5.5, 0.14);
+  // Entry door leaves, handles and a shallow threshold stay within the existing entry.
+  for (const x of [42.9, 44.6, 46.3, 48.0]) {
+    box(frameMaterial, x, 2.85, 1.04, 0.07, 5.1, 0.12);
+    box(frameMaterial, x + 0.2, 2.2, 1.15, 0.05, 0.65, 0.09);
+  }
+  box(frameMaterial, 45.5, 1.2, 1.05, 6.8, 0.08, 0.12);
+  box(paving, 45.5, 0.12, 2.3, 8.3, 0.24, 2.8);
   // Low planted canopy visible in the aerial photo.
   box(pale, 45.4, 6.5, 4.8, 23.5, 0.55, 9.5);
   box(grass, 45.4, 6.82, 4.8, 21.9, 0.12, 8.1);
+  box(joints, 45.4, 6.18, 4.8, 22.2, 0.09, 8.2);
   for (const x of [34.3, 56.4])
     for (const z of [1.2, 8.8]) box(pale, x, 3.1, z, 0.7, 6.2, 0.7);
   // A slender stone tower rises from the inner edge of the front block.
@@ -156,6 +183,10 @@ export function createDasanBuilding(building, wallColor) {
       dummy.scale.set(part.w, part.h, part.d);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
+      if (mat === glass) {
+        const tint = [0xe6eeeb, 0xf4f6f0, 0xdce8e5, 0xecf1eb][i % 4];
+        mesh.setColorAt(i, new THREE.Color(tint));
+      }
     });
     mesh.castShadow = mat !== glass;
     mesh.receiveShadow = true;
@@ -167,5 +198,6 @@ export function createDasanBuilding(building, wallColor) {
     object.userData.building = building.id;
     pickables.push(object);
   });
+  applyModelFinishes({ stone: [stone], glass: [glass] });
   return { group, body, pickables };
 }

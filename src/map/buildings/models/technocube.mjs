@@ -1,3 +1,4 @@
+import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
 
 // Photo-guided approximation. The source's 4 m height describes neither the
@@ -202,5 +203,6 @@ export function createTechnocubeBuilding(building, wallColor) {
     object.userData.building = building.id;
     pickables.push(object);
   });
+  applyModelFinishes({ stone: [stone, pale], glass: [glazing, greenGlass] });
   return { group, body, pickables, height };
 }

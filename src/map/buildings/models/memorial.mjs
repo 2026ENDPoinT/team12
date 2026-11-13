@@ -1,3 +1,4 @@
+import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
 
 // The field-facing elevation is photo-guided. Unseen sides remain schematic.
@@ -192,5 +193,6 @@ export function createMemorialBuilding(building, wallColor) {
     object.userData.building = building.id;
     pickables.push(object);
   });
+  applyModelFinishes({ stone: [charcoal, white], glass: [glass, centerGlass] });
   return { group, body, pickables };
 }

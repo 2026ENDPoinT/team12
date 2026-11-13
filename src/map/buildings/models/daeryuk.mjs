@@ -1,3 +1,4 @@
+import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
 
 // Low historic block, perpendicular pitched wings and a central stone tower.
@@ -195,5 +196,6 @@ export function createDaeryukBuilding(building, wallColor) {
     object.userData.building = building.id;
     pickables.push(object);
   });
+  applyModelFinishes({ stone: [stone], glass: [glass] });
   return { group, body, pickables, height };
 }
