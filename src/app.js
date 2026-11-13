@@ -1985,13 +1985,20 @@ $("#v2-admin").onclick = () => openAdminEntry();
 // ?edit 주소로 들어오면 관리자 로그인부터 확인하고, 관리자일 때만 편집기를 켭니다.
 // 로그인 창을 그냥 닫으면 편집기 없이 일반 지도 화면으로 둡니다.
 async function startEditModeAfterLogin(ctx) {
+  // 편집기가 켜지면 관리자·편집기 버튼을 눌린(active) 상태로 보여 줍니다.
+  const start = () => {
+    setupEditMode(ctx);
+    if (!$("#graph-overlay-toggle")) return;
+    side("alerts").setAttribute("aria-pressed", "true");
+    $("#v2-admin").setAttribute("aria-pressed", "true");
+  };
   try {
-    if (await getAdminSession()) return setupEditMode(ctx);
+    if (await getAdminSession()) return start();
   } catch {
     toast("관리자 로그인 상태를 확인하지 못해 편집기를 열지 않았어요.");
     return;
   }
-  afterAdminLogin = () => setupEditMode(ctx);
+  afterAdminLogin = start;
   $("#admin-login-error").hidden = true;
   $("#admin-login-dialog").showModal();
   // 로그인 창이 닫히는 순간(open 속성이 빠질 때)을 지켜보다가, 편집기가 켜지지 않았으면 안내합니다.
