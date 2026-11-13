@@ -6593,3 +6593,42 @@ body {
     display: none;
   }
 }
+@media (max-width: 760px) {
+  /* 첫 화면 캠퍼스 안내: 시트 대신 왼쪽 아래 작은 유리 카드로 (사용자 요청) */
+  .map-view .map-overlay-heading,
+  .map-view.panel-closed .map-overlay-heading {
+    display: block;
+    left: 12px;
+    right: auto;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100% - 24px);
+    max-height: none;
+    overflow: visible;
+    padding: 10px 14px 11px;
+    border: 0.75px solid var(--v2-stroke);
+    border-radius: 18px;
+    box-shadow: var(--v2-glass-shadow);
+  }
+  .map-overlay-heading::before {
+    content: none;
+  }
+  .map-overlay-heading .map-live {
+    padding: 2px 8px;
+    font-size: 9px;
+  }
+  .map-overlay-heading h3 {
+    margin: 5px 0 0;
+    font-size: 16px;
+  }
+  .map-overlay-heading .map-data-status {
+    display: none;
+  }
+  /* 다른 시트가 떠 있으면 숨깁니다. */
+  .map-view:not(.panel-closed) .map-overlay-heading,
+  .map-view.panel-closed.route-shown .map-overlay-heading,
+  .map-view:has(#result-panel:not([hidden])) .map-overlay-heading,
+  .map-view:has(#reports-panel:not([hidden])) .map-overlay-heading,
+  .map-view:has(#building-results:not([hidden])) .map-overlay-heading {
+    display: none;
+  }
+}
