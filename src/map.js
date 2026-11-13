@@ -1,4 +1,6 @@
-import { touchGestureMode } from "./map/touch-gesture.mjs";
+import { createStreetLights, windowLights } from "./map/night-lighting.mjs";
+import { touchGestureMode, touchTurn } from "./map/touch-gesture.mjs";
+import { cameraOffsetForHeading, smoothHeading } from "./heading.mjs";
 import { createNavigationBounds } from "./map/navigation-bounds.mjs";
 import { createKeyboardPan } from "./map/keyboard-pan.mjs";
 import { createMapProfiler } from "./map/performance.mjs";
@@ -35,7 +37,7 @@ import { createGraphOverlay } from "./graph-overlay.js";
 const VIOLET = 0x7950ff;
 
 // Three.js 기반 독립 구현. 외곽선/도로 데이터만 별도 ODbL 데이터에서 가져옵니다.
-export function createCampusMap(host, onSelect, onRoadSelect) {
+export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteraction = () => {}) {
   const mapStartedAt = performance.now();
   let renderer;
   try {
@@ -47,7 +49,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   } catch {
     return null;
   }
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const touchFirst = matchMedia("(pointer: coarse)").matches;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, touchFirst ? 1.5 : 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   // Buildings, trees and the sun are static; camera/route changes need no new shadow map.
@@ -67,7 +70,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   const controls = new OrbitControls(camera, renderer.domElement);
   const constrainNavigation = createNavigationBounds(CAMPUS_GEOMETRY.boundary);
   controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
+  // Touch drags should move the map with the finger, with a short release tail.
+  controls.dampingFactor = touchFirst ? 0.45 : 0.08;
   controls.minPolarAngle = 0.12;
   controls.maxPolarAngle = Math.PI * 0.47;
   controls.minZoom = 0.5;
@@ -85,7 +89,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     "position:absolute;inset:0;pointer-events:none;overflow:hidden";
   host.append(renderer.domElement, labels.domElement);
   // Softer sky fill and a stronger sun give surfaces a clear light/shade split.
-  scene.add(new THREE.HemisphereLight(0xeaf2ff, 0x899579, 1.15));
+  const sky = new THREE.HemisphereLight(0xeaf2ff, 0x899579, 1.15);
+  scene.add(sky);
   const sun = new THREE.DirectionalLight(0xfff2da, 2.65);
   sun.position.set(-450, 750, 550);
   sun.castShadow = true;
@@ -280,6 +285,19 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     }),
   );
   scene.add(createRoadLayer(CAMPUS_GEOMETRY.roads, crosswalkLines));
+  const streetLights = createStreetLights(CAMPUS_GEOMETRY.roads);
+  scene.add(streetLights);
+  function setNightMode(enabled) {
+    scene.background = enabled ? new THREE.Color(0x161e33) : null;
+    sky.color.setHex(enabled ? 0x9ab4f4 : 0xeaf2ff);
+    sky.groundColor.setHex(enabled ? 0x48556f : 0x899579);
+    sky.intensity = enabled ? 0.65 : 1.15;
+    sun.color.setHex(enabled ? 0xa6bbff : 0xfff2da);
+    sun.intensity = enabled ? 0.45 : 2.65;
+    streetLights.visible = enabled;
+    windowLights.value = enabled ? 1 : 0;
+  }
+
   const buildingLayer = createBuildingLayer(BUILDINGS, ENTRANCES);
   scene.add(buildingLayer.group);
   const buildingMeshes = buildingLayer.pickables,
@@ -399,6 +417,23 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   userAccuracy.position.y = 2.05;
   userBase.position.y = 2.2;
   userLocationGroup.add(userAccuracy, userBase);
+  let navigationMode = false;
+  let navigationFollowing = false, navigationHeading = null, displayedHeading = null;
+  // 길안내 중에는 테크뇽이 GPS 위치를 부드럽게 따라 걷고, 카메라는 뒤에서 비스듬히 따라갑니다(3인칭).
+  const THIRD_PERSON_TILT = 0.95,
+    THIRD_PERSON_ZOOM = 6,
+    THIRD_PERSON_AHEAD = 18;
+  const navigationTarget = new THREE.Vector3();
+  // 길안내 중 테크뇽은 건물 안(실내 GPS)이나 건물 뒤에 있어도 보이도록 1번 레이어로 옮겨
+  // 지도를 그린 뒤 깊이만 지우고 한 번 더 그립니다. 조명도 그 레이어에서 비추게 합니다.
+  const OVERLAY_LAYER = 1;
+  sky.layers.enable(OVERLAY_LAYER);
+  sun.layers.enable(OVERLAY_LAYER);
+  function setMascotOverlay(on) {
+    userTechnyong?.object.traverse((o) => o.layers.set(on ? OVERLAY_LAYER : 0));
+  }
+  let navigationTargetSet = false,
+    navigationMovedAt = -Infinity;
   let userTechnyong = null,
     technyong = null,
     movingDot = null,
@@ -598,6 +633,9 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   function clearReportSelection() {
     clearGroup(reportPreviewGroup);
   }
+  function clearGuidanceHeading() {
+    navigationFollowing = false;
+  }
   function setUserLocation(position, { follow = false } = {}) {
     if (!position) {
       userLocationGroup.visible = false;
@@ -610,11 +648,25 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       userTechnyong.object.position.y = 2.3;
       userTechnyong.object.rotation.y = Math.PI;
       userLocationGroup.add(userTechnyong.object);
+      setMascotOverlay(navigationMode);
     }
+    userTechnyong.object.visible = true;
     const accuracy = THREE.MathUtils.clamp(position.accuracy || 12, 3, 100);
-    userLocationGroup.position.set(position.x, 0, position.z);
+    if (navigationMode) {
+      // 새 위치로 순간이동하지 않고 animate에서 걸어가게 합니다. 멀리 튄 위치는 바로 옮깁니다.
+      const jump = Math.hypot(position.x - navigationTarget.x, position.z - navigationTarget.z);
+      if (!navigationTargetSet || jump > 80)
+        userLocationGroup.position.set(position.x, 0, position.z);
+      if (jump > 0.5) navigationMovedAt = performance.now();
+      navigationTarget.set(position.x, 0, position.z);
+      navigationTargetSet = true;
+    } else userLocationGroup.position.set(position.x, 0, position.z);
     userAccuracy.scale.set(accuracy, accuracy, 1);
     if (follow) {
+      if (navigationMode) {
+        navigationFollowing = true;
+        return;
+      }
       const offset = camera.position.clone().sub(controls.target);
       controls.target.set(position.x, 0, position.z);
       camera.position.copy(controls.target).add(offset);
@@ -716,6 +768,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     camera.updateProjectionMatrix();
     controls.update();
   }
+  let shortcutPicker = null;
   const raycaster = new THREE.Raycaster(),
     mouse = new THREE.Vector2(),
     groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.8);
@@ -766,6 +819,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     gesture = { start: f, last: f, mode: null };
   }
   function tilt(deltaPixels, horizontalPixels = 0) {
+    onCameraInteraction();
     const offset = camera.position.clone().sub(controls.target),
       s = new THREE.Spherical().setFromVector3(offset);
     s.theta -= horizontalPixels * 0.004;
@@ -782,6 +836,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   // 화면 좌표 from에 있던 지면 지점을 기준으로 확대(scale)·회전(turn, 시계 방향 +)한 뒤
   // 그 지점이 화면 좌표 to에 오도록 옮깁니다. 터치와 트랙패드가 함께 씁니다.
   function moveCamera(from, to, scale = 1, turn = 0) {
+    onCameraInteraction();
     const anchor = groundAt(from.x, from.y);
     if (!anchor) return;
     if (scale !== 1) {
@@ -816,11 +871,12 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       gesture.mode = touchGestureMode(gesture.start, f);
       if (!gesture.mode) return;
     }
-    if (gesture.mode === "zoom") {
+    if (gesture.mode === "zoom" || gesture.mode === "twist") {
       moveCamera(
-        gesture.start.mid,
-        gesture.start.mid,
+        gesture.last.mid,
+        f.mid,
         gesture.last.distance > 0 ? f.distance / gesture.last.distance : 1,
+        touchTurn(gesture.last.angle, f.angle),
       );
     } else {
       tilt(f.mid.y - gesture.last.mid.y, f.mid.x - gesture.last.mid.x);
@@ -830,6 +886,18 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   }
   let touchFrame = null;
   const canvas = renderer.domElement;
+  const manualPointers = new Map();
+  canvas.addEventListener("pointerdown", (event) => {
+    manualPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    const start = manualPointers.get(event.pointerId);
+    if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 5)
+      onCameraInteraction();
+  });
+  const releaseManualPointer = (event) => manualPointers.delete(event.pointerId);
+  canvas.addEventListener("pointerup", releaseManualPointer);
+  canvas.addEventListener("pointercancel", releaseManualPointer);
   canvas.addEventListener("pointerdown", (e) => {
     if (e.pointerType !== "touch") return;
     touchPoints.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -984,9 +1052,9 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     const r = renderer.domElement.getBoundingClientRect(),
       x = ((e.clientX - r.left) / r.width) * 2 - 1,
       y = (-(e.clientY - r.top) / r.height) * 2 + 1;
-    if (editHandler) {
+    if (shortcutPicker || editHandler) {
       const hit = groundAt(e.clientX, e.clientY);
-      if (hit) editHandler.click?.({ x: hit.x, z: hit.z });
+      if (hit) (shortcutPicker || editHandler.click)?.({ x: hit.x, z: hit.z });
       return;
     }
     if (reporting) {
@@ -1005,6 +1073,14 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     isEnabled: () => !homeMode && !reporting && !editHandler,
   });
   renderer.domElement.addEventListener("keydown", (e) => {
+    if (shortcutPicker && e.key === "Enter") {
+      e.preventDefault();
+      mouse.set(0, 0);
+      raycaster.setFromCamera(mouse, camera);
+      const point = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3());
+      if (point) shortcutPicker({ x: point.x, z: point.z });
+      return;
+    }
     if (reporting && e.key === "Enter") {
       e.preventDefault();
       pickPoint(0, 0);
@@ -1222,6 +1298,40 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     keyboardPan.update(deltaSeconds);
     controls.update();
     if (!homeMode) constrainNavigation(camera, controls);
+    if (navigationMode && userLocationGroup.visible) {
+      const step = Math.min(.1, deltaSeconds);
+      const weight = reduceMotion ? 1 : 1 - Math.exp(-10 * step);
+      if (navigationTargetSet)
+        userLocationGroup.position.lerp(navigationTarget, reduceMotion ? 1 : 1 - Math.exp(-4 * step));
+      if (navigationHeading !== null) {
+        displayedHeading = smoothHeading(displayedHeading, navigationHeading, weight);
+        // 나침반 방위(0=북, 시계방향)를 테크뇽이 바라보는 방향으로 바꿉니다.
+        if (userTechnyong)
+          userTechnyong.object.rotation.y = Math.PI - displayedHeading * Math.PI / 180;
+        if (navigationFollowing) {
+          const offset = camera.position.clone().sub(controls.target);
+          const bearing = Math.atan2(-offset.x, offset.z) * 180 / Math.PI;
+          const nextHeading = smoothHeading(bearing, navigationHeading, weight);
+          const phi = new THREE.Spherical().setFromVector3(offset).phi;
+          const desired = cameraOffsetForHeading(nextHeading, offset.length(), phi + (THIRD_PERSON_TILT - phi) * weight);
+          const ahead = navigationHeading * Math.PI / 180;
+          const target = userLocationGroup.position.clone().add(new THREE.Vector3(Math.sin(ahead) * THIRD_PERSON_AHEAD, 0, -Math.cos(ahead) * THIRD_PERSON_AHEAD));
+          controls.target.lerp(target, weight);
+          camera.position.copy(controls.target).add(new THREE.Vector3(desired.x, desired.y, desired.z));
+          camera.zoom += (Math.max(THIRD_PERSON_ZOOM, camera.zoom) - camera.zoom) * weight;
+          camera.updateProjectionMatrix();
+          controls.update();
+        }
+      } else if (navigationFollowing) {
+        controls.target.lerp(userLocationGroup.position, weight);
+      }
+      if (userTechnyong) {
+        const walking = !reduceMotion &&
+          (performance.now() - navigationMovedAt < 2500 ||
+            userLocationGroup.position.distanceTo(navigationTarget) > 0.4);
+        userTechnyong.update(t / 1000, { moving: walking, dt: step || 1 / 60 });
+      }
+    }
     campusTrees.updateDetail(
       (renderer.domElement.clientHeight * camera.zoom) /
         (camera.top - camera.bottom),
@@ -1235,6 +1345,17 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       );
     pondDetails.update(reduceMotion ? 0 : t / 1000);
     renderer.render(scene, camera);
+    if (navigationMode && userLocationGroup.visible && userTechnyong) {
+      const background = scene.background;
+      scene.background = null;
+      camera.layers.set(OVERLAY_LAYER);
+      renderer.autoClear = false;
+      renderer.clearDepth();
+      renderer.render(scene, camera);
+      renderer.autoClear = true;
+      camera.layers.set(0);
+      scene.background = background;
+    }
     declutterLabels(t);
     labels.render(scene, camera);
     profiler?.end(profileStart);
@@ -1246,6 +1367,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   });
   return {
     moveTo,
+    setNightMode,
     flyIntoBuilding,
     restoreBuildingFlight,
     // 편집 모드 전용: 보행 그래프 디버그 오버레이. graph가 null이면 끕니다.
@@ -1253,6 +1375,10 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     // 편집 모드 전용: 미리보기 도형(점·선)과 클릭·이동 처리기. null이면 지웁니다.
     setEditPreview: (spec) => graphOverlay.setPreview(spec),
     setEditHandler,
+    setShortcutPicker(handler) {
+      shortcutPicker = handler;
+      host.classList.toggle("shortcut-picking", Boolean(handler));
+    },
     setEntrances,
     setEntrancesVisible,
     focusTop,
@@ -1263,6 +1389,32 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     previewReportSelection,
     clearReportSelection,
     setUserLocation,
+    clearGuidanceHeading,
+    setNavigationMode(enabled) {
+      if (!enabled) {
+        navigationFollowing = false;
+        navigationHeading = displayedHeading = null;
+      }
+      navigationMode = enabled;
+      navigationTargetSet = false;
+      navigationMovedAt = -Infinity;
+      // 길안내 중 내 위치 표시는 테크뇽이 맡습니다.
+      userBase.visible = !enabled;
+      setMascotOverlay(enabled);
+      if (userTechnyong) {
+        userTechnyong.object.visible = true;
+        if (!enabled) {
+          userTechnyong.object.rotation.y = Math.PI;
+          userTechnyong.update(0, { moving: false, dt: 1 });
+        }
+      }
+    },
+    setNavigationHeading(heading, following) {
+      if (!Number.isFinite(heading)) return;
+      navigationHeading = heading;
+      navigationFollowing = following;
+    },
+    setNavigationFollowing(following) { navigationFollowing = following; },
     setRouteMascotVisible(visible) {
       routeMascotVisible = visible;
       if (movingDot) movingDot.visible = visible;

@@ -1,3 +1,4 @@
+import { shortcutEdge, shortcutNodes, withApprovedShortcuts } from "./shortcuts.mjs";
 import { normalizeSearch, suggestMatches } from "./search-suggestions.mjs";
 import { shortestPath } from "./routing.mjs";
 import { routeBetween, routeStartEntries } from "./route-target.mjs";
@@ -22,6 +23,7 @@ import {
   getDeviceId,
   confirmReportRows,
   deleteReportRows,
+  cleanupOrphanPhotos,
   uploadReportPhoto,
   photoUrlFor,
   fetchWorkRows,
@@ -58,7 +60,9 @@ import { buildingInfo } from "./building-info.mjs";
 import { setupEditMode, EDIT_MODE } from "./edit-mode.js";
 import { gpsToCampus } from "./geo.mjs";
 import { gisSummary } from "./gis.mjs";
-import { routePoints, guidanceAt, INSTRUCTION } from "./guidance.mjs";
+import { routePoints, guidanceAt, guidanceSummary, INSTRUCTION } from "./guidance.mjs";
+import { draggedSheetHeight, shouldCollapseSheet } from "./sheet.mjs";
+import { createHeadingTracker, gpsHeading } from "./heading.mjs";
 const $ = (s) => document.querySelector(s),
   $$ = (s) => document.querySelectorAll(s),
   // 761px 이상은 Figma v2 데스크톱 화면(떠 있는 패널·건물 카드·건물 검색)을 씁니다.
@@ -75,7 +79,27 @@ let region = "전체",
   gpsPosition = null,
   gpsStartNode = null,
   guidanceActive = false,
-  guidancePending = false;
+  guidancePending = false,
+  guidanceFollowing = true,
+  guidanceOriginName = "",
+  guidanceTotalMeters = 0;
+let sensorHeading = null, movementHeading = null;
+function navigationHeading(guide = null) {
+  if (sensorHeading !== null) return sensorHeading;
+  if (movementHeading !== null) return movementHeading;
+  const points = currentRoute && routePoints(currentRoute.path, currentRouteNodes);
+  return (guide ?? (gpsPosition && points && guidanceAt(points, gpsPosition)))?.heading ?? null;
+}
+function syncNavigationHeading(guide = null) {
+  map?.setNavigationHeading(navigationHeading(guide), guidanceActive && guidanceFollowing);
+}
+const headingTracker = createHeadingTracker(window, (heading) => {
+  if (!guidanceActive && !guidancePending) return;
+  sensorHeading = heading;
+  syncNavigationHeading();
+}, () => {
+  if (guidanceActive || guidancePending) toast("방향 센서를 사용할 수 없어 이동 방향을 기준으로 안내해요.");
+});
 // Supabase에서 비동기로 채워집니다 (아래 loadReports 참고). 처음엔 빈 상태로 시작합니다.
 let reports = [],
   adminAuthenticated = false,
@@ -190,6 +214,7 @@ function setRoutePlace(selector, id) {
 // 경로 계산에 쓰는 보행 그래프입니다. 평소에는 data.mjs의 합친 그래프이고,
 // 편집 모드에서는 편집 중인 조사 데이터를 합친 그래프로 바뀝니다.
 let graph = { nodes: NODES, edges: EDGES, entrances: SURVEY.entrances };
+let shortcutRows = [];
 function selectedPlace(selector, g = graph) {
   const id = routePlaceId(selector);
   // 현재 위치는 routeOn에서 길 위의 점으로 붙입니다(placeGps). entries는 붙이기 전 기본값입니다.
@@ -222,7 +247,7 @@ function routeOn(g, routeMode = mode) {
   // 확정된 공사 구간을 먼저 빼서, 막힌 길 위에는 출발점이 생기지 않게 합니다.
   let routeGraph = {
     nodes: g.nodes,
-    edges: availableEdges(confirmedEdges, g.edges),
+    edges: availableEdges(confirmedEdges, withApprovedShortcuts(g, shortcutRows, BUILDINGS)),
   };
   [start, routeGraph] = placeGps(start, routeGraph, g, "gps-start");
   [destination, routeGraph] = placeGps(destination, routeGraph, g, "gps-goal");
@@ -391,7 +416,12 @@ function showPopover(place) {
   el.hidden = false;
   $(".map-canvas-wrap").classList.add("has-building-popover");
 }
-let map = createCampusMap($("#hero-map"), buildingSelect, openRoadReport);
+let map = createCampusMap($("#hero-map"), buildingSelect, openRoadReport, () => {
+  if (!guidanceActive || !guidanceFollowing) return;
+  guidanceFollowing = false;
+  map?.clearGuidanceHeading();
+  syncNavigationCameraButtons();
+});
 if (!map) {
   $("#hero-map").innerHTML =
     '<div class="hero-fallback"><span>✦</span><b>사이로 이어지는 캠퍼스.</b><p>WebGL을 지원하는 브라우저에서<br>3D 미리보기를 볼 수 있어요.</p></div>';
@@ -930,10 +960,63 @@ function renderGuidanceButton() {
       : "안내 시작";
   button.setAttribute("aria-pressed", String(guidanceActive));
   button.setAttribute("aria-busy", String(guidancePending));
+  renderMobileNavigation();
+}
+function renderMobileNavigation(guide = null) {
+  const running = guidanceActive || guidancePending;
+  $("#map-view").classList.toggle("guidance-on", running);
+  $(".mobile-navigation").hidden = !running;
+  // 데스크톱도 모바일과 같은 최신 추적 로직을 사용하되 UI는 데스크톱 전용 배치를 씁니다.
+  map?.setNavigationMode(running);
+  if (!running || !currentRoute) return;
+  guide ??= guidanceActive && gpsPosition
+    ? guidanceAt(routePoints(currentRoute.path, currentRouteNodes), gpsPosition)
+    : null;
+  // 출발 → 도착과 도착 시각은 데스크톱(위 카드)·모바일(아래 시트)용으로 두 벌입니다.
+  $$(".navigation-origin-name").forEach((el) => (el.textContent = guidanceOriginName || "현재 위치"));
+  $$(".navigation-destination-name").forEach((el) => (el.textContent = $("#destination").value));
+  const remaining = guide?.remaining ?? currentRoute.meters;
+  const { minutes, progress } = guidanceSummary(remaining, guidanceTotalMeters || currentRoute.meters);
+  $("#navigation-minutes").textContent = `${minutes}분`;
+  $("#navigation-distance").textContent = `${Math.round(remaining)}m`;
+  const eta = `${new Date(Date.now() + minutes * 60000).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" })} 도착`;
+  $$(".navigation-eta-text").forEach((el) => (el.textContent = eta));
+  $("#navigation-progress").value = progress;
+  $(".navigation-progress-track").style.setProperty("--progress", String(Math.min(1, Math.max(0, progress))));
+  const direction = guide?.next.direction;
+  $("#navigation-direction").textContent = guidancePending ? "위치 확인 중" : INSTRUCTION[direction] || "경로를 따라 이동";
+  $("#navigation-arrow").textContent = direction === "left" ? "↰" : direction === "right" ? "↱" : direction === "arrive" ? "⚑" : "↑";
+  $("#navigation-turn-distance").textContent = guide ? `${Math.round(guide.next.distance)}m` : "—";
+  const point = guide?.nextPoint;
+  const landmark = point && BUILDINGS.filter((b) => b.name !== "교내 건물").reduce((best, b) =>
+    !best || Math.hypot(point.x - b.x, point.z - b.z) < Math.hypot(point.x - best.x, point.z - best.z) ? b : best, null);
+  $("#navigation-detail").textContent = guidancePending ? "현재 위치를 확인하고 있어요." : direction === "arrive" ? "경로를 따라 목적지까지 이동하세요" : landmark ? `${landmark.name} 인근에서 ${direction === "left" ? "왼쪽" : "오른쪽"}으로` : "표시된 경로를 따라 이동하세요";
+  syncNavigationCameraButtons();
+}
+function syncNavigationCameraButtons() {
+  const status = $("#navigation-status");
+  const message = guidancePending
+    ? "현재 위치 확인 중"
+    : guidanceActive
+      ? guidanceFollowing
+        ? "길안내 중"
+        : "길안내 중 · 지도 추적 일시 정지"
+      : "";
+  if (status.textContent !== message) status.textContent = message;
+  $("#navigation-recenter").hidden = !guidanceActive || guidanceFollowing;
+  $("#navigation-compass").setAttribute(
+    "aria-pressed",
+    String(guidanceActive && guidanceFollowing),
+  );
 }
 function endGuidance({ silent = false } = {}) {
   const wasRunning = guidanceActive || guidancePending;
   guidanceActive = guidancePending = false;
+  guidanceFollowing = true;
+  guidanceTotalMeters = 0;
+  headingTracker.stop();
+  sensorHeading = null;
+  map?.clearGuidanceHeading();
   map?.setRouteMascotVisible(true);
   renderGuidanceButton();
   if (wasRunning && gpsPosition)
@@ -949,11 +1032,18 @@ function updateGuidanceStatus() {
     gpsPosition,
   );
   if (!guide) return;
+  renderMobileNavigation(guide);
   if (guide.remaining <= 8) {
     endGuidance({ silent: true });
     setGpsStatus("도착지에 도착했어요.");
     toast("도착지에 도착했어요.");
     return;
+  }
+  if (guidanceFollowing) {
+    syncNavigationHeading(guide);
+    map?.setUserLocation(gpsPosition, {
+      follow: true,
+    });
   }
   const meters = Math.max(1, Math.round(guide.next.distance));
   setGpsStatus(
@@ -963,6 +1053,7 @@ function updateGuidanceStatus() {
 function activateGuidance() {
   guidancePending = false;
   guidanceActive = true;
+  guidanceFollowing = true;
   map?.setRouteMascotVisible(false);
   setRoutePlace("#origin", "gps");
   updateRoute();
@@ -971,10 +1062,12 @@ function activateGuidance() {
     toast("현재 위치에서 연결된 경로를 찾지 못했어요.");
     return;
   }
+  guidanceTotalMeters = currentRoute.meters;
   renderGuidanceButton();
+  syncNavigationHeading();
   map?.setUserLocation(gpsPosition, { follow: true });
   updateGuidanceStatus();
-  toast("테크뇽을 따라 길안내를 시작했어요.");
+  toast(isDesktop.matches ? "테크뇽을 따라 길안내를 시작했어요." : "길안내를 시작했어요.");
 }
 function startGuidance() {
   if (guidanceActive || guidancePending) {
@@ -989,6 +1082,8 @@ function startGuidance() {
     toast("도착지는 건물이나 출입구로 선택해주세요.");
     return;
   }
+  guidanceOriginName = $("#origin").value;
+  if (!isDesktop.matches) headingTracker.start();
   if (gpsPosition) {
     activateGuidance();
     return;
@@ -1000,22 +1095,163 @@ function startGuidance() {
     endGuidance({ silent: true });
     return;
   }
-  toast("현재 위치가 확인되면 길안내를 시작할게요.");
+  if (guidancePending) toast("현재 위치가 확인되면 길안내를 시작할게요.");
 }
 $("#route-card-start").onclick = startGuidance;
+$("#navigation-stop").onclick = () => endGuidance();
+$("#navigation-layers").onclick = () => side("layers").click();
+// 데스크톱에서 지도를 확대·축소하면 자동 추적을 멈추고 "내 위치로"를 표시합니다.
+function zoomNavigation(factor) {
+  guidanceFollowing = false;
+  map?.clearGuidanceHeading();
+  syncNavigationCameraButtons();
+  map?.zoom(factor);
+}
+$("#navigation-zoom-in").onclick = () => zoomNavigation(1.18);
+$("#navigation-zoom-out").onclick = () => zoomNavigation(1 / 1.18);
+$("#navigation-compass").onclick = () => {
+  if (!guidanceActive) return;
+  if (!guidanceFollowing) {
+    $("#navigation-recenter").click();
+    return;
+  }
+  guidanceFollowing = false;
+  map?.clearGuidanceHeading();
+  syncNavigationCameraButtons();
+};
+$("#navigation-back").onclick = () => {
+  endGuidance();
+  setPanelClosed(false);
+};
+$("#navigation-route").onclick = () => $("#navigation-back").click();
+$("#navigation-back-mobile").onclick = () => $("#navigation-back").click();
+$("#navigation-recenter").onclick = () => {
+  if (!gpsPosition || !guidanceActive) return;
+  guidanceFollowing = true;
+  syncNavigationHeading();
+  map?.setUserLocation(gpsPosition, { follow: true });
+  updateGuidanceStatus();
+};
 $$("[data-summary-mode]").forEach(
   (b) =>
     (b.onclick = () =>
       $(`.mode-tabs [data-mode="${b.dataset.summaryMode}"]`).click()),
 );
 $("#summary-edit").onclick = () => setPanelClosed(false);
+// 경로 요약의 ✕는 경로를 지우고 기본 지도(검색 바)로 돌아갑니다.
+$("#summary-close").onclick = () => {
+  endRouteSearch();
+  setPanelClosed(true);
+};
 // 모바일 경로 시트의 ✕는 길찾기를 끝내고(경로 지움) 지도로 돌아갑니다. 데스크톱은 패널만 닫습니다.
 $("#route-panel-close").onclick = () => {
   if (!isDesktop.matches) endRouteSearch();
   setPanelClosed(true);
 };
+// 모바일 경로 시트는 경로를 지우지 않고 상세만 접습니다.
+function setRouteSheetCollapsed(collapsed) {
+  $(".route-panel").classList.toggle("sheet-collapsed", collapsed);
+  $("#route-sheet-handle").setAttribute("aria-expanded", String(!collapsed));
+  $("#route-sheet-handle").setAttribute("aria-label", collapsed ? "경로 상세 펼치기" : "경로 상세 접기");
+}
+const routeSheetHandle = $("#route-sheet-handle");
+let sheetDrag = null;
+let sheetAnimation = null;
+let suppressSheetClick = false;
+function prepareSheetMotion() {
+  const panel = $(".route-panel");
+  const zoom = parseFloat(getComputedStyle(panel).zoom) || 1;
+  const height = panel.getBoundingClientRect().height / zoom;
+  const wasCollapsed = panel.classList.contains("sheet-collapsed");
+  if (sheetAnimation) {
+    sheetAnimation.cancel();
+    sheetAnimation = null;
+  }
+  panel.classList.remove("sheet-sizing");
+  panel.style.removeProperty("height");
+  panel.classList.remove("sheet-collapsed");
+  const expanded = panel.getBoundingClientRect().height / zoom;
+  panel.classList.add("sheet-collapsed");
+  const collapsed = panel.getBoundingClientRect().height / zoom;
+  panel.classList.remove("sheet-collapsed");
+  panel.classList.add("sheet-sizing");
+  panel.style.height = `${height}px`;
+  return { panel, zoom, height, expanded, collapsed, wasCollapsed };
+}
+function settleSheet(motion, collapsed) {
+  const { panel, zoom } = motion;
+  const from = panel.getBoundingClientRect().height / zoom;
+  const to = collapsed ? motion.collapsed : motion.expanded;
+  panel.style.height = `${to}px`;
+  const finish = () => {
+    setRouteSheetCollapsed(collapsed);
+    panel.classList.remove("sheet-sizing");
+    panel.style.removeProperty("height");
+    sheetAnimation = null;
+  };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return finish();
+  sheetAnimation = panel.animate([{ height: `${from}px` }, { height: `${to}px` }], {
+    duration: 260,
+    easing: "cubic-bezier(.22, 1, .36, 1)",
+  });
+  sheetAnimation.onfinish = finish;
+}
+routeSheetHandle.onclick = (event) => {
+  if (suppressSheetClick && event.detail !== 0) {
+    suppressSheetClick = false;
+    return;
+  }
+  suppressSheetClick = false;
+  const motion = prepareSheetMotion();
+  settleSheet(motion, !motion.wasCollapsed);
+};
+routeSheetHandle.addEventListener("pointerdown", (event) => {
+  if (isDesktop.matches || event.button !== 0) return;
+  suppressSheetClick = false;
+  sheetDrag = { ...prepareSheetMotion(), id: event.pointerId, y: event.clientY,
+    lastY: event.clientY, lastTime: event.timeStamp, velocity: 0, moved: false };
+  routeSheetHandle.setPointerCapture(event.pointerId);
+});
+routeSheetHandle.addEventListener("pointermove", (event) => {
+  if (!sheetDrag || event.pointerId !== sheetDrag.id) return;
+  const delta = event.clientY - sheetDrag.y;
+  sheetDrag.moved ||= Math.abs(delta) > 4;
+  const elapsed = event.timeStamp - sheetDrag.lastTime;
+  if (elapsed > 0) sheetDrag.velocity = (event.clientY - sheetDrag.lastY) / elapsed;
+  sheetDrag.lastY = event.clientY;
+  sheetDrag.lastTime = event.timeStamp;
+  sheetDrag.panel.style.height = `${draggedSheetHeight(sheetDrag.height, delta, sheetDrag.zoom, sheetDrag.collapsed, sheetDrag.expanded)}px`;
+});
+function finishSheetDrag(event, cancelled = false) {
+  if (!sheetDrag || event.pointerId !== sheetDrag.id) return;
+  const motion = sheetDrag;
+  sheetDrag = null;
+  if (routeSheetHandle.hasPointerCapture(event.pointerId)) routeSheetHandle.releasePointerCapture(event.pointerId);
+  suppressSheetClick = motion.moved;
+  if (!motion.moved && !cancelled) {
+    setRouteSheetCollapsed(motion.wasCollapsed);
+    motion.panel.classList.remove("sheet-sizing");
+    motion.panel.style.removeProperty("height");
+    return;
+  }
+  const height = motion.panel.getBoundingClientRect().height / motion.zoom;
+  const velocity = event.timeStamp - motion.lastTime > 100 ? 0 : motion.velocity;
+  settleSheet(motion, cancelled || !motion.moved ? motion.wasCollapsed : shouldCollapseSheet(height, velocity, motion.collapsed, motion.expanded));
+}
+routeSheetHandle.addEventListener("pointerup", (event) => finishSheetDrag(event));
+routeSheetHandle.addEventListener("pointercancel", (event) => finishSheetDrag(event, true));
+isDesktop.addEventListener("change", () => {
+  if (!isDesktop.matches) return;
+  sheetDrag = null;
+  sheetAnimation?.cancel();
+  sheetAnimation = null;
+  $(".route-panel").classList.remove("sheet-sizing");
+  $(".route-panel").style.removeProperty("height");
+  setRouteSheetCollapsed(false);
+});
 // 출발·도착 칸의 지우기(✕)와 바꾸기(⇅) 버튼
 function clearRouteResult() {
+  setRouteSheetCollapsed(false);
   endGuidance({ silent: true });
   routeShown = false;
   currentRoute = null;
@@ -1060,6 +1296,7 @@ function setEntranceLayer(visible) {
   map?.setEntrancesVisible(visible);
   side("entrances").setAttribute("aria-pressed", String(visible));
   $("#entrance-toggle").setAttribute("aria-pressed", String(visible));
+  $("#v2-entrances").setAttribute("aria-pressed", String(visible));
 }
 side("entrances").onclick = () =>
   setEntranceLayer(
@@ -1069,6 +1306,8 @@ $("#entrance-toggle").onclick = () =>
   setEntranceLayer(
     $("#entrance-toggle").getAttribute("aria-pressed") !== "true",
   );
+$("#v2-entrances").onclick = () =>
+  setEntranceLayer($("#v2-entrances").getAttribute("aria-pressed") !== "true");
 side("layers").onclick = () => {
   const on = !$("#map-view").classList.contains("show-legend");
   $("#map-view").classList.toggle("show-legend", on);
@@ -1105,6 +1344,14 @@ $("#v2-3d").onclick = () => setDimension(false);
 $("#v2-plus").onclick = () => map?.zoom(1.18);
 $("#v2-minus").onclick = () => map?.zoom(1 / 1.18);
 $("#v2-locate").onclick = () => $("#gps-toggle").click();
+const nightToggle = $("#v2-night");
+nightToggle.disabled = !map;
+nightToggle.onclick = () => {
+  const enabled = nightToggle.getAttribute("aria-pressed") !== "true";
+  map?.setNightMode(enabled);
+  $("#map-view").classList.toggle("map-night", enabled);
+  nightToggle.setAttribute("aria-pressed", String(enabled));
+};
 $("#v2-reset").onclick = () => setDimension(false);
 
 // ===== 트랙패드 확대 제스처로 페이지가 커지지 않게 합니다(표지·지도 화면 모두) =====
@@ -1162,6 +1409,7 @@ function placeJourneyForm() {
 }
 placeJourneyForm();
 isDesktop.addEventListener("change", placeJourneyForm);
+isDesktop.addEventListener("change", () => renderMobileNavigation());
 $("#mobile-route-back").onclick = () => setPanelClosed(true);
 
 // 모바일 오른쪽 둥근 버튼: 길 막힘 제보 패널, 관리자·편집기 진입(공개 버튼)
@@ -1190,6 +1438,7 @@ function stopGps({ keepStatus = false } = {}) {
   gpsWatchId = null;
   gpsPosition = null;
   gpsStartNode = null;
+  movementHeading = null;
   let changed = false;
   if (routePlaceId("#origin") === "gps") {
     setRoutePlace("#origin", "gate");
@@ -1208,7 +1457,10 @@ function stopGps({ keepStatus = false } = {}) {
 $("#gps-toggle").onclick = () => {
   if (gpsWatchId !== null) {
     if (gpsPosition) {
+      guidanceFollowing = true;
+      syncNavigationHeading();
       map?.setUserLocation(gpsPosition, { follow: true });
+      if (guidanceActive) updateGuidanceStatus();
       toast("내 위치로 이동했어요.");
     } else setGpsStatus("현재 위치를 확인하고 있어요…");
     return;
@@ -1232,10 +1484,21 @@ function startGps() {
         CAMPUS_GEOMETRY.meta,
       );
       const nearest = nearestGraphNode(point);
-      gpsPosition = { ...point, accuracy: coords.accuracy };
+      const course = gpsHeading(coords, gpsPosition, point);
+      if (course !== null) movementHeading = course;
+      gpsPosition = {
+        ...point,
+        accuracy: coords.accuracy,
+        heading: course,
+      };
+      if (guidanceActive) syncNavigationHeading();
       if (!nearest || nearest.distance > 350) {
         gpsStartNode = null;
         map?.setUserLocation(null);
+        if (guidanceActive || guidancePending) {
+          endGuidance({ silent: true });
+          toast("현재 위치가 캠퍼스 밖이에요. 캠퍼스 안에서 안내를 시작해주세요.");
+        }
         setGpsStatus(
           `현재 위치가 서울과기대 지도 범위 밖이에요. 캠퍼스에 들어오면 자동으로 표시됩니다.`,
         );
@@ -1244,7 +1507,7 @@ function startGps() {
       }
       gpsStartNode = nearest.id;
       map?.setUserLocation(gpsPosition, {
-        follow: firstFix || guidanceActive,
+        follow: firstFix || (guidanceActive && guidanceFollowing),
       });
       setGpsStatus(
         `현재 위치 추적 중 · 정확도 약 ${Math.round(coords.accuracy)}m`,
@@ -1275,9 +1538,11 @@ function startGps() {
   return true;
 }
 window.addEventListener("pagehide", () => {
+  headingTracker.stop();
   if (gpsWatchId !== null) navigator.geolocation?.clearWatch(gpsWatchId);
 });
 function routeView() {
+  stopShortcutPicking();
   setReporting(false);
   const isMap = location.hash.startsWith("#campus/");
   if (isMap && location.hash !== "#campus/seoultech") {
@@ -1399,10 +1664,206 @@ document.addEventListener("keydown", (e) => {
     $("#school-search").focus();
   }
 });
+// 지름길 제보는 현재 배포된 보행 그래프의 연결점에 맞춥니다.
+const shortcutDialog = $("#shortcut-dialog");
+const shortcutForm = $("#shortcut-form");
+const shortcutSubmit = $("#shortcut-submit");
+const shortcutBase = { nodes: NODES, edges: EDGES };
+const shortcutEndpoints = shortcutNodes(EDGES);
+let shortcutSelection = [];
+let reviewingShortcut = false;
+let shortcutLoad = 0;
+
+function previewShortcut(points) {
+  const color = 0x7950ff;
+  map?.setEditPreview({
+    dots: points.map((point) => ({ ...point, color, radius: 3 })),
+    lines: [{ points, color, width: 2, dashed: true }],
+  });
+}
+
+function stopShortcutPicking() {
+  if ($("#shortcut-picker").hidden && !shortcutSelection.length && !reviewingShortcut) return;
+  $("#shortcut-picker").hidden = true;
+  shortcutSelection = [];
+  reviewingShortcut = false;
+  map?.setShortcutPicker(null);
+  map?.setEditPreview(null);
+}
+
+function startShortcutPicking() {
+  if (!map || EDIT_MODE) return toast("캠퍼스 지도에서 지름길을 제보해주세요.");
+  stopShortcutPicking();
+  setReporting(false);
+  setReportsPanel(false);
+  closeBuildingPopover();
+  closeBuildingCard();
+  $("#shortcut-picker").hidden = false;
+  $("#shortcut-picker-close").textContent = "취소";
+  $("#shortcut-picker-status").textContent = "지름길의 시작점을 눌러주세요.";
+  map.setShortcutPicker(pickShortcutPoint);
+  $("#campus-map canvas")?.focus({ preventScroll: true });
+}
+
+function pickShortcutPoint(point) {
+  let nearest = null;
+  let distance = 15;
+  for (const id of shortcutEndpoints) {
+    const node = NODES[id];
+    const meters = Math.hypot(point.x - node.x, point.z - node.z);
+    if (meters < distance) {
+      nearest = id;
+      distance = meters;
+    }
+  }
+  if (!nearest) return toast("기존 보행로 가까이에서 선택해주세요.");
+  if (!shortcutSelection.length) {
+    shortcutSelection.push(nearest);
+    previewShortcut([NODES[nearest]]);
+    $("#shortcut-picker-status").textContent = "지름길의 끝점을 눌러주세요.";
+    return;
+  }
+  const [node_a] = shortcutSelection;
+  const edge = shortcutEdge({ node_a, node_b: nearest }, shortcutBase, BUILDINGS, shortcutEndpoints);
+  if (!edge) return toast("건물을 지나지 않는 다른 끝점을 선택해주세요.");
+  if (EDGES.some((candidate) => edgeId(candidate) === edgeId(edge)))
+    return toast("이미 연결된 구간이에요. 다른 끝점을 선택해주세요.");
+  shortcutSelection.push(nearest);
+  previewShortcut(shortcutSelection.map((id) => NODES[id]));
+  map.setShortcutPicker(null);
+  $("#shortcut-picker").hidden = true;
+  shortcutForm.reset();
+  $("#shortcut-error").hidden = true;
+  $("#shortcut-summary").textContent = `선택한 두 지점 사이 약 ${Math.round(edge.meters)}m`;
+  shortcutDialog.showModal();
+}
+
+$("#shortcut-start").onclick = startShortcutPicking;
+$("#shortcut-picker-close").onclick = () => {
+  const returnToReview = reviewingShortcut;
+  stopShortcutPicking();
+  if (returnToReview && adminAuthenticated) openAdminPanel("shortcuts");
+};
+shortcutDialog.addEventListener("cancel", (event) => {
+  if (shortcutSubmit.disabled) event.preventDefault();
+});
+shortcutDialog.addEventListener("close", () => {
+  if ($("#shortcut-picker").hidden) stopShortcutPicking();
+});
+$("#shortcut-repick").onclick = () => {
+  shortcutDialog.close();
+  startShortcutPicking();
+};
+shortcutForm.onsubmit = async (event) => {
+  event.preventDefault();
+  if (shortcutSubmit.disabled || shortcutSelection.length !== 2) return;
+  const [node_a, node_b] = shortcutSelection;
+  const note = $("#shortcut-note").value.trim();
+  const errorMessage = $("#shortcut-error");
+  if (!note) {
+    errorMessage.textContent = "지름길 설명을 입력해주세요.";
+    errorMessage.hidden = false;
+    return;
+  }
+  shortcutSubmit.disabled = true;
+  $("#shortcut-repick").disabled = true;
+  try {
+    const { error } = await supabase.from("shortcut_reports").insert({
+      node_a, node_b, note, has_stairs: $("#shortcut-stairs").value === "yes",
+    });
+    if (error) throw error;
+    shortcutDialog.close();
+    toast("지름길 제보가 접수됐어요. 관리자가 확인한 뒤 길찾기에 반영돼요.");
+  } catch {
+    errorMessage.textContent = "제보를 보내지 못했어요. 다시 시도해주세요.";
+    errorMessage.hidden = false;
+  } finally {
+    shortcutSubmit.disabled = false;
+    $("#shortcut-repick").disabled = false;
+  }
+};
+
+async function loadShortcuts() {
+  const request = ++shortcutLoad;
+  let query = supabase.from("shortcut_reports").select("*").order("created_at");
+  if (!adminAuthenticated) query = query.eq("status", "approved");
+  const { data, error } = await query;
+  if (request !== shortcutLoad) return;
+  if (error) {
+    $("#shortcut-admin-status").textContent = "지름길 제보를 불러오지 못했어요.";
+    return;
+  }
+  const approvedIds = (rows) => rows.filter((row) => row.status === "approved").map((row) => row.id).join(",");
+  const changed = approvedIds(shortcutRows) !== approvedIds(data);
+  shortcutRows = data;
+  if ($("#admin-dialog").open) renderShortcutReviews();
+  if (changed && routePlaceId("#origin") && routePlaceId("#destination")) updateRoute();
+}
+
+function renderShortcutReviews() {
+  const list = $("#shortcut-admin-list");
+  const rows = shortcutRows.filter((row) => row.status !== "rejected");
+  const pending = rows.filter((row) => row.status === "pending").length;
+  $("#admin-shortcut-count").textContent = pending;
+  $("#admin-shortcut-count").hidden = pending === 0;
+  $("#shortcut-admin-status").textContent = rows.length ? "" : "검토할 지름길 제보가 없어요.";
+  list.replaceChildren();
+  for (const row of rows) {
+    const edge = shortcutEdge(row, shortcutBase, BUILDINGS, shortcutEndpoints);
+    const approved = row.status === "approved";
+    const item = el("li", "shortcut-review");
+    item.append(
+      el("b", "", approved ? "등록됨" : "검토 대기"),
+      el("p", "", row.note),
+      el("small", "", edge
+        ? `약 ${Math.round(edge.meters)}m · ${edge.stairs ? "계단 있음" : "계단 없음"}`
+        : "현재 지도에서 연결점을 확인할 수 없어요."),
+    );
+    const actions = el("div", "admin-actions");
+    const preview = el("button", "", "지도에서 보기");
+    preview.disabled = !edge || !map || EDIT_MODE;
+    preview.onclick = () => {
+      const points = [NODES[edge.a], NODES[edge.b]];
+      const [a, b] = points;
+      setReporting(false);
+      $("#admin-dialog").close();
+      reviewingShortcut = true;
+      $("#shortcut-picker").hidden = false;
+      $("#shortcut-picker-status").textContent = "제보된 지름길";
+      $("#shortcut-picker-close").textContent = "검토로 돌아가기";
+      previewShortcut(points);
+      map.focusTop({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 }, Math.min(5, 170 / edge.meters));
+    };
+    actions.append(preview);
+    for (const [status, label] of approved
+      ? [["rejected", "등록 취소"]]
+      : [["approved", "승인 및 등록"], ["rejected", "반려"]]) {
+      const button = el("button", "", label);
+      button.disabled = status === "approved" && !edge;
+      if (status === "approved") button.dataset.act = "confirm";
+      button.onclick = async () => {
+        for (const control of actions.children) control.disabled = true;
+        const { data, error } = await supabase.from("shortcut_reports")
+          .update({ status }).eq("id", row.id).eq("status", row.status).select("id");
+        for (const control of actions.children) control.disabled = false;
+        await loadShortcuts();
+        if (error || !data?.length)
+          $("#shortcut-admin-status").textContent = error?.code === "23505"
+            ? "이미 등록된 지름길이에요."
+            : "검토 상태를 저장하지 못했어요. 다시 시도해주세요.";
+      };
+      actions.append(button);
+    }
+    item.append(actions);
+    list.append(item);
+  }
+}
+
 renderSchools();
 renderReportList();
 renderAdminAlert();
 routeView();
+loadShortcuts();
 loadReports(); // Supabase에서 신고 목록을 비동기로 불러와 위 렌더를 다시 채웁니다.
 
 // ===== 현장 공사 신고 (GPS 위치 + 앱 안 카메라) =====
@@ -1413,6 +1874,7 @@ const REPORT_MAX_ACCURACY = 50,
   REPORT_ADJUST_RADIUS = 30;
 let reportOrigin = null; // 신고를 시작할 때 잡은 GPS 위치 {x, z, accuracy}
 function setReporting(value) {
+  if (value) stopShortcutPicking();
   reporting = value;
   $("#report-start").classList.toggle("active", value);
   $("#report-start").setAttribute("aria-pressed", String(value));
@@ -1824,6 +2286,47 @@ function clusterHeading(li, cluster, summary) {
   );
 }
 // 사진 한 장: 고르기(라디오) + 사유·시각 + 크게 보기 + 이 신고만 빼기
+function enablePhotoDrag(photos) {
+  photos.tabIndex = 0;
+  photos.setAttribute("aria-label", "신고 사진 목록, 좌우로 스크롤");
+  let drag = null;
+  let suppressClick = false;
+  photos.addEventListener("pointerdown", (event) => {
+    // 터치는 브라우저의 기본 스크롤을 사용하고 버튼·라디오는 그대로 작동합니다.
+    if (event.pointerType !== "mouse" || event.button !== 0 ||
+        event.target.closest("button, a, input")) return;
+    suppressClick = false;
+    drag = { id: event.pointerId, x: event.clientX, left: photos.scrollLeft, moved: false };
+  });
+  photos.addEventListener("pointermove", (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const offset = event.clientX - drag.x;
+    if (!drag.moved && Math.abs(offset) < 6) return;
+    drag.moved = true;
+    photos.setPointerCapture(event.pointerId);
+    photos.classList.add("is-dragging");
+    photos.scrollLeft = drag.left - offset;
+    event.preventDefault();
+  });
+  const finish = (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    suppressClick = drag.moved;
+    drag = null;
+    photos.classList.remove("is-dragging");
+    if (photos.hasPointerCapture(event.pointerId)) photos.releasePointerCapture(event.pointerId);
+  };
+  photos.addEventListener("pointerup", finish);
+  photos.addEventListener("pointercancel", finish);
+  photos.addEventListener("pointerleave", (event) => {
+    if (drag && !drag.moved) finish(event);
+  });
+  photos.addEventListener("click", (event) => {
+    if (!suppressClick) return;
+    suppressClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+}
 function photoCard(cluster, report, { selectable }) {
   const card = el("li", "admin-photo");
   const label = el("label");
@@ -1842,6 +2345,7 @@ function photoCard(cluster, report, { selectable }) {
     img.src = url;
     img.alt = `${reasonLabel(report)} 신고 사진`;
     img.loading = "lazy";
+    img.draggable = false;
     label.append(img);
   } else label.append(el("span", "admin-photo-empty", "사진 없음"));
   // 촬영 시각과, 촬영한 GPS 위치에서 신고 지점까지 거리·GPS 정확도(현장 신고 판단 근거)
@@ -1890,6 +2394,7 @@ function renderAdminSection(listId, emptyId, list) {
       `신고 ${cluster.count}건 · 최근 ${new Date(cluster.latestAt).toLocaleString("ko-KR")}`,
     );
     const photos = el("ul", "admin-photos");
+    enablePhotoDrag(photos);
     for (const report of cluster.reports)
       photos.append(photoCard(cluster, report, { selectable: true }));
     const ids = cluster.reports.map((r) => r.id);
@@ -1928,6 +2433,7 @@ function renderConfirmedSection() {
       `통행 막힘(확정) · 신고 ${cluster.count}건 · 사용자에게 보이는 대표 사진`,
     );
     const photos = el("ul", "admin-photos");
+    enablePhotoDrag(photos);
     photos.append(photoCard(cluster, cluster.cover, { selectable: false }));
     const actions = el("div", "admin-actions");
     actions.append(
@@ -1974,10 +2480,25 @@ function renderAdminAlert() {
 }
 // 관리자 화면은 ?admin=1에서만 노출하고, 실제 권한은 Supabase Auth + RLS가 검사합니다.
 $("#admin-toggle").hidden = !new URLSearchParams(location.search).has("admin");
-function openAdminPanel() {
+function setAdminTab(tab) {
+  $$("[data-admin-tab]").forEach((button) => {
+    const active = button.dataset.adminTab === tab;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  $$("[data-admin-panel]").forEach((panel) =>
+    panel.classList.toggle("is-active", panel.dataset.adminPanel === tab),
+  );
+}
+$$('[data-admin-tab]').forEach(
+  (button) => (button.onclick = () => setAdminTab(button.dataset.adminTab)),
+);
+function openAdminPanel(tab = "reports") {
   renderAdminPanel();
   renderWorkList();
+  setAdminTab(tab);
   $("#admin-dialog").showModal();
+  loadShortcuts();
 }
 // ===== 관리자·편집기 진입 (사이드바·모바일 버튼) =====
 // 관리자 계정으로 로그인한 뒤 편집기(?edit)와 관리자 검토 중 하나를 고릅니다.
@@ -2176,6 +2697,26 @@ $("#work-form").onsubmit = async (e) => {
 };
 loadWorks();
 
+// 관리자 "사진 정리": 신고와 연결되지 않은 지 하루 넘은 사진을 Storage에서 지웁니다.
+$("#photo-cleanup").onclick = async () => {
+  const button = $("#photo-cleanup"),
+    status = $("#photo-cleanup-status");
+  button.disabled = true;
+  status.hidden = false;
+  status.textContent = "사진을 확인하고 있어요…";
+  try {
+    const { checked, removed } = await cleanupOrphanPhotos();
+    status.textContent = removed
+      ? `사진 ${checked}장 중 남아 있던 ${removed}장을 지웠어요.`
+      : `사진 ${checked}장을 확인했어요. 지울 사진이 없어요.`;
+  } catch {
+    status.textContent =
+      "사진 정리에 실패했어요. 관리자 로그인을 확인해주세요.";
+  } finally {
+    button.disabled = false;
+  }
+};
+
 // 다른 사람(사용자↔관리자)이 바꾼 내용을 가져옵니다. 10초마다, 그리고 탭으로 돌아올 때 다시 읽습니다.
 // 신고 창이 열려 있거나 위치를 고르는 중에는 선택이 지워지지 않게 건너뜁니다.
 // 관리자 창은 열어 둔 채 기다리는 화면이라 열려 있어도 갱신합니다.
@@ -2184,6 +2725,7 @@ function refreshShared() {
   if (document.hidden || reporting || $("#report-dialog").open) return;
   loadReports();
   loadWorks();
+  loadShortcuts();
 }
 setInterval(refreshShared, 10000);
 document.addEventListener("visibilitychange", refreshShared);

@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { orphanPhotos } from "./reports.mjs";
 
 // Supabase 프로젝트 연결 정보. anon/publishable 키는 RLS로 보호되는 공개 키라
 // 커밋해도 괜찮습니다 (service_role 키는 절대 여기 두지 마세요).
@@ -6,8 +7,41 @@ const SUPABASE_URL = "https://jydziqwmhjlwlsoiegdd.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_nlLz8LxRU7-DborGMtCnrQ_iDb8PjKR";
 const PHOTO_BUCKET = "report-photos";
 
-// 관리자 로그인은 현재 화면에서만 유지하고, 새로고침 뒤에는 다시 인증합니다.
-export const AUTH_OPTIONS = { auth: { persistSession: false } };
+// 관리자 로그인 유지 범위:
+// - 편집기 열기·닫기(?edit로 페이지를 다시 엶), 실내 지도에 갔다 돌아오기 → 로그인 유지
+// - 새로고침 → 로그인 해제(다시 인증), 탭을 닫으면 → 로그인 해제(sessionStorage는 탭과 함께 사라짐)
+// 그래서 세션을 이 탭의 sessionStorage에 두고, 이번 페이지 열기가 "새로고침"일 때만 지웁니다.
+export const AUTH_STORAGE_KEY = "sai:seoultech:admin-auth";
+const navigationType = () => {
+  try {
+    return performance.getEntriesByType("navigation")[0]?.type;
+  } catch {
+    return undefined;
+  }
+};
+export function authStorage({
+  storage = globalThis.sessionStorage,
+  type = navigationType(),
+} = {}) {
+  if (!storage) return undefined;
+  if (type === "reload")
+    try {
+      storage.removeItem(AUTH_STORAGE_KEY);
+    } catch {
+      // 저장소를 못 쓰는 환경(사생활 보호 모드 등)에서는 지울 것도 없습니다.
+    }
+  return storage;
+}
+const sessionStore = authStorage();
+export const AUTH_OPTIONS = {
+  auth: sessionStore
+    ? {
+        persistSession: true,
+        storage: sessionStore,
+        storageKey: AUTH_STORAGE_KEY,
+      }
+    : { persistSession: false },
+};
 export const supabase = createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
@@ -127,10 +161,78 @@ export async function deleteReportRows(ids) {
     .from("road_reports")
     .delete()
     .in("id", ids)
-    .select("id");
+    .select("id, photo_path");
   if (error) throw error;
   if (!data?.length)
     throw new Error("삭제 권한이 없어 지워진 신고가 없습니다.");
+  // 지운 신고의 사진도 Storage에서 지웁니다. 사진 삭제가 실패해도 신고 삭제는 이미 끝났으므로
+  // 실패로 보지 않고, 남은 사진은 관리자 "사진 정리"(cleanupOrphanPhotos)가 나중에 지웁니다.
+  try {
+    await removeReportPhotos(data.map((row) => row.photo_path));
+  } catch (photoError) {
+    console.warn(
+      "신고 사진 삭제 실패(사진 정리로 다시 지울 수 있음)",
+      photoError,
+    );
+  }
+}
+
+// Storage 사진 지우기. SQL로 storage.objects 행을 지우면 실제 파일은 남으므로 반드시 Storage API를 씁니다.
+// RLS: report-photos 버킷 조회·삭제는 관리자만(20261114120000_report_photo_cleanup.sql).
+export async function removeReportPhotos(paths) {
+  const list = [...new Set((paths || []).filter(Boolean))];
+  for (let i = 0; i < list.length; i += 100) {
+    const { error } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .remove(list.slice(i, i + 100));
+    if (error) throw error;
+  }
+  return list.length;
+}
+
+// 관리자 "사진 정리": 어떤 신고와도 연결되지 않은 지 24시간 넘은 사진을 지웁니다.
+// 사진은 "기기ID/시각.확장자"로 저장되므로 기기 폴더마다 목록을 읽습니다.
+export async function cleanupOrphanPhotos() {
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !isAdminUser(auth.user))
+    throw new Error("관리자 로그인이 필요합니다.");
+  const bucket = supabase.storage.from(PHOTO_BUCKET);
+  const listAll = async (prefix) => {
+    const items = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await bucket.list(prefix, {
+        limit: 1000,
+        offset,
+      });
+      if (error) throw error;
+      items.push(...data);
+      if (data.length < 1000) return items;
+    }
+  };
+  const files = [];
+  for (const item of await listAll("")) {
+    // 폴더는 id가 없습니다. 맨 위에 바로 놓인 파일도 함께 봅니다.
+    if (item.id) {
+      files.push({ path: item.name, createdAt: item.created_at });
+      continue;
+    }
+    for (const file of await listAll(item.name))
+      if (file.id)
+        files.push({
+          path: `${item.name}/${file.name}`,
+          createdAt: file.created_at,
+        });
+  }
+  const { data: rows, error } = await supabase
+    .from("road_reports")
+    .select("photo_path");
+  if (error) throw error;
+  const orphans = orphanPhotos(
+    files,
+    rows.map((row) => row.photo_path),
+  );
+  await removeReportPhotos(orphans);
+  return { checked: files.length, removed: orphans.length };
 }
 
 export async function uploadReportPhoto(file) {

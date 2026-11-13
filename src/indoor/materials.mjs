@@ -330,6 +330,47 @@ export const LIGHTING = {
   mapExposure: 1.4, // 지도 보기(위에서)
 };
 
+// Presentation palette for the cutaway. First-person navigation retains the
+// photo-matched finishes used to recognize real rooms and doors.
+const CUTAWAY_FINISH = {
+  floor: { color: 0xe7ddca, vertexColors: false, roughness: 0.76 },
+  wall: { color: 0xf5f0e7, vertexColors: false, roughness: 0.88 },
+  stone: { color: 0xdad7cf, vertexColors: false, roughness: 0.78 },
+  wood: { color: 0xc39a70, vertexColors: false, roughness: 0.68 },
+  door: { color: 0xa7b8a3, vertexColors: false, roughness: 0.7 },
+};
+
+// Subtle contact shading at the base of cutaway walls.
+function cutawayMaterial(material, kind, floorHeight) {
+  const finish = CUTAWAY_FINISH[kind];
+  if (!finish) return material;
+  const cutaway = material.clone();
+  cutaway.color.setHex(finish.color);
+  cutaway.vertexColors = false;
+  cutaway.roughness = finish.roughness;
+  if (kind === "wall") {
+    cutaway.onBeforeCompile = (shader) => {
+      shader.uniforms.cutawayFloorHeight = { value: floorHeight };
+      shader.vertexShader = "varying float cutawayHeight;\n" + shader.vertexShader;
+      shader.vertexShader = shader.vertexShader.replace(
+        "#include <begin_vertex>",
+        "#include <begin_vertex>\ncutawayHeight = position.y;",
+      );
+      shader.fragmentShader =
+        "varying float cutawayHeight;\nuniform float cutawayFloorHeight;\n" +
+        shader.fragmentShader;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+         float wallBase = smoothstep(0.05, 0.95, cutawayHeight - cutawayFloorHeight);
+         diffuseColor.rgb *= mix(0.80, 1.0, wallBase);`,
+      );
+    };
+    cutaway.customProgramCacheKey = () => "mirae-cutaway-wall-contact";
+  }
+  return cutaway;
+}
+
 /** 유리(G<층>) 재질 */
 export function glassMaterial() {
   return new THREE.MeshStandardMaterial({
@@ -438,6 +479,7 @@ export function texturize(mesh, renderer, extra = {}, opts = {}) {
   }
   const geo = new THREE.BufferGeometry();
   const matList = [];
+  const cutawayList = [];
   let w = 0;
   for (let k = 0; k < names.length; k++) {
     if (!tris[k].length) continue;
@@ -479,9 +521,11 @@ export function texturize(mesh, renderer, extra = {}, opts = {}) {
     }
     geo.addGroup(start, w - start, matList.length);
     const m = mats[names[k]];
-    matList.push(
-      Object.keys(extra).length ? Object.assign(m.clone(), extra) : m,
-    );
+    const material = Object.keys(extra).length ? Object.assign(m.clone(), extra) : m;
+    matList.push(material);
+    cutawayList.push(Number.isFinite(opts.floorHeight)
+        ? cutawayMaterial(material, names[k], opts.floorHeight)
+        : material);
   }
   geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
   geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
@@ -493,4 +537,5 @@ export function texturize(mesh, renderer, extra = {}, opts = {}) {
   if (src !== mesh.geometry) src.dispose();
   mesh.geometry = geo;
   mesh.material = matList;
+  return { firstPerson: matList, cutaway: cutawayList };
 }

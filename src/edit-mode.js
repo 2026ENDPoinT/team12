@@ -33,7 +33,7 @@ export function setupEditMode(ctx) {
   panel.style.cssText =
     "position:absolute;left:12px;top:12px;z-index:30;max-width:240px;" +
     "background:rgba(255,255,255,.94);color:#1f2430;border:1px solid #d9dbe3;" +
-    "border-radius:10px;padding:10px 12px;font:12px/1.5 system-ui,sans-serif;" +
+    "border-radius:10px;padding:10px 12px;font:12px/1.5 var(--font-ui);" +
     "box-shadow:0 4px 14px rgba(20,20,40,.12)";
   controls.parentElement.append(panel);
 

@@ -60,9 +60,18 @@ function turns(points) {
         360) -
       180;
     if (Math.abs(angle) >= 35)
-      result.push({ along, direction: angle > 0 ? "right" : "left" });
+      result.push({ along, direction: angle > 0 ? "right" : "left", point: points[i] });
   }
   return result;
+}
+
+function routeHeading(points, lookAhead) {
+  let along = 0;
+  for (let i = 1; i < points.length; i++) {
+    along += distance(points[i - 1], points[i]);
+    if (along > lookAhead) return bearing(points[i - 1], points[i]);
+  }
+  return bearing(points.at(-2), points.at(-1));
 }
 
 export function guidanceAt(points, point) {
@@ -74,8 +83,20 @@ export function guidanceAt(points, point) {
   const turn = turns(points).find((item) => item.along > at.along + 3);
   return {
     remaining,
+    heading: routeHeading(points, at.along + 3),
+    nextPoint: turn?.point ?? points.at(-1),
     next: turn
       ? { direction: turn.direction, distance: turn.along - at.along }
       : { direction: "arrive", distance: remaining },
+  };
+}
+
+// 경로 재계산 뒤에도 처음 안내를 시작한 거리를 기준으로 진행률을 계산합니다.
+export function guidanceSummary(remaining, initialMeters) {
+  const meters = Math.max(0, remaining);
+  return {
+    meters: Math.round(meters),
+    minutes: Math.max(1, Math.ceil(meters / 70)),
+    progress: Math.max(0, Math.min(1, 1 - meters / Math.max(1, initialMeters))),
   };
 }
