@@ -1564,11 +1564,12 @@ function openRoadReport(selection) {
   $("#report-dialog").showModal();
   if (!existing) startCamera();
 }
+let submittingReport = false;
 // 사진이 있고, 기타 사유면 글까지 써야 신고 버튼이 켜집니다.
 function updateReportSubmit() {
   const other = $('input[name="road-reason"]:checked').value === "other";
   $("#report-yes").disabled =
-    !selectedPhotoFile || (other && !$("#report-reason-note").value.trim());
+    submittingReport || !selectedPhotoFile || (other && !$("#report-reason-note").value.trim());
 }
 for (const radio of $$('input[name="road-reason"]'))
   radio.onchange = () => {
@@ -1684,7 +1685,7 @@ async function loadReports() {
   updateRoute();
 }
 $("#report-yes").onclick = async () => {
-  if (!selectedReport?.point) return;
+  if (submittingReport || !selectedReport?.point) return;
   const reason = $('input[name="road-reason"]:checked').value,
     reasonNote = $("#report-reason-note").value.trim();
   if (!selectedPhotoFile) {
@@ -1699,7 +1700,11 @@ $("#report-yes").onclick = async () => {
     toast("기타 사유를 적어주세요.");
     return;
   }
-  $("#report-yes").disabled = true; // 업로드 중 중복 신고 방지
+  const { edgeId, point } = selectedReport;
+  const gps = reportOrigin;
+  const takenAt = photoTakenAt;
+  submittingReport = true;
+  updateReportSubmit();
   try {
     let photoPath;
     try {
@@ -1710,23 +1715,25 @@ $("#report-yes").onclick = async () => {
     }
     try {
       await insertReportRow({
-        edgeId: selectedReport.edgeId,
-        point: selectedReport.point,
+        edgeId,
+        point,
         reason,
         reasonNote,
         photoPath,
-        gps: reportOrigin,
-        takenAt: photoTakenAt,
+        gps,
+        takenAt,
       });
     } catch {
       toast("신고 저장에 실패했어요. 다시 시도해주세요.");
       return;
     }
   } finally {
+    submittingReport = false;
     updateReportSubmit();
   }
   setReporting(false);
   $("#report-dialog").close();
+  $("#report-success-dialog").showModal();
   await loadReports();
 };
 // 이 기기에서 올린 신고인지(기기 ID 비교). 기기 ID가 없는 예전 신고는 내 신고로 보지 않습니다.
