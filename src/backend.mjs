@@ -8,6 +8,33 @@ const PHOTO_BUCKET = "report-photos";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// 권한 판정에는 사용자가 직접 바꿀 수 없는 app_metadata만 사용합니다.
+export const isAdminUser = (user) => user?.app_metadata?.role === "admin";
+
+export async function getAdminSession() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return isAdminUser(data.session?.user) ? data.session : null;
+}
+
+export async function signInAdmin(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (error) throw error;
+  if (!isAdminUser(data.user)) {
+    await supabase.auth.signOut();
+    throw new Error("관리자 권한이 없는 계정입니다.");
+  }
+  return data.user;
+}
+
+export async function signOutAdmin() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
 // 같은 사람이 같은 구간을 여러 번 눌러서 신고 건수를 부풀리는 걸 막기 위한
 // 이 브라우저만의 익명 ID입니다. 개인정보를 담지 않습니다.
 const DEVICE_ID_KEY = "sai:seoultech:device-id:v1";
@@ -64,11 +91,15 @@ export async function insertReportRow({
 // 관리자 확정: 구역의 모든 신고를 confirmed로 바꾸고(행은 기록으로 남김), 고른 사진 하나를
 // 대표(is_cover)로 표시합니다. 대표 사진은 사용자에게 빨간색 표시와 함께 보입니다.
 export async function confirmReportRows(ids, coverId) {
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !isAdminUser(auth.user))
+    throw new Error("관리자 로그인이 필요합니다.");
   const { data, error } = await supabase
     .from("road_reports")
     .update({
       status: "confirmed",
       confirmed_at: new Date().toISOString(),
+      confirmed_by: auth.user.id,
       is_cover: false,
     })
     .in("id", ids)

@@ -27,6 +27,9 @@ import {
   fetchWorkRows,
   insertWorkRow,
   deleteWorkRow,
+  getAdminSession,
+  signInAdmin,
+  signOutAdmin,
 } from "./backend.mjs";
 import {
   activeWorks,
@@ -76,7 +79,6 @@ let reports = [],
   confirmedEdges = [],
   reporting = false,
   selectedReport = null,
-  adminUnlocked = false,
   // 신고를 올릴 때 Storage에 업로드할 File. 미리보기용 blob URL은 따로 관리합니다.
   selectedPhotoFile = null,
   photoPreviewUrl = null,
@@ -84,9 +86,6 @@ let reports = [],
   works = [],
   // 30m 안 신고를 묶은 구역 (loadReports에서 다시 계산)
   clusters = [];
-// TODO(백엔드): 지금은 코드만 맞으면 누구나 여는 시연용 잠금입니다.
-// 실제 배포 전 서버에서 관리자 로그인/권한을 검증하도록 교체하세요.
-const ADMIN_DEMO_CODE = "team12admin";
 const GIS_SUMMARY = gisSummary(CAMPUS_GEOMETRY, ENTRANCES);
 for (const [key, value] of Object.entries(GIS_SUMMARY)) {
   const element = document.querySelector(`[data-gis-count="${key}"]`);
@@ -1545,8 +1544,8 @@ function openRoadReport(selection) {
   $("#report-reasons").hidden = !!existing;
   $("#new-report-actions").hidden = !!existing;
   $("#existing-report-actions").hidden = !existing;
-  // 내 신고이고 아직 관리자가 확정하지 않았을 때만 삭제할 수 있습니다.
-  $("#report-remove").hidden = !(mine && !locked);
+  // 익명 기기 ID는 본인 증명이 아니므로 삭제는 관리자만 처리합니다.
+  $("#report-remove").hidden = true;
   $("#report-photo-field").hidden = !!existing;
   resetCamera();
   $('input[name="road-reason"][value="construction"]').checked = true;
@@ -1564,7 +1563,7 @@ function openRoadReport(selection) {
       (locked
         ? "관리자가 확정한 신고라 삭제할 수 없어요. 공사가 끝나면 관리자가 해제합니다."
         : mine
-          ? "내가 올린 신고예요. 삭제하면 집계에서 빠집니다."
+          ? "내가 올린 신고예요. 삭제가 필요하면 관리자에게 요청해 주세요."
           : "다른 사람이 올린 신고예요.")
     : `신고 ${REPORT_THRESHOLD}건부터 지도에 표시돼요. 관리자가 확인하면 우회 경로에 반영됩니다.`;
   $("#report-dialog").showModal();
@@ -1959,36 +1958,51 @@ function renderAdminAlert() {
   $("#side-alert-count").textContent = count;
   $("#side-alert-count").hidden = count === 0;
 }
-// 관리자 버튼은 사용자에게 숨깁니다. 주소에 ?admin=1을 붙여 열거나, 이 기기에서 한 번
-// 관리자 코드를 맞게 넣었으면 보입니다. 화면에서 감추는 것일 뿐 보안 장치는 아닙니다
-// (진짜 보호는 관리자 로그인 + Supabase RLS로 해야 합니다).
-const ADMIN_DEVICE_KEY = "sai:seoultech:admin-device:v1";
-function isAdminDevice() {
-  try {
-    return localStorage.getItem(ADMIN_DEVICE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-$("#admin-toggle").hidden = !(
-  new URLSearchParams(location.search).has("admin") || isAdminDevice()
-);
-$("#admin-toggle").onclick = () => {
-  if (!adminUnlocked) {
-    const input = prompt("관리자 코드를 입력하세요 (해커톤 시연용 임시 잠금)");
-    if (input === null) return;
-    if (input !== ADMIN_DEMO_CODE) {
-      toast("관리자 코드가 올바르지 않아요.");
-      return;
-    }
-    adminUnlocked = true;
-    try {
-      localStorage.setItem(ADMIN_DEVICE_KEY, "1");
-    } catch {}
-  }
+// 관리자 화면은 ?admin=1에서만 노출하고, 실제 권한은 Supabase Auth + RLS가 검사합니다.
+$("#admin-toggle").hidden = !new URLSearchParams(location.search).has("admin");
+function openAdminPanel() {
   renderAdminPanel();
   renderWorkList();
   $("#admin-dialog").showModal();
+}
+$("#admin-toggle").onclick = async () => {
+  try {
+    if (await getAdminSession()) return openAdminPanel();
+  } catch {
+    toast("관리자 로그인 상태를 확인하지 못했어요.");
+    return;
+  }
+  $("#admin-login-error").hidden = true;
+  $("#admin-login-dialog").showModal();
+};
+$("#admin-login-form").onsubmit = async (event) => {
+  event.preventDefault();
+  const button = $("#admin-login-submit"),
+    error = $("#admin-login-error");
+  button.disabled = true;
+  error.hidden = true;
+  try {
+    await signInAdmin($("#admin-email").value.trim(), $("#admin-password").value);
+  } catch {
+    error.textContent = "관리자 계정 또는 비밀번호를 확인해 주세요.";
+    error.hidden = false;
+    return;
+  } finally {
+    button.disabled = false;
+  }
+  $("#admin-password").value = "";
+  $("#admin-login-dialog").close();
+  openAdminPanel();
+};
+$("#admin-logout").onclick = async () => {
+  try {
+    await signOutAdmin();
+  } catch {
+    toast("로그아웃하지 못했어요. 다시 시도해 주세요.");
+    return;
+  }
+  $("#admin-dialog").close();
+  toast("관리자 계정에서 로그아웃했어요.");
 };
 
 // ===== 건물 공사 (관리자가 건물을 골라 기간과 함께 등록 → 지도에 🚧 표시만, 경로는 그대로) =====
