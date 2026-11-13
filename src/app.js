@@ -1479,12 +1479,28 @@ function openRoadReport(selection) {
     }
   }
   selectedReport = existing || selection;
-  $("#report-location").textContent = reportLocation(selectedReport);
   const cluster = existing && clusterOf(existing.id, clusters),
     mine = existing && isMyReport(existing),
     locked = cluster?.status === "confirmed";
+  const locationCard = $("#report-location"),
+    locationIcon = document.createElement("span"),
+    locationCopy = document.createElement("span"),
+    locationName = document.createElement("b"),
+    locationDetail = document.createElement("small"),
+    locationStatus = document.createElement("span");
+  locationIcon.className = "report-location-icon";
+  locationIcon.textContent = "⌾";
+  locationName.textContent = reportLocation(selectedReport).replace(
+    " · 선택한 도로 구간",
+    "",
+  );
+  locationDetail.textContent = existing ? reasonLabel(existing) : "선택한 도로 구간";
+  locationStatus.className = "report-location-status";
+  locationStatus.textContent = existing ? reportStatusLabel(existing) : "GPS 확인됨";
+  locationCopy.append(locationName, locationDetail);
+  locationCard.replaceChildren(locationIcon, locationCopy, locationStatus);
   $("#report-title").textContent = !existing
-    ? "선택한 도로 구간이 공사 중인가요?"
+    ? "길 막힘 신고"
     : mine
       ? "이 구간에 내 신고가 있어요."
       : "이 구간의 신고";
@@ -1512,7 +1528,7 @@ function openRoadReport(selection) {
         : mine
           ? "내가 올린 신고예요. 삭제하면 집계에서 빠집니다."
           : "다른 사람이 올린 신고예요.")
-    : `같은 구간에 신고가 ${REPORT_THRESHOLD}건 이상 모이면 지도에 주의(노란색)로 표시되고 관리자에게 검토 알림이 갑니다. 관리자가 확인해 확정하면 통행 막힘(빨간색)으로 바뀌며 우회 경로를 안내합니다.`;
+    : `신고 ${REPORT_THRESHOLD}건부터 지도에 표시돼요. 관리자가 확인하면 우회 경로에 반영됩니다.`;
   $("#report-dialog").showModal();
   if (!existing) startCamera();
 }
