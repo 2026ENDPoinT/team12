@@ -7,6 +7,7 @@ import { createRoadLayer } from "./map/landscape/road-layer.mjs";
 import { createBuildingLayer } from "./map/buildings/index.mjs";
 import { createCampusTrees } from "./map/landscape/trees.mjs";
 import { createPondDetails } from "./map/landscape/pond-details.mjs";
+import { createTechnyong } from "./map/mascot/technyong.mjs";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {
@@ -358,7 +359,12 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   userLocationGroup.visible = false;
   scene.add(routeGroup, warningGroup, reportPreviewGroup, userLocationGroup);
   const warningLabels = [];
-  let movingDot = null,
+  // 경로를 따라 걷는 마스코트(테크뇽). 처음 경로를 그릴 때 한 번만 만들고 재사용합니다.
+  const WALKER_SCALE = 8,
+    WALKER_Y = 1.9;
+  let technyong = null,
+    movingDot = null,
+    walkerHeading = null,
     routeCurve = null,
     routeLength = 1;
   function clearGroup(group) {
@@ -424,10 +430,15 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       routeGroup.add(ring);
     }
     if (routeCurve.curves.length) {
-      movingDot = new THREE.Mesh(
-        new THREE.SphereGeometry(2.1, 8, 6),
-        new THREE.MeshBasicMaterial({ color: 0xd5ff76 }),
-      );
+      if (!technyong) {
+        technyong = createTechnyong();
+        technyong.object.scale.setScalar(WALKER_SCALE);
+      }
+      // clearGroup은 메시만 정리하므로 재사용하는 마스코트 그룹은 지워지지 않고 떼어지기만 합니다.
+      movingDot = technyong.object;
+      movingDot.position.set(origin.x, WALKER_Y, origin.z);
+      walkerHeading = null;
+      placeWalker(0, 0, 0, false);
       routeGroup.add(movingDot);
     }
     routeLength = route.meters;
@@ -1066,6 +1077,23 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   const profiler = createMapProfiler(renderer, campusTrees, mapStartedAt);
   let frame,
     previousFrameTime = 0;
+  // u: 경로 위 위치(0~1). 진행 방향을 바라보고, 모퉁이에서는 부드럽게 돌아섭니다.
+  function placeWalker(u, t, dt, moving) {
+    routeCurve.getPoint(u, movingDot.position);
+    movingDot.position.y = WALKER_Y;
+    const tangent = routeCurve.getTangent(Math.min(u, 0.999));
+    const target = Math.atan2(tangent.x, tangent.z);
+    if (walkerHeading === null || dt === 0) walkerHeading = target;
+    else {
+      const diff = Math.atan2(
+        Math.sin(target - walkerHeading),
+        Math.cos(target - walkerHeading),
+      );
+      walkerHeading += diff * Math.min(1, dt * 10);
+    }
+    movingDot.rotation.y = walkerHeading;
+    technyong.update(t / 1000, { moving, dt: dt || 1 });
+  }
   function animate(t) {
     frame = requestAnimationFrame(animate);
     const deltaSeconds = previousFrameTime ? (t - previousFrameTime) / 1000 : 0;
@@ -1079,12 +1107,13 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       (renderer.domElement.clientHeight * camera.zoom) /
         (camera.top - camera.bottom),
     );
-    if (movingDot && routeCurve?.curves.length && !reduceMotion) {
-      movingDot.position.copy(
-        routeCurve.getPoint((t / Math.max(6000, routeLength * 18)) % 1),
+    if (movingDot && routeCurve?.curves.length)
+      placeWalker(
+        reduceMotion ? 0 : (t / Math.max(6000, routeLength * 18)) % 1,
+        t,
+        reduceMotion ? 0 : Math.min(0.1, deltaSeconds),
+        !reduceMotion,
       );
-      movingDot.position.y = 4;
-    }
     pondDetails.update(reduceMotion ? 0 : t / 1000);
     renderer.render(scene, camera);
     declutterLabels(t);
