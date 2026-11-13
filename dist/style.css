@@ -7455,3 +7455,72 @@ body {
 #admin-dialog .work-form select {
   background: rgba(255, 255, 255, 0.78);
 }
+
+/* 관리자 검토 창 간격 정리: 창 28 · 섹션 16 · 카드 16 패딩, 간격은 gap 하나로만(겹치는 margin 제거) */
+#admin-dialog .dialog-body {
+  gap: 16px;
+  padding: 28px;
+}
+#admin-dialog .admin-section {
+  gap: 12px;
+  padding: 16px;
+}
+#admin-dialog .admin-section .report-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+#admin-dialog .admin-item {
+  gap: 12px;
+  padding: 16px;
+}
+#admin-dialog .admin-photos,
+#admin-dialog .admin-actions,
+#admin-dialog .admin-section > p,
+#admin-dialog .admin-section h3 {
+  margin: 0;
+}
+
+/* 확정 · 반려 · 해제 버튼: 건물 정보 카드 버튼과 같은 모양(50px 알약 · 가운데 글자) */
+#admin-dialog .admin-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50px;
+  padding: 0 16px;
+  border: 0.75px solid rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--v2-ink);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+/* 확정(통행 막힘): 채도를 낮춘 빨강 바탕 + 흰 글자 */
+#admin-dialog .admin-actions button[data-act="confirm"] {
+  border-color: transparent;
+  background: #d9645e;
+  color: #fff;
+}
+#admin-dialog .admin-actions button[data-act="confirm"]:hover {
+  background: #cc5852;
+}
+#admin-dialog .admin-actions button[data-act="release"] {
+  border-color: transparent;
+  background: var(--lime);
+  color: var(--v2-ink);
+}
+#admin-dialog .admin-actions button:disabled {
+  opacity: 0.5;
+}
+@media (max-width: 760px) {
+  #admin-dialog .dialog-body {
+    padding: 24px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+  #admin-dialog .admin-section,
+  #admin-dialog .admin-item {
+    padding: 14px;
+  }
+}
