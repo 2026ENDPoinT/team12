@@ -9,6 +9,7 @@
 - 원본 데이터의 별도 공개 조건: [저장소 LICENSE의 지도 데이터 예외](https://github.com/Hong-Iron/SMASH-SEOULTECH/blob/5f3e93bcd8570f796dc405c2c33906dcd353fd2b/LICENSE)
 - © OpenStreetMap 기여자. [Open Database License (ODbL) 1.0](https://opendatacommons.org/licenses/odbl/1-0/). [OSM 저작권 안내](https://www.openstreetmap.org/copyright).
 - 보완 자료: 국토교통부 디지털트윈국토(브이월드) 건물통합정보·학교용지 경계·지붕 대표색. 공공누리 제1유형(출처표시). 원본 항공영상은 포함하지 않습니다.
+- 수림학사 외곽선: [OpenStreetMap way 579071106](https://www.openstreetmap.org/way/579071106) (ODbL 1.0). 건물 번호와 층수는 [서울과기대 생활관 시설안내](https://housing.seoultech.ac.kr/facilities/surim)를 참고했습니다.
 
 `data/seoultech.json`과 공개 배포 사본 `dist/data/seoultech.json`은 위 원본에서 변환한 데이터베이스이며 **ODbL 1.0으로 제공합니다.** 지도 화면에도 출처와 다운로드 링크가 있습니다. 지도 데이터에는 애플리케이션 코드의 조건을 적용해 재사용을 제한하지 않습니다.
 
