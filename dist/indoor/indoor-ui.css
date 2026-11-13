@@ -1602,3 +1602,35 @@ button.ar-status::after {
     margin-bottom: calc(var(--place-card-height, 220px) + 12px);
   }
 }
+
+/* 층 선택 줄·전체 층·시점 초기화: 알약 모양으로 더 둥글게, 지도가 비치도록 반투명 */
+.floors,
+.floor-overview,
+.view-reset {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  backdrop-filter: blur(14px) saturate(170%);
+  -webkit-backdrop-filter: blur(14px) saturate(170%);
+}
+.floors {
+  border-radius: 999px;
+  padding: 6px 4px;
+}
+.floors button {
+  border-radius: 999px;
+}
+.floor-overview {
+  border-radius: 999px;
+  padding: 0 16px;
+}
+.floor-overview-open .floor-overview {
+  background: var(--lime);
+}
+/* 층을 바꿀 때 가운데 뜨는 "▲ 2F" 표시도 알약 모양으로 */
+.floor-badge {
+  border-radius: 999px;
+  padding: 10px 32px;
+}
