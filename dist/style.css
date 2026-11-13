@@ -6479,3 +6479,79 @@ body {
     font-weight: 700;
   }
 }
+
+/* 모바일 투명도를 데스크톱 패널과 맞춥니다(사용자 요청):
+   유리 배경 흰색 40% → 12% 그라데이션, 흐림 20px · 채도 190%, 테두리 흰색 60% 0.75px, 안쪽 칸 흰색 35%. */
+@media (max-width: 760px) {
+  .map-view {
+    --v2-glass-bg: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.4) 0%,
+      rgba(255, 255, 255, 0.12) 100%
+    );
+    --v2-glass-filter: blur(20px) saturate(190%);
+    --v2-tile: rgba(255, 255, 255, 0.35);
+    --v2-stroke: rgba(255, 255, 255, 0.6);
+    --v2-glass-shadow:
+      inset 0 0.75px 0 rgba(255, 255, 255, 0.75),
+      0 12px 40px rgba(21, 33, 43, 0.16);
+  }
+  /* 시트·위쪽 카드·요약 줄·둥근 버튼: 데스크톱 패널과 같은 유리 */
+  .building-results,
+  .result-panel,
+  .route-panel,
+  .map-view.panel-closed .route-panel,
+  .reports-panel,
+  .map-overlay-heading,
+  .map-view.panel-closed .map-overlay-heading,
+  .mobile-route-top,
+  .route-summary-bar,
+  .v2-map-controls > button,
+  .map-topbar::before {
+    background: var(--v2-glass-bg);
+    backdrop-filter: var(--v2-glass-filter);
+    -webkit-backdrop-filter: var(--v2-glass-filter);
+  }
+  .building-results,
+  .result-panel,
+  .route-panel,
+  .map-view.panel-closed .route-panel,
+  .reports-panel,
+  .map-overlay-heading,
+  .map-view.panel-closed .map-overlay-heading {
+    border-top: 0.75px solid var(--v2-stroke);
+    box-shadow:
+      inset 0 0.75px 0 rgba(255, 255, 255, 0.75),
+      0 -10px 40px rgba(21, 33, 43, 0.16);
+  }
+  .map-topbar,
+  .mobile-route-top,
+  .route-summary-bar,
+  .v2-map-controls > button {
+    border: 0.75px solid var(--v2-stroke);
+    box-shadow: var(--v2-glass-shadow);
+  }
+  /* 안쪽 칸(숫자 칸 · 경로 방식 카드 · 출발·도착 칸 · 버튼)도 데스크톱과 같은 35% */
+  .building-search,
+  .building-option-icon,
+  .building-card-stats > span,
+  .building-card-actions button:not(.primary),
+  .mode-tabs button:not(.active),
+  .route-card .result-card-icon,
+  .summary-modes,
+  #summary-edit,
+  .reports-panel .report-list button,
+  .mobile-route-fields .journey-form > label,
+  .mobile-route-fields .journey-form > .destination-label,
+  .mobile-route-fields #origin,
+  .mobile-route-fields #destination {
+    background: var(--v2-tile);
+  }
+  .mode-icon {
+    background: rgba(255, 255, 255, 0.5);
+  }
+  /* 장소 추천 목록은 글자가 읽히도록 데스크톱처럼 조금 더 불투명하게 */
+  .mobile-route-fields .place-suggestions {
+    background: rgba(255, 255, 255, 0.85);
+  }
+}
