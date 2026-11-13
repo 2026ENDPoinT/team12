@@ -238,53 +238,69 @@
           >사이.</a
         >
         <span class="map-sidebar-divider" aria-hidden="true"></span>
-        <button data-side="map" aria-label="건물 검색 바 보이기" aria-pressed="true" title="건물 검색 바">
+        <button data-side="map" aria-label="건물 검색 바 보이기" aria-pressed="true">
           <svg class="icon"><use href="#i-map" /></svg>
+          <span class="sidebar-tooltip" role="tooltip"
+            ><b>건물 검색</b><span>건물 이름을 검색하고 위치를 확인해요.</span></span
+          >
         </button>
         <button
           data-side="route"
           aria-label="길찾기 패널"
           aria-pressed="false"
-          title="길찾기"
         >
           <svg class="icon"><use href="#i-route" /></svg>
+          <span class="sidebar-tooltip" role="tooltip"
+            ><b>길찾기</b><span>출발지와 도착지를 선택해 경로를 찾아요.</span></span
+          >
         </button>
         <button
           data-side="report"
           aria-label="길 막힘 제보"
           aria-pressed="false"
-          title="길 막힘 제보"
         >
           <svg class="icon"><use href="#i-alert" /></svg>
+          <span class="sidebar-tooltip" role="tooltip"
+            ><b>길 막힘 제보</b><span>공사나 통제로 막힌 길을 신고해요.</span></span
+          >
         </button>
         <button
           data-side="layers"
           aria-label="지도 범례 보기"
           aria-pressed="false"
-          title="지도 범례"
         >
           <svg class="icon"><use href="#i-layers" /></svg>
+          <span class="sidebar-tooltip" role="tooltip"
+            ><b>지도 범례</b><span>경로와 지도 표시의 의미를 확인해요.</span></span
+          >
         </button>
         <button
           data-side="entrances"
           aria-label="출입구 표시"
           aria-pressed="true"
-          title="출입구 표시"
         >
           <svg class="icon"><use href="#i-pin" /></svg>
+          <span class="sidebar-tooltip" role="tooltip"
+            ><b>출입구 표시</b><span>건물 출입구 표시를 켜거나 꺼요.</span></span
+          >
         </button>
         <span class="map-sidebar-spacer" aria-hidden="true"></span>
-        <button data-side="alerts" aria-label="관리자 검토 알림" title="관리자 검토">
+        <button data-side="alerts" aria-label="관리자 검토 알림">
           <svg class="icon"><use href="#i-bell" /></svg
           ><span id="side-alert-count" class="map-sidebar-badge" hidden>0</span>
+          <span class="sidebar-tooltip" role="tooltip"
+            ><b>관리자 검토</b><span>접수된 길 막힘 신고를 확인해요.</span></span
+          >
         </button>
         <button
           data-side="settings"
           aria-label="지도 조작 안내 보기"
           aria-pressed="false"
-          title="지도 조작 안내"
         >
           <svg class="icon"><use href="#i-sliders" /></svg>
+          <span class="sidebar-tooltip" role="tooltip"
+            ><b>지도 조작 안내</b><span>지도 이동·회전·확대 방법을 확인해요.</span></span
+          >
         </button>
       </nav>
       <div id="route-summary-bar" class="route-summary-bar" hidden>

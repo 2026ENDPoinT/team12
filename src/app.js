@@ -63,8 +63,6 @@ const side = (name) => $(`[data-side="${name}"]`);
 let region = "전체",
   showAll = false,
   mode = "shortest",
-  activeStart = "gate",
-  activeDestination = "future",
   currentRoute = null,
   currentRouteNodes = NODES,
   toastTimer,
@@ -187,8 +185,6 @@ function setRoutePlace(selector, id) {
   $(selector).removeAttribute("aria-invalid");
   closePlaceSuggestions.get(selector)?.();
 }
-setRoutePlace("#origin", activeStart);
-setRoutePlace("#destination", activeDestination);
 // 경로 계산에 쓰는 보행 그래프입니다. 평소에는 data.mjs의 합친 그래프이고,
 // 편집 모드에서는 편집 중인 조사 데이터를 합친 그래프로 바뀝니다.
 let graph = { nodes: NODES, edges: EDGES, entrances: SURVEY.entrances };
@@ -254,8 +250,6 @@ function placeGps(place, routeGraph, g, id) {
   return [{ ...place, entries: [at.nodeId] }, at.graph];
 }
 function updateRoute({ announce = false } = {}) {
-  activeStart = routePlaceId("#origin") || activeStart;
-  activeDestination = routePlaceId("#destination") || activeDestination;
   const { start, destination, route, nodes } = routeOn(graph);
   if (!start || !destination) {
     routeShown = false;
@@ -837,8 +831,7 @@ isDesktop.addEventListener("change", () => {
 
 // ===== 오른쪽 결과 카드 (데스크톱) =====
 // 건물을 고르면 건물 정보 카드, 경로를 그리면 경로 카드 하나만 보여 줍니다.
-let routeShown = false,
-  desktopStarted = false;
+let routeShown = false;
 function renderResultPanel() {
   const desktop = isDesktop.matches;
   // 경로 결과는 길찾기 패널 안에, 오른쪽에는 건물 정보 카드만 둡니다.
@@ -1269,22 +1262,16 @@ function routeView() {
   $("#map-view").hidden = !exploring;
   document.body.classList.toggle("exploring", exploring);
   if (exploring) {
-    if (!$("#map-view").dataset.opened) {
-      // 데스크톱은 지도부터 보여 주고, 길찾기 버튼을 누르면 패널이 열립니다.
-      setPanelClosed(isDesktop.matches);
-      $("#map-view").dataset.opened = "true";
-    }
+    // 학교를 열 때마다 이전 선택과 경로를 지우고 지도만 보여 줍니다.
+    setPanelClosed(isDesktop.matches);
+    $("#origin").value = "";
+    $("#destination").value = "";
+    routeShown = false;
+    currentRoute = null;
+    map?.setRoute(null);
+    updateModeOptions();
+    renderResultPanel();
     map?.moveTo($("#campus-map"), false);
-    if (isDesktop.matches && !desktopStarted) {
-      // 데스크톱 첫 화면은 경로 없이 지도만 보여 주고, 검색이나 길찾기로 시작합니다.
-      desktopStarted = true;
-      $("#origin").value = "";
-      $("#destination").value = "";
-      currentRoute = null;
-      map?.setRoute(null);
-      updateModeOptions();
-      renderResultPanel();
-    } else updateRoute();
     document.title = "서울과기대 길찾기 | 사이";
     $(isDesktop.matches ? "#building-search" : "#back-home").focus({
       preventScroll: true,
