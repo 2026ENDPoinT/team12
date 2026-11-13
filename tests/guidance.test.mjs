@@ -25,6 +25,9 @@ test("guidanceAt reports the next turn and remaining distance", () => {
   assert.deepEqual(guide.next, { direction: "right", distance: 70 });
   assert.equal(guide.remaining, 170);
   assert.deepEqual(guide.nextPoint, { x: 0, z: -100 });
+  // 걷는 방향: 북쪽(0°), 꺾은 뒤에는 동쪽(90°). 데스크톱 지도를 이 방향이 위로 오게 돌립니다.
+  assert.equal(guide.heading, 0);
+  assert.equal(guidanceAt(route, { x: 40, z: -100 }).heading, 90);
 });
 
 test("navigation time matches route walking speed and progress survives rerouting", () => {
