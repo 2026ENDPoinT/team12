@@ -58,7 +58,7 @@ import { buildingInfo } from "./building-info.mjs";
 import { setupEditMode, EDIT_MODE } from "./edit-mode.js";
 import { gpsToCampus } from "./geo.mjs";
 import { gisSummary } from "./gis.mjs";
-import { routePoints, guidanceAt, INSTRUCTION } from "./guidance.mjs";
+import { routePoints, guidanceAt, guidanceSummary, INSTRUCTION } from "./guidance.mjs";
 const $ = (s) => document.querySelector(s),
   $$ = (s) => document.querySelectorAll(s),
   // 761px 이상은 Figma v2 데스크톱 화면(떠 있는 패널·건물 카드·건물 검색)을 씁니다.
@@ -75,7 +75,10 @@ let region = "전체",
   gpsPosition = null,
   gpsStartNode = null,
   guidanceActive = false,
-  guidancePending = false;
+  guidancePending = false,
+  guidanceFollowing = true,
+  guidanceOriginName = "",
+  guidanceTotalMeters = 0;
 // Supabase에서 비동기로 채워집니다 (아래 loadReports 참고). 처음엔 빈 상태로 시작합니다.
 let reports = [],
   adminAuthenticated = false,
@@ -391,7 +394,11 @@ function showPopover(place) {
   el.hidden = false;
   $(".map-canvas-wrap").classList.add("has-building-popover");
 }
-let map = createCampusMap($("#hero-map"), buildingSelect, openRoadReport);
+let map = createCampusMap($("#hero-map"), buildingSelect, openRoadReport, () => {
+  if (!guidanceActive) return;
+  guidanceFollowing = false;
+  $("#navigation-recenter").hidden = false;
+});
 if (!map) {
   $("#hero-map").innerHTML =
     '<div class="hero-fallback"><span>✦</span><b>사이로 이어지는 캠퍼스.</b><p>WebGL을 지원하는 브라우저에서<br>3D 미리보기를 볼 수 있어요.</p></div>';
@@ -930,10 +937,40 @@ function renderGuidanceButton() {
       : "안내 시작";
   button.setAttribute("aria-pressed", String(guidanceActive));
   button.setAttribute("aria-busy", String(guidancePending));
+  renderMobileNavigation();
+}
+function renderMobileNavigation(guide = null) {
+  const running = guidanceActive || guidancePending;
+  $("#map-view").classList.toggle("guidance-on", running);
+  $(".mobile-navigation").hidden = !running;
+  map?.setNavigationMode(running && !isDesktop.matches);
+  if (!running || !currentRoute) return;
+  guide ??= guidanceActive && gpsPosition
+    ? guidanceAt(routePoints(currentRoute.path, currentRouteNodes), gpsPosition)
+    : null;
+  $("#navigation-origin").textContent = guidanceOriginName || "현재 위치";
+  $("#navigation-destination").textContent = $("#destination").value;
+  const remaining = guide?.remaining ?? currentRoute.meters;
+  const { minutes, progress } = guidanceSummary(remaining, guidanceTotalMeters || currentRoute.meters);
+  $("#navigation-minutes").textContent = `${minutes}분`;
+  $("#navigation-distance").textContent = `${Math.round(remaining)}m`;
+  $("#navigation-eta").textContent = `${new Date(Date.now() + minutes * 60000).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" })} 도착`;
+  $("#navigation-progress").value = progress;
+  const direction = guide?.next.direction;
+  $("#navigation-direction").textContent = guidancePending ? "위치 확인 중" : INSTRUCTION[direction] || "경로를 따라 이동";
+  $("#navigation-arrow").textContent = direction === "left" ? "↰" : direction === "right" ? "↱" : direction === "arrive" ? "⚑" : "↑";
+  $("#navigation-turn-distance").textContent = guide ? `${Math.round(guide.next.distance)}m` : "—";
+  const point = guide?.nextPoint;
+  const landmark = point && BUILDINGS.filter((b) => b.name !== "교내 건물").reduce((best, b) =>
+    !best || Math.hypot(point.x - b.x, point.z - b.z) < Math.hypot(point.x - best.x, point.z - best.z) ? b : best, null);
+  $("#navigation-detail").textContent = guidancePending ? "현재 위치를 확인하고 있어요." : direction === "arrive" ? "경로를 따라 목적지까지 이동하세요" : landmark ? `${landmark.name} 인근에서 ${direction === "left" ? "왼쪽" : "오른쪽"}으로` : "표시된 경로를 따라 이동하세요";
+  $("#navigation-recenter").hidden = !guidanceActive || guidanceFollowing;
 }
 function endGuidance({ silent = false } = {}) {
   const wasRunning = guidanceActive || guidancePending;
   guidanceActive = guidancePending = false;
+  guidanceFollowing = true;
+  guidanceTotalMeters = 0;
   map?.setRouteMascotVisible(true);
   renderGuidanceButton();
   if (wasRunning && gpsPosition)
@@ -949,6 +986,7 @@ function updateGuidanceStatus() {
     gpsPosition,
   );
   if (!guide) return;
+  renderMobileNavigation(guide);
   if (guide.remaining <= 8) {
     endGuidance({ silent: true });
     setGpsStatus("도착지에 도착했어요.");
@@ -963,6 +1001,7 @@ function updateGuidanceStatus() {
 function activateGuidance() {
   guidancePending = false;
   guidanceActive = true;
+  guidanceFollowing = true;
   map?.setRouteMascotVisible(false);
   setRoutePlace("#origin", "gps");
   updateRoute();
@@ -971,10 +1010,11 @@ function activateGuidance() {
     toast("현재 위치에서 연결된 경로를 찾지 못했어요.");
     return;
   }
+  guidanceTotalMeters = currentRoute.meters;
   renderGuidanceButton();
   map?.setUserLocation(gpsPosition, { follow: true });
   updateGuidanceStatus();
-  toast("테크뇽을 따라 길안내를 시작했어요.");
+  toast(isDesktop.matches ? "테크뇽을 따라 길안내를 시작했어요." : "길안내를 시작했어요.");
 }
 function startGuidance() {
   if (guidanceActive || guidancePending) {
@@ -989,6 +1029,7 @@ function startGuidance() {
     toast("도착지는 건물이나 출입구로 선택해주세요.");
     return;
   }
+  guidanceOriginName = $("#origin").value;
   if (gpsPosition) {
     activateGuidance();
     return;
@@ -1000,9 +1041,27 @@ function startGuidance() {
     endGuidance({ silent: true });
     return;
   }
-  toast("현재 위치가 확인되면 길안내를 시작할게요.");
+  if (guidancePending) toast("현재 위치가 확인되면 길안내를 시작할게요.");
 }
 $("#route-card-start").onclick = startGuidance;
+$("#navigation-stop").onclick = () => endGuidance();
+$("#navigation-layers").onclick = () => side("layers").click();
+$("#navigation-compass").onclick = () => {
+  guidanceFollowing = false;
+  map?.reset();
+  renderMobileNavigation();
+};
+$("#navigation-back").onclick = () => {
+  endGuidance();
+  setPanelClosed(false);
+};
+$("#navigation-route").onclick = () => $("#navigation-back").click();
+$("#navigation-recenter").onclick = () => {
+  if (!gpsPosition || !guidanceActive) return;
+  guidanceFollowing = true;
+  map?.setUserLocation(gpsPosition, { follow: true });
+  updateGuidanceStatus();
+};
 $$("[data-summary-mode]").forEach(
   (b) =>
     (b.onclick = () =>
@@ -1014,8 +1073,42 @@ $("#route-panel-close").onclick = () => {
   if (!isDesktop.matches) endRouteSearch();
   setPanelClosed(true);
 };
+// 모바일 경로 시트는 경로를 지우지 않고 상세만 접습니다.
+function setRouteSheetCollapsed(collapsed) {
+  $(".route-panel").classList.toggle("sheet-collapsed", collapsed);
+  $("#route-sheet-handle").setAttribute("aria-expanded", String(!collapsed));
+  $("#route-sheet-handle").setAttribute("aria-label", collapsed ? "경로 상세 펼치기" : "경로 상세 접기");
+}
+const routeSheetHandle = $("#route-sheet-handle");
+routeSheetHandle.onclick = () => setRouteSheetCollapsed(!$(".route-panel").classList.contains("sheet-collapsed"));
+let sheetDrag = null;
+routeSheetHandle.addEventListener("pointerdown", (event) => {
+  if (isDesktop.matches || event.button !== 0) return;
+  sheetDrag = { id: event.pointerId, y: event.clientY };
+  routeSheetHandle.setPointerCapture(event.pointerId);
+});
+routeSheetHandle.addEventListener("pointermove", (event) => {
+  if (!sheetDrag || event.pointerId !== sheetDrag.id) return;
+  if (Math.abs(event.clientY - sheetDrag.y) < 24) return;
+  setRouteSheetCollapsed(event.clientY > sheetDrag.y);
+});
+routeSheetHandle.addEventListener("pointerup", (event) => {
+  if (!sheetDrag || event.pointerId !== sheetDrag.id) return;
+  const moved = Math.abs(event.clientY - sheetDrag.y) >= 24;
+  sheetDrag = null;
+  if (routeSheetHandle.hasPointerCapture(event.pointerId)) routeSheetHandle.releasePointerCapture(event.pointerId);
+  // 드래그 뒤 합성 click이 다시 상태를 뒤집지 않게 합니다.
+  if (moved) {
+    routeSheetHandle.addEventListener("click", (click) => {
+      click.preventDefault();
+      click.stopImmediatePropagation();
+    }, { once: true, capture: true });
+  }
+});
+routeSheetHandle.addEventListener("pointercancel", () => { sheetDrag = null; });
 // 출발·도착 칸의 지우기(✕)와 바꾸기(⇅) 버튼
 function clearRouteResult() {
+  setRouteSheetCollapsed(false);
   endGuidance({ silent: true });
   routeShown = false;
   currentRoute = null;
@@ -1165,6 +1258,7 @@ function placeJourneyForm() {
 }
 placeJourneyForm();
 isDesktop.addEventListener("change", placeJourneyForm);
+isDesktop.addEventListener("change", () => renderMobileNavigation());
 $("#mobile-route-back").onclick = () => setPanelClosed(true);
 
 // 모바일 오른쪽 둥근 버튼: 길 막힘 제보 패널, 관리자·편집기 진입(공개 버튼)
@@ -1211,7 +1305,9 @@ function stopGps({ keepStatus = false } = {}) {
 $("#gps-toggle").onclick = () => {
   if (gpsWatchId !== null) {
     if (gpsPosition) {
+      guidanceFollowing = true;
       map?.setUserLocation(gpsPosition, { follow: true });
+      if (guidanceActive) updateGuidanceStatus();
       toast("내 위치로 이동했어요.");
     } else setGpsStatus("현재 위치를 확인하고 있어요…");
     return;
@@ -1239,6 +1335,10 @@ function startGps() {
       if (!nearest || nearest.distance > 350) {
         gpsStartNode = null;
         map?.setUserLocation(null);
+        if (guidanceActive || guidancePending) {
+          endGuidance({ silent: true });
+          toast("현재 위치가 캠퍼스 밖이에요. 캠퍼스 안에서 안내를 시작해주세요.");
+        }
         setGpsStatus(
           `현재 위치가 서울과기대 지도 범위 밖이에요. 캠퍼스에 들어오면 자동으로 표시됩니다.`,
         );
@@ -1247,7 +1347,7 @@ function startGps() {
       }
       gpsStartNode = nearest.id;
       map?.setUserLocation(gpsPosition, {
-        follow: firstFix || guidanceActive,
+        follow: firstFix || (guidanceActive && guidanceFollowing),
       });
       setGpsStatus(
         `현재 위치 추적 중 · 정확도 약 ${Math.round(coords.accuracy)}m`,

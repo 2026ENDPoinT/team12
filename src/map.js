@@ -35,7 +35,7 @@ import { createGraphOverlay } from "./graph-overlay.js";
 const VIOLET = 0x7950ff;
 
 // Three.js 기반 독립 구현. 외곽선/도로 데이터만 별도 ODbL 데이터에서 가져옵니다.
-export function createCampusMap(host, onSelect, onRoadSelect) {
+export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteraction = () => {}) {
   const mapStartedAt = performance.now();
   let renderer;
   try {
@@ -399,6 +399,15 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   userAccuracy.position.y = 2.05;
   userBase.position.y = 2.2;
   userLocationGroup.add(userAccuracy, userBase);
+  let navigationMode = false;
+  const navigationMarker = document.createElement("div");
+  navigationMarker.className = "navigation-position";
+  navigationMarker.setAttribute("aria-label", "현재 위치");
+  navigationMarker.innerHTML = '<span aria-hidden="true">▲</span>';
+  const navigationLabel = new CSS2DObject(navigationMarker);
+  navigationLabel.position.y = 4;
+  navigationLabel.visible = false;
+  userLocationGroup.add(navigationLabel);
   let userTechnyong = null,
     technyong = null,
     movingDot = null,
@@ -611,6 +620,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       userTechnyong.object.rotation.y = Math.PI;
       userLocationGroup.add(userTechnyong.object);
     }
+    userTechnyong.object.visible = !navigationMode;
     const accuracy = THREE.MathUtils.clamp(position.accuracy || 12, 3, 100);
     userLocationGroup.position.set(position.x, 0, position.z);
     userAccuracy.scale.set(accuracy, accuracy, 1);
@@ -766,6 +776,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     gesture = { start: f, last: f, mode: null };
   }
   function tilt(deltaPixels, horizontalPixels = 0) {
+    onCameraInteraction();
     const offset = camera.position.clone().sub(controls.target),
       s = new THREE.Spherical().setFromVector3(offset);
     s.theta -= horizontalPixels * 0.004;
@@ -782,6 +793,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   // 화면 좌표 from에 있던 지면 지점을 기준으로 확대(scale)·회전(turn, 시계 방향 +)한 뒤
   // 그 지점이 화면 좌표 to에 오도록 옮깁니다. 터치와 트랙패드가 함께 씁니다.
   function moveCamera(from, to, scale = 1, turn = 0) {
+    onCameraInteraction();
     const anchor = groundAt(from.x, from.y);
     if (!anchor) return;
     if (scale !== 1) {
@@ -830,6 +842,18 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   }
   let touchFrame = null;
   const canvas = renderer.domElement;
+  const manualPointers = new Map();
+  canvas.addEventListener("pointerdown", (event) => {
+    manualPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    const start = manualPointers.get(event.pointerId);
+    if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 5)
+      onCameraInteraction();
+  });
+  const releaseManualPointer = (event) => manualPointers.delete(event.pointerId);
+  canvas.addEventListener("pointerup", releaseManualPointer);
+  canvas.addEventListener("pointercancel", releaseManualPointer);
   canvas.addEventListener("pointerdown", (e) => {
     if (e.pointerType !== "touch") return;
     touchPoints.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1263,6 +1287,12 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     previewReportSelection,
     clearReportSelection,
     setUserLocation,
+    setNavigationMode(enabled) {
+      navigationMode = enabled;
+      navigationLabel.visible = enabled;
+      userBase.visible = !enabled;
+      if (userTechnyong) userTechnyong.object.visible = !enabled;
+    },
     setRouteMascotVisible(visible) {
       routeMascotVisible = visible;
       if (movingDot) movingDot.visible = visible;
