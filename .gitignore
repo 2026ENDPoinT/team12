@@ -11,3 +11,10 @@ mirae_map_final_v6/
 # npm run dev:phone 용 자체 서명 인증서
 .cert/
 dist/editor.js
+# 환경변수(실제 키·비밀번호)는 커밋하지 않습니다. 예시는 .env.example
+.env
+.env.local
+.env.*.local
+# Supabase CLI 로컬 상태
+supabase/.temp/
+supabase/.branches/

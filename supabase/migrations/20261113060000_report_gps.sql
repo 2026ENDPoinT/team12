@@ -1,4 +1,5 @@
--- Supabase SQL Editor에서 새 창(New query)에 붙여 넣고 한 번 실행하세요.
+-- ⚠ 아직 원격 DB에 적용되지 않은 migration입니다(2026-11-13 기준). 적용: npx supabase@2 db push
+-- main의 프론트엔드 코드(src/backend.mjs insertReportRow)는 이 칸들을 보내므로, 적용 전에는 새 신고 저장이 실패합니다.
 -- 현장 신고: 신고를 시작할 때 GPS 위치(캠퍼스 미터 좌표)·정확도, 앱 안 카메라 촬영 시각
 alter table road_reports add column if not exists gps_x double precision;
 alter table road_reports add column if not exists gps_z double precision;
