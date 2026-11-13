@@ -68,6 +68,19 @@ test("step-free routing chooses longer non-stair alternative on a controlled gra
   assert.equal(shortestPath("a", "c", "shortest", nodes, edges).meters, 1);
   assert.equal(shortestPath("a", "c", "stepfree", nodes, edges).meters, 4);
 });
+test("stairs flag follows the edge actually taken when a walkway and stairs join the same nodes", () => {
+  const nodes = { a: {}, b: {} },
+    edges = [
+      { a: "a", b: "b", meters: 5, stairs: true },
+      { a: "a", b: "b", meters: 9 },
+    ];
+  const free = shortestPath("a", "b", "stepfree", nodes, edges);
+  assert.equal(free.meters, 9);
+  assert.equal(free.stairs, false);
+  const fast = shortestPath("a", "b", "shortest", nodes, edges);
+  assert.equal(fast.meters, 5);
+  assert.equal(fast.stairs, true);
+});
 test("missing or disconnected nodes return no route; already there returns zero", () => {
   assert.equal(shortestPath("missing"), null);
   assert.equal(shortestPath("gate", "missing"), null);
@@ -75,8 +88,12 @@ test("missing or disconnected nodes return no route; already there returns zero"
   assert.equal(shortestPath("futureDoor").meters, 0);
 });
 test("derived walking edges do not cut across building interiors", () => {
-  // 건물을 가로지를 수 있는 간선은 팀이 조사한 건물 관통(building_passage)뿐입니다.
-  for (const edge of EDGES.filter(({ type }) => type !== "building_passage")) {
+  // 건물을 가로지를 수 있는 간선은 팀이 조사한 건물 관통(building_passage)과
+  // 팀이 현장에서 확인해 그린 계단(예: 100주년기념관 아래 계단)뿐입니다. docs/decisions.md 참고.
+  const surveyed = ({ type, source_kind }) =>
+    type === "building_passage" ||
+    (type === "stairs" && source_kind === "team_input");
+  for (const edge of EDGES.filter((edge) => !surveyed(edge))) {
     const a = NODES[edge.a],
       b = NODES[edge.b];
     for (const t of [0.2, 0.5, 0.8]) {

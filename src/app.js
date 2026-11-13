@@ -1,6 +1,6 @@
 import { normalizeSearch, suggestMatches } from "./search-suggestions.mjs";
 import { shortestPath } from "./routing.mjs";
-import { routeBetween } from "./route-target.mjs";
+import { routeBetween, routeStartEntries } from "./route-target.mjs";
 import { attachGps } from "./gps-start.mjs";
 import {
   edgeId,
@@ -53,6 +53,7 @@ import { buildingInfo } from "./building-info.mjs";
 import { setupEditMode } from "./edit-mode.js";
 import { gpsToCampus } from "./geo.mjs";
 import { gisSummary } from "./gis.mjs";
+import { routePoints, guidanceAt, INSTRUCTION } from "./guidance.mjs";
 const $ = (s) => document.querySelector(s),
   $$ = (s) => document.querySelectorAll(s),
   // 761px 이상은 Figma v2 데스크톱 화면(떠 있는 패널·건물 카드·건물 검색)을 씁니다.
@@ -65,10 +66,13 @@ let region = "전체",
   activeStart = "gate",
   activeDestination = "future",
   currentRoute = null,
+  currentRouteNodes = NODES,
   toastTimer,
   gpsWatchId = null,
   gpsPosition = null,
-  gpsStartNode = null;
+  gpsStartNode = null,
+  guidanceActive = false,
+  guidancePending = false;
 // Supabase에서 비동기로 채워집니다 (아래 loadReports 참고). 처음엔 빈 상태로 시작합니다.
 let reports = [],
   confirmedEdges = [],
@@ -229,7 +233,7 @@ function routeOn(g, routeMode = mode) {
     destination,
     nodes: routeGraph.nodes,
     route: routeBetween(
-      start.entries,
+      routeStartEntries(start, routeMode, routeGraph.nodes),
       destination.entries,
       routeMode,
       routeGraph.nodes,
@@ -277,6 +281,7 @@ function updateRoute({ announce = false } = {}) {
   indoorButton.onclick = () => enterIndoor(destination.id);
   currentRoute = route;
   if (!currentRoute) {
+    endGuidance({ silent: true });
     updateModeOptions();
     routeShown = false;
     renderResultPanel();
@@ -289,6 +294,7 @@ function updateRoute({ announce = false } = {}) {
     map?.setRoute(null);
     return;
   }
+  currentRouteNodes = nodes;
   $("#no-route-message").hidden = true;
   $("#route-result").hidden = false;
   $("#route-minutes").textContent = currentRoute.minutes;
@@ -906,18 +912,94 @@ function renderRouteCard(start, destination, nodes) {
   renderResultPanel();
 }
 $("#route-card-close").onclick = () => {
+  endGuidance({ silent: true });
   routeShown = false;
   currentRoute = null;
   map?.setRoute(null);
   renderResultPanel();
 };
-$("#route-card-start").onclick = () => {
-  const startId = routePlaceId("#origin");
-  if (startId && startId !== "gps" && !map?.focusPlace(startId)) map?.reset();
-  toast(
-    "출발지에서 보라색 경로를 따라가세요. 단계별 음성 안내는 준비 중이에요.",
+function renderGuidanceButton() {
+  const button = $("#route-card-start");
+  $("#route-card-start-label").textContent = guidanceActive
+    ? "안내 종료"
+    : guidancePending
+      ? "위치 확인 중…"
+      : "안내 시작";
+  button.setAttribute("aria-pressed", String(guidanceActive));
+  button.setAttribute("aria-busy", String(guidancePending));
+}
+function endGuidance({ silent = false } = {}) {
+  const wasRunning = guidanceActive || guidancePending;
+  guidanceActive = guidancePending = false;
+  map?.setRouteMascotVisible(true);
+  renderGuidanceButton();
+  if (wasRunning && gpsPosition)
+    setGpsStatus(
+      `현재 위치 추적 중 · 정확도 약 ${Math.round(gpsPosition.accuracy)}m`,
+    );
+  if (wasRunning && !silent) toast("길안내를 종료했어요.");
+}
+function updateGuidanceStatus() {
+  if (!guidanceActive || !gpsPosition || !currentRoute) return;
+  const guide = guidanceAt(
+    routePoints(currentRoute.path, currentRouteNodes),
+    gpsPosition,
   );
-};
+  if (!guide) return;
+  if (guide.remaining <= 8) {
+    endGuidance({ silent: true });
+    setGpsStatus("도착지에 도착했어요.");
+    toast("도착지에 도착했어요.");
+    return;
+  }
+  const meters = Math.max(1, Math.round(guide.next.distance));
+  setGpsStatus(
+    `안내 중 · ${meters}m 후 ${INSTRUCTION[guide.next.direction]} · 남은 거리 ${Math.round(guide.remaining)}m`,
+  );
+}
+function activateGuidance() {
+  guidancePending = false;
+  guidanceActive = true;
+  map?.setRouteMascotVisible(false);
+  setRoutePlace("#origin", "gps");
+  updateRoute();
+  if (!currentRoute) {
+    endGuidance({ silent: true });
+    toast("현재 위치에서 연결된 경로를 찾지 못했어요.");
+    return;
+  }
+  renderGuidanceButton();
+  map?.setUserLocation(gpsPosition, { follow: true });
+  updateGuidanceStatus();
+  toast("테크뇽을 따라 길안내를 시작했어요.");
+}
+function startGuidance() {
+  if (guidanceActive || guidancePending) {
+    endGuidance();
+    return;
+  }
+  if (!currentRoute) {
+    toast("출발지와 도착지를 먼저 선택해주세요.");
+    return;
+  }
+  if (routePlaceId("#destination") === "gps") {
+    toast("도착지는 건물이나 출입구로 선택해주세요.");
+    return;
+  }
+  if (gpsPosition) {
+    activateGuidance();
+    return;
+  }
+  guidancePending = true;
+  map?.setRouteMascotVisible(false);
+  renderGuidanceButton();
+  if (!startGps()) {
+    endGuidance({ silent: true });
+    return;
+  }
+  toast("현재 위치가 확인되면 길안내를 시작할게요.");
+}
+$("#route-card-start").onclick = startGuidance;
 $$("[data-summary-mode]").forEach(
   (b) =>
     (b.onclick = () =>
@@ -927,6 +1009,7 @@ $("#summary-edit").onclick = () => setPanelClosed(false);
 $("#route-panel-close").onclick = () => setPanelClosed(true);
 // 출발·도착 칸의 지우기(✕)와 바꾸기(⇅) 버튼
 function clearRouteResult() {
+  endGuidance({ silent: true });
   routeShown = false;
   currentRoute = null;
   map?.setRoute(null);
@@ -966,6 +1049,19 @@ side("route").onclick = () =>
   setPanelClosed(!$("#map-view").classList.contains("panel-closed"));
 // 길 막힘(공사) 아이콘: 왼쪽에 길 막힘 제보 목록 패널을 열고 닫습니다.
 side("report").onclick = () => setReportsPanel($("#reports-panel").hidden);
+function setEntranceLayer(visible) {
+  map?.setEntrancesVisible(visible);
+  side("entrances").setAttribute("aria-pressed", String(visible));
+  $("#entrance-toggle").setAttribute("aria-pressed", String(visible));
+}
+side("entrances").onclick = () =>
+  setEntranceLayer(
+    side("entrances").getAttribute("aria-pressed") !== "true",
+  );
+$("#entrance-toggle").onclick = () =>
+  setEntranceLayer(
+    $("#entrance-toggle").getAttribute("aria-pressed") !== "true",
+  );
 side("layers").onclick = () => {
   const on = !$("#map-view").classList.contains("show-legend");
   $("#map-view").classList.toggle("show-legend", on);
@@ -1065,6 +1161,7 @@ function setGpsStatus(message, visible = true) {
   $("#gps-status").hidden = !visible;
 }
 function stopGps({ keepStatus = false } = {}) {
+  endGuidance({ silent: true });
   if (gpsWatchId !== null) navigator.geolocation?.clearWatch(gpsWatchId);
   gpsWatchId = null;
   gpsPosition = null;
@@ -1081,22 +1178,27 @@ function stopGps({ keepStatus = false } = {}) {
   if (changed) updateRoute();
   map?.setUserLocation(null);
   $("#gps-toggle").setAttribute("aria-pressed", "false");
-  $("#gps-toggle span:last-child").textContent = "내 위치";
+  $("#gps-toggle span:last-child").textContent = "내 위치로";
   if (!keepStatus) setGpsStatus("", false);
 }
 $("#gps-toggle").onclick = () => {
   if (gpsWatchId !== null) {
-    stopGps();
-    toast("현재 위치 추적을 종료했어요.");
+    if (gpsPosition) {
+      map?.setUserLocation(gpsPosition, { follow: true });
+      toast("내 위치로 이동했어요.");
+    } else setGpsStatus("현재 위치를 확인하고 있어요…");
     return;
   }
+  startGps();
+};
+function startGps() {
   if (!navigator.geolocation) {
     setGpsStatus("이 브라우저에서는 위치 기능을 사용할 수 없어요.");
-    return;
+    return false;
   }
+  if (gpsWatchId !== null) return true;
   setGpsStatus("현재 위치 권한을 확인하고 있어요…");
   $("#gps-toggle").setAttribute("aria-pressed", "true");
-  $("#gps-toggle span:last-child").textContent = "추적 중";
   let firstFix = true;
   gpsWatchId = navigator.geolocation.watchPosition(
     ({ coords }) => {
@@ -1117,11 +1219,14 @@ $("#gps-toggle").onclick = () => {
         return;
       }
       gpsStartNode = nearest.id;
-      map?.setUserLocation(gpsPosition, { follow: true });
+      map?.setUserLocation(gpsPosition, {
+        follow: firstFix || guidanceActive,
+      });
       setGpsStatus(
         `현재 위치 추적 중 · 정확도 약 ${Math.round(coords.accuracy)}m`,
       );
-      if (firstFix) {
+      if (guidancePending) activateGuidance();
+      else if (firstFix) {
         setRoutePlace("#origin", "gps");
         updateRoute();
         toast("현재 위치를 출발지로 설정했어요.");
@@ -1130,6 +1235,7 @@ $("#gps-toggle").onclick = () => {
         routePlaceId("#destination") === "gps"
       )
         updateRoute();
+      if (guidanceActive) updateGuidanceStatus();
       firstFix = false;
     },
     (error) => {
@@ -1142,7 +1248,8 @@ $("#gps-toggle").onclick = () => {
     },
     { enableHighAccuracy: true, maximumAge: 3000, timeout: 12000 },
   );
-};
+  return true;
+}
 window.addEventListener("pagehide", () => {
   if (gpsWatchId !== null) navigator.geolocation?.clearWatch(gpsWatchId);
 });

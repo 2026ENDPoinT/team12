@@ -319,7 +319,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     entranceDotGeometry = new THREE.SphereGeometry(1.75, 12, 8),
     entranceRingGeometry = new THREE.RingGeometry(2.2, 3.1, 20);
   // 등록된 출입구(team-survey.json)를 초록 점으로 그립니다. 편집기로 바꾸면 다시 그립니다.
-  let mappedEntrances = ENTRANCES;
+  let mappedEntrances = ENTRANCES,
+    entrancesVisible = true;
   function setEntrances(list) {
     mappedEntrances = list;
     for (const child of [...entranceGroup.children])
@@ -345,6 +346,10 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     stem.renderOrder = dot.renderOrder = ring.renderOrder = 4;
     entranceGroup.add(stem, dot, ring, marker);
   }
+  function setEntrancesVisible(visible) {
+    entrancesVisible = visible;
+    entranceGroup.visible = !homeMode && visible;
+  }
   for (const entrance of ENTRANCES) addEntranceMarker(entrance);
   entranceGroup.visible = false;
   scene.add(entranceGroup);
@@ -365,8 +370,32 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   // 경로를 따라 걷는 마스코트(테크뇽). 처음 경로를 그릴 때 한 번만 만들고 재사용합니다.
   const WALKER_SCALE = 8,
     WALKER_Y = 1.9;
-  let technyong = null,
+  // GPS 표시는 파란 점 대신 테크뇽으로 한 번만 만들어 위치만 갱신합니다.
+  const userAccuracy = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0x7950ff,
+        transparent: true,
+        opacity: 0.13,
+        depthWrite: false,
+      }),
+    ),
+    userBase = new THREE.Mesh(
+      new THREE.RingGeometry(4.8, 6.5, 32),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        depthTest: false,
+        depthWrite: false,
+      }),
+    );
+  userAccuracy.rotation.x = userBase.rotation.x = -Math.PI / 2;
+  userAccuracy.position.y = 2.05;
+  userBase.position.y = 2.2;
+  userLocationGroup.add(userAccuracy, userBase);
+  let userTechnyong = null,
+    technyong = null,
     movingDot = null,
+    routeMascotVisible = true,
     walkerHeading = null,
     routeCurve = null,
     routeLength = 1;
@@ -439,6 +468,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       }
       // clearGroup은 메시만 정리하므로 재사용하는 마스코트 그룹은 지워지지 않고 떼어지기만 합니다.
       movingDot = technyong.object;
+      movingDot.visible = routeMascotVisible;
       movingDot.position.set(origin.x, WALKER_Y, origin.z);
       walkerHeading = null;
       placeWalker(0, 0, 0, false);
@@ -562,37 +592,21 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     clearGroup(reportPreviewGroup);
   }
   function setUserLocation(position, { follow = false } = {}) {
-    clearGroup(userLocationGroup);
     if (!position) {
       userLocationGroup.visible = false;
       return;
     }
     userLocationGroup.visible = true;
+    if (!userTechnyong) {
+      userTechnyong = createTechnyong();
+      userTechnyong.object.scale.setScalar(7.5);
+      userTechnyong.object.position.y = 2.3;
+      userTechnyong.object.rotation.y = Math.PI;
+      userLocationGroup.add(userTechnyong.object);
+    }
     const accuracy = THREE.MathUtils.clamp(position.accuracy || 12, 3, 100);
-    const area = new THREE.Mesh(
-      new THREE.CircleGeometry(accuracy, 48),
-      new THREE.MeshBasicMaterial({
-        color: 0x2f7df4,
-        transparent: true,
-        opacity: 0.16,
-        depthWrite: false,
-      }),
-    );
-    area.rotation.x = -Math.PI / 2;
-    area.position.set(position.x, 2.05, position.z);
-    const halo = new THREE.Mesh(
-      new THREE.RingGeometry(4.3, 6.4, 32),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false }),
-    );
-    halo.rotation.x = -Math.PI / 2;
-    halo.position.set(position.x, 3, position.z);
-    const dot = new THREE.Mesh(
-      new THREE.CircleGeometry(4.5, 32),
-      new THREE.MeshBasicMaterial({ color: 0x2878f0, depthTest: false }),
-    );
-    dot.rotation.x = -Math.PI / 2;
-    dot.position.set(position.x, 3.2, position.z);
-    userLocationGroup.add(area, halo, dot);
+    userLocationGroup.position.set(position.x, 0, position.z);
+    userAccuracy.scale.set(accuracy, accuracy, 1);
     if (follow) {
       const offset = camera.position.clone().sub(controls.target);
       controls.target.set(position.x, 0, position.z);
@@ -613,7 +627,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     controls.mouseButtons.LEFT = value ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN;
     controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
     keyboardPan.clear();
-    entranceGroup.visible = !value;
+    entranceGroup.visible = !value && entrancesVisible;
     for (const { id, label } of labelObjects) {
       label.visible =
         !value || ["future", "davinci", "library", "gate"].includes(id);
@@ -1233,6 +1247,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     setEditPreview: (spec) => graphOverlay.setPreview(spec),
     setEditHandler,
     setEntrances,
+    setEntrancesVisible,
     focusTop,
     setRoute,
     setReports,
@@ -1241,6 +1256,10 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     previewReportSelection,
     clearReportSelection,
     setUserLocation,
+    setRouteMascotVisible(visible) {
+      routeMascotVisible = visible;
+      if (movingDot) movingDot.visible = visible;
+    },
     zoom,
     reset,
     top,

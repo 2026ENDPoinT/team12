@@ -38,6 +38,7 @@ const state = {
   mode: "stairs",
   route: null,
   steps: null,
+  focusStep: null, // 안내 목록에서 누른 단계(미리 걷기를 여기서 시작)
   sheet: "home",
 };
 let indoor,
@@ -83,12 +84,15 @@ async function init() {
 
   // 캠퍼스 지도에서 넘어온 경우: ?from=futureDoor (캠퍼스 노드) 또는 출입구 id, 또는 f:id (호실)
   const from = params.get("from");
-  const ent = entrances.find((e) => e.id === from || e.campusNode === from);
+  // 출입구마다 캠퍼스 노드가 여러 개일 수 있음(기존 futureDoor, 팀 조사 출입구 ent-future-*)
+  const isNode = (e, id) =>
+    e.campusNode === id || (e.campusNodes || []).includes(id);
+  const ent = entrances.find((e) => e.id === from || isNode(e, from));
   const fromPlace = !ent && from && indoor.findDest(from);
   setStart(
     fromPlace ? placeStart(fromPlace) : entranceStart(ent || entrances[0]),
   );
-  if (ent && from === ent.campusNode)
+  if (ent && isNode(ent, from))
     $("#home-from").textContent =
       `캠퍼스 경로가 ${ent.name}로 이어졌어요. 가려는 호실을 검색해 보세요.`;
   if (params.get("mode") === "elevator") setMode("elevator", false);
@@ -456,13 +460,7 @@ function computeRoute() {
   if (!r) {
     state.route = null;
     view.clearRoute();
-    sum.append(
-      el(
-        "span",
-        "warn",
-        "경로를 찾지 못했어요.",
-      ),
-    );
+    sum.append(el("span", "warn", "경로를 찾지 못했어요."));
     $("#ar-open").disabled = $("#walk-open").disabled = true;
     syncFloors();
     return;
@@ -470,6 +468,7 @@ function computeRoute() {
   $("#ar-open").disabled = $("#walk-open").disabled = false;
   state.route = r;
   state.steps = buildSteps(r, d, { landmarks: indoor.destinations });
+  state.focusStep = null;
   history.replaceState(null, "", routeUrl());
   sum.append(
     el("b", "", `${Math.round(r.len)}m`),
@@ -600,6 +599,7 @@ async function renderSteps() {
 }
 function focusStep(i) {
   const st = state.steps[i];
+  state.focusStep = i;
   for (const li of $$("#route-steps li"))
     li.classList.toggle("on", +li.dataset.i === i);
   view.highlightStep(i);
@@ -627,16 +627,21 @@ for (const b of $$(".voice-btn"))
   };
 
 // ---------- 미리 걷기 (1인칭 애니메이션)
+const WALK_STOP = 3.2; // 도착 표시 앞에서 멈추는 거리(m): 표시가 화면에 보이게
 let walking = null;
 $("#walk-open").onclick = async () => {
   if (!state.route) return;
   await loadSV().catch(() => null);
   const r = state.route,
     cum = routeMetrics(r);
+  const total = cum[cum.length - 1];
   walking = {
     s: 0,
+    s0: 0,
     cum,
-    total: cum[cum.length - 1],
+    total,
+    // 도착 표시 위에 올라서지 않고, 표시가 보이게 조금 앞에서 멈춤
+    end: Math.max(0, total - WALK_STOP),
     yaw: null,
     last: performance.now(),
     shot: null,
@@ -646,6 +651,17 @@ $("#walk-open").onclick = async () => {
     lift: null,
     liftDone: new Set(),
   };
+  // 안내 목록에서 고른 단계가 있으면 거기서 시작(그 동작이 보이게 2m 앞에서)
+  const fi = state.focusStep;
+  if (fi != null && state.steps[fi]) {
+    const prev = fi > 0 ? state.steps[fi - 1].s : 0;
+    walking.s0 = Math.min(
+      walking.end,
+      Math.max(prev, fi > 0 ? state.steps[fi].s - 2 : 0),
+    );
+    walking.s = walking.s0;
+    skipLiftsBefore(walking);
+  }
   $("#walk").hidden = false;
   for (const s of ["#sheet", ".topbar", "#floors", ".map-tools"])
     $(s).hidden = true;
@@ -653,6 +669,11 @@ $("#walk-open").onclick = async () => {
   syncWalkButtons();
   requestAnimationFrame(walkStep);
 };
+// 이미 지난 엘리베이터는 탑승 장면을 다시 보여 주지 않음
+function skipLiftsBefore(w) {
+  for (const st of state.steps)
+    if (st.kind === "elev" && st.s < w.s) w.liftDone.add(st.s);
+}
 function endWalk() {
   walking?.lift?.close();
   walking = null;
@@ -679,9 +700,10 @@ function syncWalkButtons() {
 $("#walk-close").onclick = endWalk;
 $("#walk-play").onclick = () => {
   if (!walking) return;
-  if (walking.s >= walking.total - 0.05) {
-    walking.s = 0;
+  if (walking.s >= walking.end - 0.05) {
+    walking.s = walking.s0;
     walking.liftDone.clear();
+    skipLiftsBefore(walking);
     walking.yaw = null;
   }
   walking.playing = !walking.playing;
@@ -701,10 +723,9 @@ function jumpStep(delta) {
       currentStep(state.steps, walking.s) + delta,
     ),
   );
-  walking.s = Math.min(walking.total, state.steps[k].s + 0.01);
+  walking.s = Math.min(walking.end, state.steps[k].s + 0.01);
   // 엘리베이터를 건너뛰면 탑승 장면은 생략
-  for (const st of state.steps)
-    if (st.kind === "elev" && st.s < walking.s) walking.liftDone.add(st.s);
+  skipLiftsBefore(walking);
   walking.yaw = null;
 }
 $("#walk-prev").onclick = () => jumpStep(-1);
@@ -720,7 +741,7 @@ function walkStep(now) {
   if (w.playing && !w.lift) {
     const p0 = pointAt(r, w.cum, w.s);
     const onStair = r.pts[p0.i]?.kind === "stair";
-    let ns = Math.min(w.total, w.s + dt * w.speed * (onStair ? 1.3 : 2.4));
+    let ns = Math.min(w.end, w.s + dt * w.speed * (onStair ? 1.3 : 2.4));
     // 엘리베이터에 닿으면 탑승 장면
     const ev = steps.find(
       (st) =>
@@ -751,11 +772,11 @@ function walkStep(now) {
   const p = pointAt(r, w.cum, w.s);
   // 2m 앞을 바라보며 부드럽게 회전
   const a = pointAt(r, w.cum, Math.min(w.total, w.s + 2.2));
-  // 도착 직전에는 문을 바라보도록 돌아섭니다.
-  const door = r.target?.door;
+  // 멈추기 직전에는 도착 표시(경로 끝)를 바라보도록 돌아섭니다.
+  const goal = r.pts[r.pts.length - 1];
   const want =
-    door && w.total - w.s < 1.2
-      ? (Math.atan2(door[1] - p.y, door[0] - p.x) * 180) / Math.PI
+    w.end - w.s < 3 && Math.hypot(goal.x - p.x, goal.y - p.y) > 0.3
+      ? (Math.atan2(goal.y - p.y, goal.x - p.x) * 180) / Math.PI
       : Math.hypot(a.x - p.x, a.y - p.y) > 0.3
         ? (Math.atan2(a.y - p.y, a.x - p.x) * 180) / Math.PI
         : (w.yaw ?? 90);
@@ -763,7 +784,7 @@ function walkStep(now) {
   const d = ((((want - w.yaw) % 360) + 540) % 360) - 180;
   w.yaw += d * Math.min(1, dt * 3.2);
   view.setWalkPose({ x: p.x, y: p.y, z: p.z, f: p.f, yaw: w.yaw, pitch: -0.1 });
-  $("#walk-bar").style.width = `${(w.s / w.total) * 100}%`;
+  $("#walk-bar").style.width = `${(w.s / Math.max(0.01, w.end)) * 100}%`;
 
   // 안내 카드: 다음 동작과 남은 거리
   const nx = nextStep(steps, r, w.cum, w.s);
@@ -772,7 +793,7 @@ function walkStep(now) {
     w.step = cur;
     if (cur > 0 && steps[cur].kind !== "elev") voice.say(steps[cur].text);
   }
-  const done = w.s >= w.total - 0.05;
+  const done = w.s >= w.end - 0.05;
   const card = $("#walk-step");
   card.replaceChildren();
   const t = el("div");

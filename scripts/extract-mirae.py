@@ -19,6 +19,10 @@ M, _ = dec.raw_decode(html, m_start)
 xn_start = html.index("const XN=") + len("const XN=")
 XN, _ = dec.raw_decode(html, xn_start)
 M["names"] = XN  # 연구실·교수실 이름 (호실 번호 → 이름)
+# 층별 안내판 기준 이름(data/mirae/room-names.json)이 있으면 그것을 우선 적용
+sign = out / "room-names.json"
+if sign.exists():
+    M["names"].update(json.loads(sign.read_text(encoding="utf-8"))["names"])
 (out / "mirae.json").write_text(json.dumps(M, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 print("mirae.glb", (out / "mirae.glb").stat().st_size, "bytes")
 print("mirae.json", (out / "mirae.json").stat().st_size, "bytes")
