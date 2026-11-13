@@ -452,8 +452,12 @@
             ><small id="route-card-distance"></small>
           </p>
           <ol id="route-card-steps" class="route-card-steps"></ol>
-          <button id="route-card-start" class="result-card-primary">
-            안내 시작
+          <button
+            id="route-card-start"
+            class="result-card-primary"
+            aria-pressed="false"
+          >
+            <span id="route-card-start-label">안내 시작</span>
             <svg class="icon" aria-hidden="true"><use href="#i-chevron" /></svg>
           </button>
         </section>

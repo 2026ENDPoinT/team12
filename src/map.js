@@ -390,6 +390,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   let userTechnyong = null,
     technyong = null,
     movingDot = null,
+    routeMascotVisible = true,
     walkerHeading = null,
     routeCurve = null,
     routeLength = 1;
@@ -462,6 +463,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       }
       // clearGroup은 메시만 정리하므로 재사용하는 마스코트 그룹은 지워지지 않고 떼어지기만 합니다.
       movingDot = technyong.object;
+      movingDot.visible = routeMascotVisible;
       movingDot.position.set(origin.x, WALKER_Y, origin.z);
       walkerHeading = null;
       placeWalker(0, 0, 0, false);
@@ -1248,6 +1250,10 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     previewReportSelection,
     clearReportSelection,
     setUserLocation,
+    setRouteMascotVisible(visible) {
+      routeMascotVisible = visible;
+      if (movingDot) movingDot.visible = visible;
+    },
     zoom,
     reset,
     top,
