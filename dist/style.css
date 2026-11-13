@@ -5937,6 +5937,7 @@ body {
     grid-template-columns: minmax(0, 1fr) 44px;
     grid-template-rows: repeat(6, auto);
     column-gap: 8px;
+    row-gap: 0;
     margin: 0;
     padding: 0;
     border: 0;
@@ -7702,5 +7703,198 @@ body {
   #admin-dialog .admin-section,
   #admin-dialog .admin-item {
     padding: 14px;
+  }
+}
+
+/* 모바일 경로 시트와 길안내 화면 */
+#route-sheet-handle,
+.mobile-navigation,
+.navigation-position {
+  display: none;
+}
+@media (max-width: 760px) {
+  .route-panel #route-panel-close,
+  .route-panel #route-card-close {
+    display: none;
+  }
+  .route-panel #route-sheet-handle,
+  .map-view.panel-closed.route-shown .route-panel > #route-sheet-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 32px;
+    margin: -12px 0 4px;
+    padding: 0;
+    touch-action: none;
+    cursor: ns-resize;
+  }
+  #route-sheet-handle span,
+  .navigation-bottom-grip {
+    display: block;
+    width: 40px;
+    height: 4px;
+    border-radius: 99px;
+    background: rgba(90, 104, 114, .35);
+  }
+  .route-panel .mode-heading {
+    margin-top: 0;
+    padding-right: 0;
+  }
+  .route-panel.sheet-collapsed > :not(#route-sheet-handle):not(.route-card) {
+    display: none !important;
+  }
+  .route-panel.sheet-collapsed .route-card > :not(#route-card-start) {
+    display: none;
+  }
+  .route-panel.sheet-collapsed .route-card {
+    margin-top: 0;
+  }
+  .map-view.guidance-on .route-panel,
+  .map-view.guidance-on .mobile-route-top,
+  .map-view.guidance-on .route-summary-bar,
+  .map-view.guidance-on .map-topbar,
+  .map-view.guidance-on .map-overlay-heading,
+  .map-view.guidance-on .v2-map-controls,
+  .map-view.guidance-on .gps-status,
+  .map-view.guidance-on .result-panel {
+    display: none !important;
+  }
+  .mobile-navigation:not([hidden]) {
+    display: contents;
+  }
+  .navigation-banner {
+    position: fixed;
+    z-index: 35;
+    top: calc(24px + env(safe-area-inset-top, 0px));
+    left: 16px;
+    right: 16px;
+    padding: 18px 16px;
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: 28px;
+    background: linear-gradient(135deg, #303a44, #1c2c2e);
+    color: #f4f7f8;
+    box-shadow: 0 12px 30px rgba(21,33,43,.18);
+  }
+  .navigation-journey {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .navigation-journey > span:not([class]) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #navigation-back {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    margin-right: 5px;
+    font-size: 26px;
+  }
+  .navigation-origin-dot,
+  .navigation-destination-dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--lime);
+  }
+  .navigation-destination-dot { background: var(--violet); }
+  .navigation-instruction {
+    display: grid;
+    grid-template-columns: 60px minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+    margin-top: 18px;
+  }
+  .navigation-turn { text-align: center; }
+  #navigation-arrow {
+    display: grid;
+    place-items: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--lime);
+    color: #192b2e;
+    font-size: 42px;
+    line-height: 1;
+  }
+  #navigation-turn-distance { display: block; margin-top: 5px; font-size: 16px; }
+  #navigation-direction { margin: 0; font-size: 22px; line-height: 1.4; letter-spacing: -.7px; }
+  #navigation-detail { margin: 5px 0 0; color: #a4b4b1; font-size: 13px; line-height: 1.5; word-break: keep-all; }
+  .navigation-bottom {
+    position: fixed;
+    z-index: 35;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px 21px calc(28px + env(safe-area-inset-bottom, 0px));
+    border: 1px solid var(--v2-stroke);
+    border-radius: 28px 28px 0 0;
+    background: var(--v2-sheet);
+    backdrop-filter: var(--v2-glass-filter);
+    color: var(--v2-ink);
+  }
+  .navigation-bottom-grip { margin: 0 auto 14px; background: rgba(255,255,255,.85); }
+  .navigation-arrival { display: flex; align-items: center; gap: 8px; }
+  #navigation-minutes { font-size: 23px; }
+  #navigation-distance { font-size: 17px; }
+  #navigation-eta { color: var(--v2-muted); font-size: 12px; }
+  #navigation-stop { flex: none; width: 44px; height: 44px; margin-left: auto; border: 1px solid var(--v2-stroke); border-radius: 50%; background: var(--v2-tile); font-size: 23px; }
+  #navigation-progress { appearance: none; width: 100%; height: 6px; margin-top: 16px; border: 0; border-radius: 99px; overflow: hidden; background: rgba(255,255,255,.6); accent-color: var(--violet); }
+  #navigation-progress::-webkit-progress-bar { background: rgba(255,255,255,.6); }
+  #navigation-progress::-webkit-progress-value { background: var(--violet); border-radius: 99px; }
+  #navigation-progress::-moz-progress-bar { background: var(--violet); border-radius: 99px; }
+  #navigation-recenter {
+    position: fixed;
+    z-index: 35;
+    bottom: calc(148px + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border-radius: 99px;
+    background: #233039;
+    color: #f4f7f8;
+    font-size: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  #navigation-layers,
+  #navigation-route,
+  #navigation-compass {
+    position: fixed;
+    z-index: 35;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--v2-stroke);
+    border-radius: 50%;
+    background: var(--v2-tile);
+    backdrop-filter: var(--v2-glass-filter);
+    color: var(--v2-ink);
+  }
+  #navigation-layers { right: 16px; top: calc(228px + env(safe-area-inset-top, 0px)); }
+  #navigation-route { left: 16px; bottom: calc(148px + env(safe-area-inset-bottom, 0px)); }
+  #navigation-compass { right: 16px; bottom: calc(148px + env(safe-area-inset-bottom, 0px)); }
+  .guidance-on .navigation-position {
+    display: grid;
+    place-items: center;
+    width: 54px;
+    height: 54px;
+    border: 4px solid var(--violet);
+    border-radius: 50%;
+    background: white;
+    color: var(--violet);
+    font-size: 32px;
+    pointer-events: none;
   }
 }

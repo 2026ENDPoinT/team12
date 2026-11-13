@@ -357,7 +357,19 @@
         </button>
       </div>
       <div class="explorer">
+        <section class="mobile-navigation" aria-label="길안내" hidden>
+          <div class="navigation-banner">
+            <div class="navigation-journey"><button id="navigation-back" aria-label="경로 미리보기로 돌아가기">←</button><span class="navigation-origin-dot"></span><span id="navigation-origin"></span><span>→</span><span class="navigation-destination-dot"></span><span id="navigation-destination"></span></div>
+            <div class="navigation-instruction"><div class="navigation-turn"><span id="navigation-arrow" aria-hidden="true">↑</span><b id="navigation-turn-distance">—</b></div><div><h2 id="navigation-direction">위치 확인 중</h2><p id="navigation-detail" role="status">현재 위치를 확인하고 있어요.</p></div></div>
+          </div>
+          <button id="navigation-recenter" hidden><svg class="icon" aria-hidden="true"><use href="#i-locate" /></svg>내 위치로</button>
+          <button id="navigation-layers" aria-label="지도 범례 보기"><svg class="icon" aria-hidden="true"><use href="#i-layers" /></svg></button>
+          <button id="navigation-route" aria-label="경로 상세 보기"><svg class="icon" aria-hidden="true"><use href="#i-route" /></svg></button>
+          <button id="navigation-compass" aria-label="지도 시점 초기화"><svg class="icon" aria-hidden="true"><use href="#i-locate" /></svg></button>
+          <div class="navigation-bottom"><span class="navigation-bottom-grip" aria-hidden="true"></span><div class="navigation-arrival"><b id="navigation-minutes"></b><strong id="navigation-distance"></strong><span id="navigation-eta"></span><button id="navigation-stop" aria-label="길안내 종료">✕</button></div><progress id="navigation-progress" max="1" value="0" aria-label="경로 진행률"></progress></div>
+        </section>
         <aside class="route-panel">
+          <button id="route-sheet-handle" aria-label="경로 상세 접기" aria-expanded="true"><span></span></button>
           <div class="route-panel-head">
             <b>길찾기</b
             ><button id="route-panel-close" aria-label="길찾기 패널 닫기">✕</button>
