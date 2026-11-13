@@ -28,7 +28,8 @@ import {
   reportLocation,
   clusterReports,
 } from "./reports.mjs";
-import { insideBuilding, projectToSegment } from "./geo.mjs";
+import crosswalks from "../data/crosswalks.json";
+import { insideBuilding, projectToSegment, toScene } from "./geo.mjs";
 import { buildingLabel, worksPeriod } from "./buildings.mjs";
 import { createGraphOverlay } from "./graph-overlay.js";
 const VIOLET = 0x7950ff;
@@ -272,7 +273,13 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     group.add(mesh);
     return mesh;
   }
-  scene.add(createRoadLayer(CAMPUS_GEOMETRY.roads));
+  const crosswalkLines = crosswalks.map(({ coordinates }) =>
+    coordinates.map((coordinate) => {
+      const { x, z } = toScene(coordinate, CAMPUS_GEOMETRY.meta);
+      return [x, z];
+    }),
+  );
+  scene.add(createRoadLayer(CAMPUS_GEOMETRY.roads, crosswalkLines));
   const buildingLayer = createBuildingLayer(BUILDINGS, ENTRANCES);
   scene.add(buildingLayer.group);
   const buildingMeshes = buildingLayer.pickables,

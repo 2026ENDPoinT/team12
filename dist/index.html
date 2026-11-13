@@ -748,9 +748,9 @@
       <button class="dialog-close" aria-label="닫기">✕</button>
       <div class="dialog-body">
         <span class="report-dialog-symbol" aria-hidden="true">⚠</span
-        ><span class="eyebrow">길 막힘 신고 · 시연</span>
-        <h2 id="report-title">이 도로 구간이 공사 중인가요?</h2>
-        <p id="report-location"></p>
+        ><span class="eyebrow">길 막힘 신고</span>
+        <h2 id="report-title">길 막힘 신고</h2>
+        <div id="report-location" class="report-location-card"></div>
         <fieldset id="report-reasons">
           <legend>어떤 상황인가요?</legend>
           <label
@@ -760,13 +760,16 @@
               value="construction"
               checked
             />
-            공사 중이에요</label
+            <span class="report-reason-icon" aria-hidden="true">▰</span
+            ><span>공사 중</span></label
           ><label
-            ><input type="radio" name="road-reason" value="blocked" /> 장애물이
-            있거나 통제 중이에요</label
+            ><input type="radio" name="road-reason" value="blocked" />
+            <span class="report-reason-icon" aria-hidden="true">⊘</span
+            ><span>장애물·통제</span></label
           ><label
-            ><input type="radio" name="road-reason" value="other" /> 기타 (직접
-            입력)</label
+            ><input type="radio" name="road-reason" value="other" />
+            <span class="report-reason-icon" aria-hidden="true">•••</span
+            ><span>기타</span></label
           >
           <input
             type="text"
@@ -780,7 +783,7 @@
         </fieldset>
         <p class="report-scope"></p>
         <div id="report-photo-field" class="report-photo-field">
-          <span>현장 사진 (필수) · 지금 이 자리에서 찍어 주세요</span>
+          <span>현장 사진 <em>필수</em></span>
           <video
             id="report-camera"
             class="report-camera"
@@ -807,8 +810,8 @@
           hidden
         />
         <div id="new-report-actions" class="report-actions">
-          <button id="report-no">아니요</button
-          ><button id="report-yes">네, 신고할게요</button>
+          <button id="report-no">취소</button
+          ><button id="report-yes">이 내용으로 신고하기&nbsp; 〉</button>
         </div>
         <div id="existing-report-actions" class="report-actions" hidden>
           <button id="report-keep">닫기</button

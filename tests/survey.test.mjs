@@ -297,3 +297,116 @@ test("a report keeps blocking its path after the edge is split", () => {
     graph.edges.length - 1,
   );
 });
+
+// ===== 팀 계단과 겹친 자동 평지 선 빼기 (docs/decisions.md 2026-11-14) =====
+const pairOf = (e) => [e.a, e.b].sort().join("--"),
+  flatBetween = (edges, a, b) =>
+    edges.filter((e) => !e.stairs && pairOf(e) === [a, b].sort().join("--"));
+
+test("team stairs drawn over a generated path replace that flat path", () => {
+  const { n613, n641 } = base.nodes;
+  assert.equal(flatBetween(base.edges, "n613", "n641").length, 1);
+  const merged = merge([line("st", [n613, n641], "stairs")]);
+  assert.equal(flatBetween(merged.edges, "n613", "n641").length, 0);
+  assert.ok(merged.edges.some((e) => e.stairs && pairOf(e) === "n613--n641"));
+  const flat = shortestPath(
+    "n613",
+    "n641",
+    "stepfree",
+    merged.nodes,
+    merged.edges,
+  );
+  assert.ok(
+    !flat || flat.meters > 20,
+    "계단 없는 모드가 계단 옆 평지로 가면 안 됩니다",
+  );
+});
+
+test("a team sidewalk over a generated path keeps that path", () => {
+  const { n613, n641 } = base.nodes,
+    merged = merge([line("walk", [n613, n641])]);
+  assert.equal(
+    flatBetween(merged.edges, "n613", "n641").filter((e) => !e.source_kind)
+      .length,
+    1,
+  );
+});
+
+// 다산관 자동 입구(dasanDoor)는 n505에서 노란 연결선 하나로만 이어진 끝 점입니다.
+const dasanDoor = base.nodes.dasanDoor,
+  dasanRoad = base.nodes.n505,
+  dasanEntrance = (id, dx) =>
+    entrance(id, {
+      x: dasanDoor.x + dx,
+      z: dasanDoor.z,
+      buildingId: "dasan",
+      name: "시험 문",
+    }),
+  stairsUpTo = (id, end) => {
+    const dir = { x: dasanRoad.x - dasanDoor.x, z: dasanRoad.z - dasanDoor.z },
+      len = Math.hypot(dir.x, dir.z);
+    return line(
+      id,
+      [{ x: end.x + (dir.x / len) * 6, z: end.z + (dir.z / len) * 6 + 4 }, end],
+      "stairs",
+    );
+  };
+
+test("stairs ending at a generated door remove that door's flat connector", () => {
+  const end = { x: dasanDoor.x + 1.5, z: dasanDoor.z },
+    merged = merge([dasanEntrance("door", 1.5), stairsUpTo("st", end)]);
+  assert.ok(
+    !merged.edges.some(
+      (e) =>
+        !e.stairs &&
+        !e.source_kind &&
+        (e.a === "dasanDoor" || e.b === "dasanDoor"),
+    ),
+  );
+  const flat = shortestPath(
+      "n505",
+      "door",
+      "stepfree",
+      merged.nodes,
+      merged.edges,
+    ),
+    any = shortestPath("n505", "door", "shortest", merged.nodes, merged.edges);
+  assert.ok(any?.stairs, "계단으로는 갈 수 있어야 합니다");
+  assert.ok(!flat || flat.meters > 20, "노란 선으로 계단을 우회하면 안 됩니다");
+});
+
+test("stairs touching the middle of a generated door connector remove the whole connector", () => {
+  // 계단 끝이 입구 점이 아니라 노란 선 중간(입구에서 3m)에 붙는 경우
+  const t =
+      3 / Math.hypot(dasanRoad.x - dasanDoor.x, dasanRoad.z - dasanDoor.z),
+    mid = {
+      x: dasanDoor.x + (dasanRoad.x - dasanDoor.x) * t,
+      z: dasanDoor.z + (dasanRoad.z - dasanDoor.z) * t,
+    },
+    merged = merge([
+      line("st", [{ x: mid.x + 6, z: mid.z + 6 }, mid], "stairs"),
+    ]);
+  // 계단 끝(st:1:p)이 노란 선을 둘로 잘랐지만, 두 조각 모두 빠져야 합니다.
+  assert.ok(merged.nodes["st:1:p"]);
+  assert.ok(
+    !merged.edges.some(
+      (e) =>
+        !e.source_kind &&
+        [e.a, e.b].some((n) => n === "dasanDoor" || n === "st:1:p"),
+    ),
+    "노란 선 조각이 남으면 안 됩니다",
+  );
+  assert.ok(!merged.edges.some((e) => "_autoEntry" in e));
+});
+
+test("generated door connectors without team stairs stay as they are", () => {
+  const merged = merge([dasanEntrance("door", 1.5)]);
+  assert.ok(
+    merged.edges.some(
+      (e) => !e.source_kind && (e.a === "dasanDoor" || e.b === "dasanDoor"),
+    ),
+  );
+  assert.ok(
+    shortestPath("n505", "door", "stepfree", merged.nodes, merged.edges),
+  );
+});

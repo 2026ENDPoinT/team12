@@ -63,8 +63,6 @@ const side = (name) => $(`[data-side="${name}"]`);
 let region = "전체",
   showAll = false,
   mode = "shortest",
-  activeStart = "gate",
-  activeDestination = "future",
   currentRoute = null,
   currentRouteNodes = NODES,
   toastTimer,
@@ -187,8 +185,6 @@ function setRoutePlace(selector, id) {
   $(selector).removeAttribute("aria-invalid");
   closePlaceSuggestions.get(selector)?.();
 }
-setRoutePlace("#origin", activeStart);
-setRoutePlace("#destination", activeDestination);
 // 경로 계산에 쓰는 보행 그래프입니다. 평소에는 data.mjs의 합친 그래프이고,
 // 편집 모드에서는 편집 중인 조사 데이터를 합친 그래프로 바뀝니다.
 let graph = { nodes: NODES, edges: EDGES, entrances: SURVEY.entrances };
@@ -254,8 +250,6 @@ function placeGps(place, routeGraph, g, id) {
   return [{ ...place, entries: [at.nodeId] }, at.graph];
 }
 function updateRoute({ announce = false } = {}) {
-  activeStart = routePlaceId("#origin") || activeStart;
-  activeDestination = routePlaceId("#destination") || activeDestination;
   const { start, destination, route, nodes } = routeOn(graph);
   if (!start || !destination) {
     routeShown = false;
@@ -840,8 +834,7 @@ document.addEventListener("keydown", (e) => {
 
 // ===== 오른쪽 결과 카드 (데스크톱) =====
 // 건물을 고르면 건물 정보 카드, 경로를 그리면 경로 카드 하나만 보여 줍니다.
-let routeShown = false,
-  desktopStarted = false;
+let routeShown = false;
 function renderResultPanel() {
   // 경로 결과는 길찾기 패널 안에, 건물 정보 카드는 따로 둡니다
   // (데스크톱은 오른쪽 카드, 모바일은 아래 시트).
@@ -1306,22 +1299,17 @@ function routeView() {
   $("#map-view").hidden = !exploring;
   document.body.classList.toggle("exploring", exploring);
   if (exploring) {
-    if (!$("#map-view").dataset.opened) {
-      // 지도부터 보여 주고, 길찾기 버튼을 누르면 패널이 열립니다(데스크톱·모바일 공통).
-      setPanelClosed(true);
-      $("#map-view").dataset.opened = "true";
-    }
+    // 학교를 열 때마다 이전 선택과 경로를 지우고 지도만 보여 줍니다.
+    // 지도부터 보여 주고, 길찾기 버튼을 누르면 패널이 열립니다(데스크톱·모바일 공통).
+    setPanelClosed(true);
+    $("#origin").value = "";
+    $("#destination").value = "";
+    routeShown = false;
+    currentRoute = null;
+    map?.setRoute(null);
+    updateModeOptions();
+    renderResultPanel();
     map?.moveTo($("#campus-map"), false);
-    if (!desktopStarted) {
-      // 첫 화면은 경로 없이 지도만 보여 주고, 검색이나 길찾기로 시작합니다.
-      desktopStarted = true;
-      $("#origin").value = "";
-      $("#destination").value = "";
-      currentRoute = null;
-      map?.setRoute(null);
-      updateModeOptions();
-      renderResultPanel();
-    } else updateRoute();
     document.title = "서울과기대 길찾기 | 사이";
     $(isDesktop.matches ? "#building-search" : "#back-home").focus({
       preventScroll: true,
@@ -1529,12 +1517,28 @@ function openRoadReport(selection) {
     }
   }
   selectedReport = existing || selection;
-  $("#report-location").textContent = reportLocation(selectedReport);
   const cluster = existing && clusterOf(existing.id, clusters),
     mine = existing && isMyReport(existing),
     locked = cluster?.status === "confirmed";
+  const locationCard = $("#report-location"),
+    locationIcon = document.createElement("span"),
+    locationCopy = document.createElement("span"),
+    locationName = document.createElement("b"),
+    locationDetail = document.createElement("small"),
+    locationStatus = document.createElement("span");
+  locationIcon.className = "report-location-icon";
+  locationIcon.textContent = "⌾";
+  locationName.textContent = reportLocation(selectedReport).replace(
+    " · 선택한 도로 구간",
+    "",
+  );
+  locationDetail.textContent = existing ? reasonLabel(existing) : "선택한 도로 구간";
+  locationStatus.className = "report-location-status";
+  locationStatus.textContent = existing ? reportStatusLabel(existing) : "GPS 확인됨";
+  locationCopy.append(locationName, locationDetail);
+  locationCard.replaceChildren(locationIcon, locationCopy, locationStatus);
   $("#report-title").textContent = !existing
-    ? "선택한 도로 구간이 공사 중인가요?"
+    ? "길 막힘 신고"
     : mine
       ? "이 구간에 내 신고가 있어요."
       : "이 구간의 신고";
@@ -1562,7 +1566,7 @@ function openRoadReport(selection) {
         : mine
           ? "내가 올린 신고예요. 삭제하면 집계에서 빠집니다."
           : "다른 사람이 올린 신고예요.")
-    : `같은 구간에 신고가 ${REPORT_THRESHOLD}건 이상 모이면 지도에 주의(노란색)로 표시되고 관리자에게 검토 알림이 갑니다. 관리자가 확인해 확정하면 통행 막힘(빨간색)으로 바뀌며 우회 경로를 안내합니다.`;
+    : `신고 ${REPORT_THRESHOLD}건부터 지도에 표시돼요. 관리자가 확인하면 우회 경로에 반영됩니다.`;
   $("#report-dialog").showModal();
   if (!existing) startCamera();
 }
