@@ -3424,3 +3424,36 @@ body.exploring .header {
   font-size: 11px;
   color: #b3362c;
 }
+
+.place-suggestion-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.place-suggestion-hint {
+  margin: 0 0 3px;
+  padding-left: 10px;
+  color: #6d5782;
+  font-size: 11px;
+  font-weight: 600;
+}
+.place-suggestions {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #e5dcf0;
+  border-radius: 8px;
+  background: white;
+}
+.place-suggestions li {
+  padding: 9px 10px;
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+.place-suggestions li:hover,
+.place-suggestions li[aria-selected="true"] {
+  background: #f1eafd;
+}

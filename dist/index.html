@@ -205,13 +205,20 @@
             ><input
               id="origin"
               type="search"
-              list="route-places"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded="false"
+              aria-controls="origin-suggestions"
               placeholder="건물 이름 검색"
               aria-label="출발지 검색"
               autocomplete="off"
               enterkeyhint="search"
               spellcheck="false"
             />
+            <div class="place-suggestion-panel" hidden>
+              <p id="origin-suggestion-hint" class="place-suggestion-hint" role="status"></p>
+              <ul id="origin-suggestions" class="place-suggestions" role="listbox" aria-label="장소 검색 결과"></ul>
+            </div>
             <div class="journey-connector"></div>
             <label class="destination-label" for="destination">
               <svg class="icon"><use href="#i-pin" /></svg><span>도착지</span>
@@ -219,14 +226,20 @@
             <input
               id="destination"
               type="search"
-              list="route-places"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded="false"
+              aria-controls="destination-suggestions"
               placeholder="건물 이름 검색"
               aria-label="도착지 검색"
               autocomplete="off"
               enterkeyhint="search"
               spellcheck="false"
             />
-            <datalist id="route-places"></datalist>
+            <div class="place-suggestion-panel" hidden>
+              <p id="destination-suggestion-hint" class="place-suggestion-hint" role="status"></p>
+              <ul id="destination-suggestions" class="place-suggestions" role="listbox" aria-label="장소 검색 결과"></ul>
+            </div>
           </div>
           <div class="mode-tabs" role="group" aria-label="경로 모드">
             <button class="active" data-mode="shortest" aria-pressed="true">
