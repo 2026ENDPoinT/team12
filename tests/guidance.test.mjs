@@ -43,3 +43,8 @@ test("guidanceAt reports arrival near the destination", () => {
   });
   assert.equal(guidanceAt([{ x: 0, z: 0 }], { x: 0, z: 0 }), null);
 });
+
+test("guidance heading follows the route as it turns", () => {
+  assert.equal(guidanceAt(route, { x: 0, z: -30 }).heading, 0);
+  assert.equal(guidanceAt(route, { x: 0, z: -100 }).heading, 90);
+});

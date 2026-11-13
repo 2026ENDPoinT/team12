@@ -60,6 +60,8 @@ import { setupEditMode, EDIT_MODE } from "./edit-mode.js";
 import { gpsToCampus } from "./geo.mjs";
 import { gisSummary } from "./gis.mjs";
 import { routePoints, guidanceAt, guidanceSummary, INSTRUCTION } from "./guidance.mjs";
+import { draggedSheetHeight, shouldCollapseSheet } from "./sheet.mjs";
+import { createHeadingTracker, gpsHeading } from "./heading.mjs";
 const $ = (s) => document.querySelector(s),
   $$ = (s) => document.querySelectorAll(s),
   // 761px 이상은 Figma v2 데스크톱 화면(떠 있는 패널·건물 카드·건물 검색)을 씁니다.
@@ -80,6 +82,23 @@ let region = "전체",
   guidanceFollowing = true,
   guidanceOriginName = "",
   guidanceTotalMeters = 0;
+let sensorHeading = null, movementHeading = null;
+function navigationHeading(guide = null) {
+  if (sensorHeading !== null) return sensorHeading;
+  if (movementHeading !== null) return movementHeading;
+  const points = currentRoute && routePoints(currentRoute.path, currentRouteNodes);
+  return (guide ?? (gpsPosition && points && guidanceAt(points, gpsPosition)))?.heading ?? null;
+}
+function syncNavigationHeading(guide = null) {
+  map?.setNavigationHeading(navigationHeading(guide), guidanceActive && guidanceFollowing);
+}
+const headingTracker = createHeadingTracker(window, (heading) => {
+  if (!guidanceActive && !guidancePending) return;
+  sensorHeading = heading;
+  syncNavigationHeading();
+}, () => {
+  if (guidanceActive || guidancePending) toast("방향 센서를 사용할 수 없어 이동 방향을 기준으로 안내해요.");
+});
 // Supabase에서 비동기로 채워집니다 (아래 loadReports 참고). 처음엔 빈 상태로 시작합니다.
 let reports = [],
   adminAuthenticated = false,
@@ -396,9 +415,10 @@ function showPopover(place) {
   $(".map-canvas-wrap").classList.add("has-building-popover");
 }
 let map = createCampusMap($("#hero-map"), buildingSelect, openRoadReport, () => {
-  if (!guidanceActive) return;
+  if (!guidanceActive || !guidanceFollowing) return;
   guidanceFollowing = false;
-  $("#navigation-recenter").hidden = false;
+  map?.clearGuidanceHeading();
+  syncNavigationCameraButtons();
 });
 if (!map) {
   $("#hero-map").innerHTML =
@@ -944,10 +964,8 @@ function renderMobileNavigation(guide = null) {
   const running = guidanceActive || guidancePending;
   $("#map-view").classList.toggle("guidance-on", running);
   $(".mobile-navigation").hidden = !running;
-  // 길안내 중에는 모바일·데스크톱 모두 Figma처럼 보라 화살표 위치 표시를 씁니다.
-  // 데스크톱은 나침반이 없어, 걷는 방향이 화면 위가 되게 지도를 돌려 따라갑니다(Figma GD-2).
+  // 데스크톱도 모바일과 같은 최신 추적 로직을 사용하되 UI는 데스크톱 전용 배치를 씁니다.
   map?.setNavigationMode(running);
-  map?.setNavigationView(running && isDesktop.matches);
   if (!running || !currentRoute) return;
   guide ??= guidanceActive && gpsPosition
     ? guidanceAt(routePoints(currentRoute.path, currentRouteNodes), gpsPosition)
@@ -968,13 +986,23 @@ function renderMobileNavigation(guide = null) {
   const landmark = point && BUILDINGS.filter((b) => b.name !== "교내 건물").reduce((best, b) =>
     !best || Math.hypot(point.x - b.x, point.z - b.z) < Math.hypot(point.x - best.x, point.z - best.z) ? b : best, null);
   $("#navigation-detail").textContent = guidancePending ? "현재 위치를 확인하고 있어요." : direction === "arrive" ? "경로를 따라 목적지까지 이동하세요" : landmark ? `${landmark.name} 인근에서 ${direction === "left" ? "왼쪽" : "오른쪽"}으로` : "표시된 경로를 따라 이동하세요";
+  syncNavigationCameraButtons();
+}
+function syncNavigationCameraButtons() {
   $("#navigation-recenter").hidden = !guidanceActive || guidanceFollowing;
+  $("#navigation-compass").setAttribute(
+    "aria-pressed",
+    String(guidanceActive && guidanceFollowing),
+  );
 }
 function endGuidance({ silent = false } = {}) {
   const wasRunning = guidanceActive || guidancePending;
   guidanceActive = guidancePending = false;
   guidanceFollowing = true;
   guidanceTotalMeters = 0;
+  headingTracker.stop();
+  sensorHeading = null;
+  map?.clearGuidanceHeading();
   map?.setRouteMascotVisible(true);
   renderGuidanceButton();
   if (wasRunning && gpsPosition)
@@ -991,12 +1019,17 @@ function updateGuidanceStatus() {
   );
   if (!guide) return;
   renderMobileNavigation(guide);
-  map?.setFollowHeading(guide.heading);
   if (guide.remaining <= 8) {
     endGuidance({ silent: true });
     setGpsStatus("도착지에 도착했어요.");
     toast("도착지에 도착했어요.");
     return;
+  }
+  if (guidanceFollowing) {
+    syncNavigationHeading(guide);
+    map?.setUserLocation(gpsPosition, {
+      follow: true,
+    });
   }
   const meters = Math.max(1, Math.round(guide.next.distance));
   setGpsStatus(
@@ -1017,6 +1050,7 @@ function activateGuidance() {
   }
   guidanceTotalMeters = currentRoute.meters;
   renderGuidanceButton();
+  syncNavigationHeading();
   map?.setUserLocation(gpsPosition, { follow: true });
   updateGuidanceStatus();
   toast(isDesktop.matches ? "테크뇽을 따라 길안내를 시작했어요." : "길안내를 시작했어요.");
@@ -1035,6 +1069,7 @@ function startGuidance() {
     return;
   }
   guidanceOriginName = $("#origin").value;
+  if (!isDesktop.matches) headingTracker.start();
   if (gpsPosition) {
     activateGuidance();
     return;
@@ -1051,13 +1086,24 @@ function startGuidance() {
 $("#route-card-start").onclick = startGuidance;
 $("#navigation-stop").onclick = () => endGuidance();
 $("#navigation-layers").onclick = () => side("layers").click();
-// 데스크톱 길안내 오른쪽 아래 +/− (Figma GD-2). 누르면 따라가기가 멈추고 "내 위치로"가 나옵니다.
-$("#navigation-zoom-in").onclick = () => map?.zoom(1.18);
-$("#navigation-zoom-out").onclick = () => map?.zoom(1 / 1.18);
-$("#navigation-compass").onclick = () => {
+// 데스크톱에서 지도를 확대·축소하면 자동 추적을 멈추고 "내 위치로"를 표시합니다.
+function zoomNavigation(factor) {
   guidanceFollowing = false;
-  map?.reset();
-  renderMobileNavigation();
+  map?.clearGuidanceHeading();
+  syncNavigationCameraButtons();
+  map?.zoom(factor);
+}
+$("#navigation-zoom-in").onclick = () => zoomNavigation(1.18);
+$("#navigation-zoom-out").onclick = () => zoomNavigation(1 / 1.18);
+$("#navigation-compass").onclick = () => {
+  if (!guidanceActive) return;
+  if (!guidanceFollowing) {
+    $("#navigation-recenter").click();
+    return;
+  }
+  guidanceFollowing = false;
+  map?.clearGuidanceHeading();
+  syncNavigationCameraButtons();
 };
 $("#navigation-back").onclick = () => {
   endGuidance();
@@ -1067,6 +1113,7 @@ $("#navigation-route").onclick = () => $("#navigation-back").click();
 $("#navigation-recenter").onclick = () => {
   if (!gpsPosition || !guidanceActive) return;
   guidanceFollowing = true;
+  syncNavigationHeading();
   map?.setUserLocation(gpsPosition, { follow: true });
   updateGuidanceStatus();
 };
@@ -1088,32 +1135,100 @@ function setRouteSheetCollapsed(collapsed) {
   $("#route-sheet-handle").setAttribute("aria-label", collapsed ? "경로 상세 펼치기" : "경로 상세 접기");
 }
 const routeSheetHandle = $("#route-sheet-handle");
-routeSheetHandle.onclick = () => setRouteSheetCollapsed(!$(".route-panel").classList.contains("sheet-collapsed"));
 let sheetDrag = null;
+let sheetAnimation = null;
+let suppressSheetClick = false;
+function prepareSheetMotion() {
+  const panel = $(".route-panel");
+  const zoom = parseFloat(getComputedStyle(panel).zoom) || 1;
+  const height = panel.getBoundingClientRect().height / zoom;
+  const wasCollapsed = panel.classList.contains("sheet-collapsed");
+  if (sheetAnimation) {
+    sheetAnimation.cancel();
+    sheetAnimation = null;
+  }
+  panel.classList.remove("sheet-sizing");
+  panel.style.removeProperty("height");
+  panel.classList.remove("sheet-collapsed");
+  const expanded = panel.getBoundingClientRect().height / zoom;
+  panel.classList.add("sheet-collapsed");
+  const collapsed = panel.getBoundingClientRect().height / zoom;
+  panel.classList.remove("sheet-collapsed");
+  panel.classList.add("sheet-sizing");
+  panel.style.height = `${height}px`;
+  return { panel, zoom, height, expanded, collapsed, wasCollapsed };
+}
+function settleSheet(motion, collapsed) {
+  const { panel, zoom } = motion;
+  const from = panel.getBoundingClientRect().height / zoom;
+  const to = collapsed ? motion.collapsed : motion.expanded;
+  panel.style.height = `${to}px`;
+  const finish = () => {
+    setRouteSheetCollapsed(collapsed);
+    panel.classList.remove("sheet-sizing");
+    panel.style.removeProperty("height");
+    sheetAnimation = null;
+  };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return finish();
+  sheetAnimation = panel.animate([{ height: `${from}px` }, { height: `${to}px` }], {
+    duration: 260,
+    easing: "cubic-bezier(.22, 1, .36, 1)",
+  });
+  sheetAnimation.onfinish = finish;
+}
+routeSheetHandle.onclick = (event) => {
+  if (suppressSheetClick && event.detail !== 0) {
+    suppressSheetClick = false;
+    return;
+  }
+  suppressSheetClick = false;
+  const motion = prepareSheetMotion();
+  settleSheet(motion, !motion.wasCollapsed);
+};
 routeSheetHandle.addEventListener("pointerdown", (event) => {
   if (isDesktop.matches || event.button !== 0) return;
-  sheetDrag = { id: event.pointerId, y: event.clientY };
+  suppressSheetClick = false;
+  sheetDrag = { ...prepareSheetMotion(), id: event.pointerId, y: event.clientY,
+    lastY: event.clientY, lastTime: event.timeStamp, velocity: 0, moved: false };
   routeSheetHandle.setPointerCapture(event.pointerId);
 });
 routeSheetHandle.addEventListener("pointermove", (event) => {
   if (!sheetDrag || event.pointerId !== sheetDrag.id) return;
-  if (Math.abs(event.clientY - sheetDrag.y) < 24) return;
-  setRouteSheetCollapsed(event.clientY > sheetDrag.y);
+  const delta = event.clientY - sheetDrag.y;
+  sheetDrag.moved ||= Math.abs(delta) > 4;
+  const elapsed = event.timeStamp - sheetDrag.lastTime;
+  if (elapsed > 0) sheetDrag.velocity = (event.clientY - sheetDrag.lastY) / elapsed;
+  sheetDrag.lastY = event.clientY;
+  sheetDrag.lastTime = event.timeStamp;
+  sheetDrag.panel.style.height = `${draggedSheetHeight(sheetDrag.height, delta, sheetDrag.zoom, sheetDrag.collapsed, sheetDrag.expanded)}px`;
 });
-routeSheetHandle.addEventListener("pointerup", (event) => {
+function finishSheetDrag(event, cancelled = false) {
   if (!sheetDrag || event.pointerId !== sheetDrag.id) return;
-  const moved = Math.abs(event.clientY - sheetDrag.y) >= 24;
+  const motion = sheetDrag;
   sheetDrag = null;
   if (routeSheetHandle.hasPointerCapture(event.pointerId)) routeSheetHandle.releasePointerCapture(event.pointerId);
-  // 드래그 뒤 합성 click이 다시 상태를 뒤집지 않게 합니다.
-  if (moved) {
-    routeSheetHandle.addEventListener("click", (click) => {
-      click.preventDefault();
-      click.stopImmediatePropagation();
-    }, { once: true, capture: true });
+  suppressSheetClick = motion.moved;
+  if (!motion.moved && !cancelled) {
+    setRouteSheetCollapsed(motion.wasCollapsed);
+    motion.panel.classList.remove("sheet-sizing");
+    motion.panel.style.removeProperty("height");
+    return;
   }
+  const height = motion.panel.getBoundingClientRect().height / motion.zoom;
+  const velocity = event.timeStamp - motion.lastTime > 100 ? 0 : motion.velocity;
+  settleSheet(motion, cancelled || !motion.moved ? motion.wasCollapsed : shouldCollapseSheet(height, velocity, motion.collapsed, motion.expanded));
+}
+routeSheetHandle.addEventListener("pointerup", (event) => finishSheetDrag(event));
+routeSheetHandle.addEventListener("pointercancel", (event) => finishSheetDrag(event, true));
+isDesktop.addEventListener("change", () => {
+  if (!isDesktop.matches) return;
+  sheetDrag = null;
+  sheetAnimation?.cancel();
+  sheetAnimation = null;
+  $(".route-panel").classList.remove("sheet-sizing");
+  $(".route-panel").style.removeProperty("height");
+  setRouteSheetCollapsed(false);
 });
-routeSheetHandle.addEventListener("pointercancel", () => { sheetDrag = null; });
 // 출발·도착 칸의 지우기(✕)와 바꾸기(⇅) 버튼
 function clearRouteResult() {
   setRouteSheetCollapsed(false);
@@ -1303,6 +1418,7 @@ function stopGps({ keepStatus = false } = {}) {
   gpsWatchId = null;
   gpsPosition = null;
   gpsStartNode = null;
+  movementHeading = null;
   let changed = false;
   if (routePlaceId("#origin") === "gps") {
     setRoutePlace("#origin", "gate");
@@ -1322,6 +1438,7 @@ $("#gps-toggle").onclick = () => {
   if (gpsWatchId !== null) {
     if (gpsPosition) {
       guidanceFollowing = true;
+      syncNavigationHeading();
       map?.setUserLocation(gpsPosition, { follow: true });
       if (guidanceActive) updateGuidanceStatus();
       toast("내 위치로 이동했어요.");
@@ -1347,7 +1464,14 @@ function startGps() {
         CAMPUS_GEOMETRY.meta,
       );
       const nearest = nearestGraphNode(point);
-      gpsPosition = { ...point, accuracy: coords.accuracy };
+      const course = gpsHeading(coords, gpsPosition, point);
+      if (course !== null) movementHeading = course;
+      gpsPosition = {
+        ...point,
+        accuracy: coords.accuracy,
+        heading: course,
+      };
+      if (guidanceActive) syncNavigationHeading();
       if (!nearest || nearest.distance > 350) {
         gpsStartNode = null;
         map?.setUserLocation(null);
@@ -1394,6 +1518,7 @@ function startGps() {
   return true;
 }
 window.addEventListener("pagehide", () => {
+  headingTracker.stop();
   if (gpsWatchId !== null) navigator.geolocation?.clearWatch(gpsWatchId);
 });
 function routeView() {

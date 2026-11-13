@@ -1,5 +1,6 @@
 import { createStreetLights, windowLights } from "./map/night-lighting.mjs";
-import { touchGestureMode } from "./map/touch-gesture.mjs";
+import { touchGestureMode, touchTurn } from "./map/touch-gesture.mjs";
+import { cameraOffsetForHeading, smoothHeading, headingDelta } from "./heading.mjs";
 import { createNavigationBounds } from "./map/navigation-bounds.mjs";
 import { createKeyboardPan } from "./map/keyboard-pan.mjs";
 import { createMapProfiler } from "./map/performance.mjs";
@@ -36,12 +37,7 @@ import { createGraphOverlay } from "./graph-overlay.js";
 const VIOLET = 0x7950ff;
 
 // Three.js 기반 독립 구현. 외곽선/도로 데이터만 별도 ODbL 데이터에서 가져옵니다.
-export function createCampusMap(host, onSelect, onRoadSelect, notifyCameraInteraction = () => {}) {
-  // 손으로 지도를 움직이면(끌기·확대·회전) 길안내 따라가기를 멈추고 앱에 알립니다(→ "내 위치로" 표시).
-  function onCameraInteraction() {
-    followView = null;
-    notifyCameraInteraction();
-  }
+export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteraction = () => {}) {
   const mapStartedAt = performance.now();
   let renderer;
   try {
@@ -420,45 +416,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, notifyCameraIntera
   userBase.position.y = 2.2;
   userLocationGroup.add(userAccuracy, userBase);
   let navigationMode = false;
-  // 데스크톱 길안내(Figma GD-2): 내 위치를 따라가며 걷는 방향이 화면 위가 되게 지도를 돌리고 기울입니다.
-  // followView가 있으면 매 프레임 부드럽게 다가갑니다(updateFollowView). 손으로 움직이면 null.
-  const FOLLOW_ZOOM = 5.5,
-    FOLLOW_PHI = 0.95, // 위에서 약 54° 기울여 앞쪽이 멀리 보이게
-    FOLLOW_AHEAD = 0.2; // 화면 높이의 20%만큼 앞을 비춰 내 위치가 아래쪽에 오게
-  let navigationView = false,
-    followView = null,
-    followHeading = null;
-  const followSpherical = new THREE.Spherical(),
-    followOffset = new THREE.Vector3();
-  function updateFollowView(dt) {
-    const k = dt ? Math.min(1, dt * 4) : 1;
-    camera.zoom += (FOLLOW_ZOOM - camera.zoom) * k;
-    camera.updateProjectionMatrix();
-    const h = THREE.MathUtils.degToRad(followHeading ?? 0),
-      ahead =
-        (((camera.top - camera.bottom) / camera.zoom) * FOLLOW_AHEAD) /
-        Math.cos(FOLLOW_PHI);
-    // 방위 h(북 0°, 시계 방향) → 땅 위 방향 (sin h, -cos h). +z가 남쪽입니다.
-    controls.target.x +=
-      (followView.x + Math.sin(h) * ahead - controls.target.x) * k;
-    controls.target.z +=
-      (followView.z - Math.cos(h) * ahead - controls.target.z) * k;
-    controls.target.y += (0 - controls.target.y) * k;
-    followSpherical.setFromVector3(
-      followOffset.copy(camera.position).sub(controls.target),
-    );
-    followSpherical.phi += (FOLLOW_PHI - followSpherical.phi) * k;
-    // 카메라가 진행 방향 뒤에 서야 그 방향이 화면 위가 됩니다(theta = -h).
-    if (followHeading !== null)
-      followSpherical.theta +=
-        Math.atan2(
-          Math.sin(-h - followSpherical.theta),
-          Math.cos(-h - followSpherical.theta),
-        ) * k;
-    camera.position
-      .copy(controls.target)
-      .add(followOffset.setFromSpherical(followSpherical));
-  }
+  let navigationFollowing = false, navigationHeading = null, displayedHeading = null;
   const navigationMarker = document.createElement("div");
   navigationMarker.className = "navigation-position";
   navigationMarker.setAttribute("aria-label", "현재 위치");
@@ -666,6 +624,9 @@ export function createCampusMap(host, onSelect, onRoadSelect, notifyCameraIntera
   function clearReportSelection() {
     clearGroup(reportPreviewGroup);
   }
+  function clearGuidanceHeading() {
+    navigationFollowing = false;
+  }
   function setUserLocation(position, { follow = false } = {}) {
     if (!position) {
       userLocationGroup.visible = false;
@@ -683,11 +644,11 @@ export function createCampusMap(host, onSelect, onRoadSelect, notifyCameraIntera
     const accuracy = THREE.MathUtils.clamp(position.accuracy || 12, 3, 100);
     userLocationGroup.position.set(position.x, 0, position.z);
     userAccuracy.scale.set(accuracy, accuracy, 1);
-    if (follow && navigationView) {
-      followView = { x: position.x, z: position.z };
-      return;
-    }
     if (follow) {
+      if (navigationMode) {
+        navigationFollowing = true;
+        return;
+      }
       const offset = camera.position.clone().sub(controls.target);
       controls.target.set(position.x, 0, position.z);
       camera.position.copy(controls.target).add(offset);
@@ -769,7 +730,6 @@ export function createCampusMap(host, onSelect, onRoadSelect, notifyCameraIntera
       item.label.element.classList.toggle("is-selected", item.id === id);
   }
   function zoom(factor) {
-    if (followView) onCameraInteraction(); // 길안내 중 +/−도 따라가기를 멈춥니다(GD-3)
     camera.zoom = THREE.MathUtils.clamp(camera.zoom * factor, 0.5, 12);
     camera.updateProjectionMatrix();
   }
@@ -897,6 +857,13 @@ export function createCampusMap(host, onSelect, onRoadSelect, notifyCameraIntera
         gesture.start.mid,
         gesture.start.mid,
         gesture.last.distance > 0 ? f.distance / gesture.last.distance : 1,
+      );
+    } else if (gesture.mode === "twist") {
+      moveCamera(
+        gesture.last.mid,
+        f.mid,
+        1,
+        touchTurn(gesture.last.angle, f.angle),
       );
     } else {
       tilt(f.mid.y - gesture.last.mid.y, f.mid.x - gesture.last.mid.x);
@@ -1308,9 +1275,29 @@ export function createCampusMap(host, onSelect, onRoadSelect, notifyCameraIntera
     }
     const profileStart = profiler?.begin(t);
     keyboardPan.update(deltaSeconds);
-    if (followView) updateFollowView(Math.min(0.1, deltaSeconds));
     controls.update();
     if (!homeMode) constrainNavigation(camera, controls);
+    if (navigationMode && userLocationGroup.visible && navigationHeading !== null) {
+      const weight = reduceMotion ? 1 : 1 - Math.exp(-10 * Math.min(.1, deltaSeconds));
+      displayedHeading = smoothHeading(displayedHeading, navigationHeading, weight);
+      if (navigationFollowing) {
+        const offset = camera.position.clone().sub(controls.target);
+        const bearing = Math.atan2(-offset.x, offset.z) * 180 / Math.PI;
+        const nextHeading = smoothHeading(bearing, navigationHeading, weight);
+        const phi = new THREE.Spherical().setFromVector3(offset).phi;
+        const desired = cameraOffsetForHeading(nextHeading, offset.length(), phi + (.45 - phi) * weight);
+        const ahead = navigationHeading * Math.PI / 180;
+        const target = userLocationGroup.position.clone().add(new THREE.Vector3(Math.sin(ahead) * 35, 0, -Math.cos(ahead) * 35));
+        controls.target.lerp(target, weight);
+        camera.position.copy(controls.target).add(new THREE.Vector3(desired.x, desired.y, desired.z));
+        camera.zoom += (Math.max(4.2, camera.zoom) - camera.zoom) * weight;
+        camera.updateProjectionMatrix();
+        controls.update();
+      }
+      const view = camera.position.clone().sub(controls.target);
+      const cameraHeading = Math.atan2(-view.x, view.z) * 180 / Math.PI;
+      navigationMarker.firstElementChild.style.transform = `rotate(${headingDelta(cameraHeading, displayedHeading)}deg)`;
+    }
     campusTrees.updateDetail(
       (renderer.domElement.clientHeight * camera.zoom) /
         (camera.top - camera.bottom),
@@ -1353,21 +1340,23 @@ export function createCampusMap(host, onSelect, onRoadSelect, notifyCameraIntera
     previewReportSelection,
     clearReportSelection,
     setUserLocation,
+    clearGuidanceHeading,
     setNavigationMode(enabled) {
+      if (!enabled) {
+        navigationFollowing = false;
+        navigationHeading = displayedHeading = null;
+      }
       navigationMode = enabled;
       navigationLabel.visible = enabled;
       userBase.visible = !enabled;
       if (userTechnyong) userTechnyong.object.visible = !enabled;
     },
-    // 데스크톱 길안내 시점(GD-2): 켜면 setUserLocation(follow)이 순간이동 대신 방향·기울기까지 맞춰 따라갑니다.
-    setNavigationView(enabled) {
-      navigationView = enabled;
-      if (!enabled) followView = followHeading = null;
+    setNavigationHeading(heading, following) {
+      if (!Number.isFinite(heading)) return;
+      navigationHeading = heading;
+      navigationFollowing = following;
     },
-    // 걷는 방위(북 0°, 시계 방향). 이 방향이 화면 위로 오게 돌립니다.
-    setFollowHeading(deg) {
-      followHeading = Number.isFinite(deg) ? deg : null;
-    },
+    setNavigationFollowing(following) { navigationFollowing = following; },
     setRouteMascotVisible(visible) {
       routeMascotVisible = visible;
       if (movingDot) movingDot.visible = visible;
