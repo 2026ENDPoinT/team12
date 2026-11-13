@@ -1,3 +1,5 @@
+import { windowLights } from "../night-lighting.mjs";
+
 // Shared architectural finishes. All details reuse existing triangles/materials.
 // No images, reflections, extra render passes or per-frame JS updates.
 export function applyBuildingFinish(material, kind = "stone") {
@@ -82,6 +84,16 @@ export function applyBuildingFinish(material, kind = "stone") {
       "#include <color_fragment>",
       `#include <color_fragment>\n${detail}`,
     );
+    if (glass) {
+      shader.uniforms.windowLights = windowLights;
+      shader.fragmentShader = "uniform float windowLights;\n" + shader.fragmentShader;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <emissivemap_fragment>",
+        `#include <emissivemap_fragment>
+        totalEmissiveRadiance += vec3(1.0, 0.59, 0.24) *
+          windowLights * step(0.28, finishSeed) * mix(0.55, 1.3, finishSeed);`,
+      );
+    }
     if (glass)
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <normal_fragment_maps>",
