@@ -6648,3 +6648,16 @@ body {
     display: none;
   }
 }
+@media (max-width: 760px) {
+  /* 건물 정보 시트는 끌어 내리는 손잡이 대신 오른쪽 위 ✕로 닫습니다(사용자 요청). */
+  .result-panel::before {
+    content: none;
+  }
+  .result-panel {
+    padding-top: 16px;
+  }
+  .result-panel #building-card-close {
+    background: var(--v2-tile);
+    border: 0.75px solid var(--v2-stroke);
+  }
+}
