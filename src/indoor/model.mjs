@@ -1,4 +1,4 @@
-import { suggestMatches } from "../search-suggestions.mjs";
+import { normalizeSearch, suggestMatches } from "../search-suggestions.mjs";
 // 미래관 실내 데이터 모델: 걸을 수 있는 격자, 목적지 목록·검색, 층을 오가는 경로 탐색.
 // 브라우저와 Node 테스트에서 함께 쓰므로 DOM·three에 의존하지 않습니다.
 // 좌표는 건물 기준 미터(x 동쪽, y 북쪽, z 위)이며 v6 도면 데이터(M)를 그대로 씁니다.
@@ -15,7 +15,7 @@ const ELEV_PER_FLOOR = 3;
 
 const NO_DEST = /^(\dC|\dS|\dW|\dE|\dK)-/;
 const CAT_ALIAS = {
-  toilet: ["화장실", "toilet", "wc"],
+  toilet: ["화장실", "toilet", "wc", "restroom"],
   elev: ["엘리베이터", "승강기", "elevator", "ev"],
   prof: ["교수", "교수실", "교수연구실", "연구실"],
   lab: ["실습실", "lab"],
@@ -77,11 +77,7 @@ export function inPoly(p, x, y) {
   return c;
 }
 
-const norm = (s) =>
-  String(s || "")
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/호$/, "");
+const norm = (s) => normalizeSearch(s).replace(/호$/, "");
 
 export function createIndoor(M) {
   const floors = M.floors.map((f) => f.n);
@@ -366,7 +362,9 @@ export function createIndoor(M) {
           const nd =
             d +
             links[k].cost +
-            (mode === "elevator" && links[k].kind === "stair" ? STAIR_AVOID : 0);
+            (mode === "elevator" && links[k].kind === "stair"
+              ? STAIR_AVOID
+              : 0);
           if (nd < D[v]) {
             D[v] = nd;
             prev[v] = u;
@@ -464,7 +462,16 @@ export function createIndoor(M) {
     const stairFloors = vertical
       .filter((l) => l.kind === "stair")
       .reduce((n, l) => n + Math.abs(l.to - l.from), 0);
-    return { pts, legs, len, cost: D[hit], target, vertical, mode, stairFloors };
+    return {
+      pts,
+      legs,
+      len,
+      cost: D[hit],
+      target,
+      vertical,
+      mode,
+      stairFloors,
+    };
   }
 
   // 같은 층 걷기 구간: 시야가 트인 점만 남기는 줄당기기
@@ -553,7 +560,11 @@ export function createIndoor(M) {
           doors: [],
           center: null,
         };
-        d.search = [id, d.title, nm, ...(CAT_ALIAS[cat] || [])]
+        const gender = cat === "toilet" && /여|남/.exec(d.title)?.[0];
+        const toiletTerms = gender
+          ? [`${gender}자화장실`, `${gender}성화장실`, `화장실${gender}자`]
+          : [];
+        d.search = [id, d.title, nm, ...(CAT_ALIAS[cat] || []), ...toiletTerms]
           .map(norm)
           .join("|");
         dest.set(key, d);
@@ -584,7 +595,35 @@ export function createIndoor(M) {
       a.id.localeCompare(b.id, "ko", { numeric: true }),
   );
 
-  function search(q, limit = 30) {
+  let distanceOrigin = "";
+  const searchDistances = new Map();
+  function distanceFrom(d, context) {
+    const origin = context.origin;
+    if (!origin) return Infinity;
+    const key = `${origin.f}:${origin.x}:${origin.y}:${context.mode || "stairs"}`;
+    if (key !== distanceOrigin) {
+      distanceOrigin = key;
+      searchDistances.clear();
+    }
+    if (!searchDistances.has(d.key)) {
+      const path = routeTo(origin, d, { mode: context.mode || "stairs" });
+      searchDistances.set(d.key, path?.len ?? Infinity);
+    }
+    return searchDistances.get(d.key);
+  }
+  function compareNearby(a, b, context) {
+    if (!Number.isFinite(context.floor)) return a.f - b.f;
+    const floorDifference =
+      Math.abs(a.f - context.floor) - Math.abs(b.f - context.floor);
+    if (floorDifference) return floorDifference;
+    if (a.cat === "toilet" && b.cat === "toilet" && context.origin) {
+      const da = distanceFrom(a, context),
+        db = distanceFrom(b, context);
+      if (da !== db) return da - db;
+    }
+    return a.f - b.f;
+  }
+  function search(q, limit = 30, context = {}) {
     const s = norm(q);
     if (!s) return [];
     const scored = [];
@@ -598,11 +637,21 @@ export function createIndoor(M) {
       else if (d.search.includes(s)) sc = 40;
       if (sc) scored.push([sc, d]);
     }
-    scored.sort((a, b) => b[0] - a[0] || a[1].f - b[1].f);
+    scored.sort((a, b) => b[0] - a[0] || compareNearby(a[1], b[1], context));
     return scored.slice(0, limit).map((x) => x[1]);
   }
-  function suggest(q, limit = 5) {
-    return suggestMatches(norm(q), destinations, (d) => d.search.split("|"), limit);
+  function suggest(q, limit = 5, context = {}) {
+    const matches = suggestMatches(
+      norm(q),
+      destinations,
+      (d) => d.search.split("|"),
+      destinations.length,
+    );
+    // Rank all restroom candidates before limiting; distant floors must not
+    // hide a nearer restroom just because it appeared earlier in the directory.
+    if (matches.length && matches.every((d) => d.cat === "toilet"))
+      matches.sort((a, b) => compareNearby(a, b, context));
+    return matches.slice(0, limit);
   }
   const findDest = (key) =>
     destinations.find((d) => d.key === key) ||
@@ -613,7 +662,9 @@ export function createIndoor(M) {
   // 방 안이나 문틀 가운데가 아니라 문을 마주 보는 자리에서 멈춥니다.
   const STANDOFF = 0.7;
   function doorFront(f, p, rid) {
-    const polys = FL(f).rooms.filter((r) => r.id === rid).map((r) => r.poly);
+    const polys = FL(f)
+      .rooms.filter((r) => r.id === rid)
+      .map((r) => r.poly);
     if (!polys.length) return null;
     // 문에서 가장 가까운 벽(외곽선 선분)
     let best = null;
@@ -625,7 +676,10 @@ export function createIndoor(M) {
           ey = b[1] - a[1],
           L2 = ex * ex + ey * ey;
         if (L2 < 1e-6) continue;
-        const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ey) / L2));
+        const t = Math.max(
+          0,
+          Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ey) / L2),
+        );
         const d = Math.hypot(a[0] + t * ex - p[0], a[1] + t * ey - p[1]);
         if (!best || d < best[0]) {
           const L = Math.sqrt(L2);
@@ -658,7 +712,11 @@ export function createIndoor(M) {
     const o = { ...opts, allowRooms: [d.id] };
     const r = route(start, targets, o);
     // 빠른 길이라도 계단으로 3개 층 이상 오르내리면 엘리베이터 경로를 우선합니다.
-    if (r && (opts.mode || "stairs") === "stairs" && r.stairFloors >= ELEV_PREFER_FLOORS) {
+    if (
+      r &&
+      (opts.mode || "stairs") === "stairs" &&
+      r.stairFloors >= ELEV_PREFER_FLOORS
+    ) {
       const e = route(start, targets, { ...o, mode: "elevator" });
       if (e && e.stairFloors < r.stairFloors)
         return { ...e, mode: "stairs", preferElev: true };

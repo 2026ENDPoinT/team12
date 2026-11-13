@@ -28,6 +28,7 @@ import {
   relTurn,
 } from "./calib.mjs";
 import { playLift, voice } from "../lift.js";
+import { setDirectionIcon } from "../ui.mjs";
 import { xrSupported, startSession, CameraGrab } from "./xr.js";
 import {
   poseFromXR,
@@ -50,21 +51,6 @@ const buzz = (p) => {
   if (navigator.userActivation?.hasBeenActive) navigator.vibrate?.(p);
 };
 const angDiff = (a, b) => ((((a - b) % 360) + 540) % 360) - 180;
-const ARROW = {
-  start: "↑",
-  straight: "↑",
-  left: "←",
-  right: "→",
-  "slight-left": "↖",
-  "slight-right": "↗",
-  "u-left": "↶",
-  "u-right": "↷",
-  "stair-up": "⇡",
-  "stair-down": "⇣",
-  elev: "⇅",
-  arrive: "✦",
-};
-
 // 3×3 행 우선 행렬 유틸
 const mul = (A, B) => {
   const C = new Array(9);
@@ -157,7 +143,16 @@ export async function openAR(opts) {
   ui.err.hidden = true;
   ui.arrive.hidden = true;
   ui.coach.hidden = false;
-  ui.dest.textContent = `${dest.title}${dest.name ? " · " + dest.name : ""}`;
+  ui.dest.textContent = [dest.name || dest.title, floorName(dest.f)].join(
+    " · ",
+  );
+  $("#ar-distance").textContent = `${dest.title}까지 ${Math.round(route.len)}m`;
+  ui.step.textContent = "위치를 찾는 중";
+  ui.sub.textContent = "";
+  ui.status.className = "ar-status searching";
+  ui.status.textContent = "위치를 찾는 중";
+  setDirectionIcon(ui.arrow, "straight", true);
+  ui.arrow.dataset.icon = "straight";
   setStatus("searching", "위치를 찾는 중");
 
   // iOS: 센서 권한은 사용자 터치 직후에 요청해야 합니다.
@@ -748,6 +743,8 @@ export async function openAR(opts) {
           ? `${st.text} · 다음: ${after.text}`
           : st.text;
     ui.remain.textContent = `남은 거리 ${Math.round(pr.remain)}m · 약 ${walkMinutes(pr.remain)}`;
+    $("#ar-distance").textContent =
+      `${dest.title}까지 ${Math.round(pr.remain)}m`;
     // 음성: 다가올 때 한 번, 바로 앞에서 한 번 (위치가 확실할 때만 — 틀린 안내는 하지 않음)
     const k1 = nx.index * 2,
       k2 = k1 + 1;
@@ -1278,8 +1275,12 @@ export async function openAR(opts) {
           arrow3d.rotation.set(0, (out - 90) * D2R, 0);
         }
       }
-      // HUD 화살표: 다가오는 동작(25m 안쪽) 아이콘, 그 전에는 직진
-      ui.arrow.textContent = nx.dist < 25 ? ARROW[nx.step.dir] || "↑" : "↑";
+      // 동작 바로 앞에서 방향을 바꾸고, 그 전에는 직진 아이콘으로 안내.
+      const direction = nx.dist < 3 ? nx.step.dir : "straight";
+      if (ui.arrow.dataset.icon !== direction) {
+        setDirectionIcon(ui.arrow, direction, true);
+        ui.arrow.dataset.icon = direction;
+      }
       // 경로가 화면 밖이면 어느 쪽을 보라고 알려 줌
       const ahead = pointAt(route, cum, sShow + 4);
       const rel = angDiff(
@@ -1570,6 +1571,7 @@ export async function openAR(opts) {
   function showError(e) {
     ui.err.hidden = false;
     ui.coach.hidden = true;
+    ui.err.focus({ preventScroll: true });
     const insecure = e.code === "insecure";
     const denied = e.name === "NotAllowedError";
     ui.err.querySelector("b").textContent = insecure
@@ -1578,7 +1580,7 @@ export async function openAR(opts) {
         ? "카메라 권한이 필요해요"
         : "카메라를 켤 수 없어요";
     ui.err.querySelector("p").textContent = insecure
-      ? "휴대폰 카메라는 보안 연결(HTTPS)에서만 쓸 수 있어요. 배포 주소나 npm run dev:phone 주소로 열어 주세요."
+      ? "카메라를 사용하려면 보안 연결(HTTPS)로 접속해 주세요. 촬영 영상으로 미리 체험할 수도 있어요."
       : denied
         ? "브라우저 설정에서 이 사이트의 카메라 접근을 허용한 뒤 다시 시도해 주세요. 촬영 영상으로 미리 체험할 수도 있어요."
         : `${e.message || e} 촬영 영상으로 AR 길안내를 체험할 수 있어요.`;
