@@ -8328,7 +8328,22 @@ body {
 
 .shortcut-picking canvas { cursor: crosshair; }
 .shortcut-picking :is(.building-label, .entrance-dot) { pointer-events: none !important; }
-#shortcut-start { margin-top: 8px; }
+/* 지름길 제보: 모든 화면에서 보조 버튼 모양으로 보이게 합니다. */
+#reports-panel #shortcut-start {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 50px;
+  margin-top: 8px;
+  border: 1px solid var(--v2-stroke);
+  border-radius: 999px;
+  background: var(--v2-tile);
+  color: var(--v2-ink);
+  font-size: 16px;
+  font-weight: 700;
+}
 #shortcut-picker { z-index: 20; }
 dialog.shortcut-dialog {
   --shortcut-field: #ffffff42;
