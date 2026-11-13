@@ -16,8 +16,7 @@ import {
   locateReportPoint,
   edgeId,
   reportLocation,
-  groupReportsByEdge,
-  edgeStatus,
+  clusterReports,
 } from "./reports.mjs";
 import { buildingLabel, worksPeriod } from "./buildings.mjs";
 import { createGraphOverlay } from "./graph-overlay.js";
@@ -427,8 +426,9 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     }
     routeLength = route.meters;
   }
-  // 신고가 3건(REPORT_THRESHOLD) 이상 쌓이면 주의(노란색)로 뜨고, 관리자가 확정한 구간만 빨간색으로 막습니다.
-  function setReports(reports, confirmedEdges = []) {
+  // 30m 안 신고를 한 구역으로 묶어 구역마다 표시 하나만 띄웁니다.
+  // 서로 다른 기기 3건 이상이면 주의(노란색), 관리자가 확정하면 빨간색으로 막습니다.
+  function setReports(reports) {
     clearReportSelection();
     clearGroup(warningGroup);
     for (const label of warningLabels) {
@@ -436,42 +436,37 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       label.element.remove();
     }
     warningLabels.length = 0;
-    const groups = groupReportsByEdge(reports);
-    for (const group of groups.values()) {
-      const status = edgeStatus(group.edgeId, groups, confirmedEdges);
-      if (status === "pending") continue; // 아직 기준 미만: 지도에 표시하지 않음
-      const confirmed = status === "confirmed";
-      const edge = EDGES.find((e) => edgeId(e) === group.edgeId);
-      if (edge)
-        segment(
-          NODES[edge.a],
-          NODES[edge.b],
-          3.5,
-          confirmed ? 0xd43f3f : 0xf2c200,
-          1,
-          warningGroup,
-        );
-      // 신고가 몇 건이든 구간당 마커는 하나만 찍습니다. 가장 최근 신고 위치를 씁니다.
-      const latestReport = group.reports.reduce((a, r) =>
-        Date.parse(r.createdAt) > Date.parse(a.createdAt) ? r : a,
-      );
+    for (const cluster of clusterReports(reports)) {
+      if (cluster.status === "pending") continue; // 아직 기준 미만: 지도에 표시하지 않음
+      const confirmed = cluster.status === "confirmed";
+      for (const id of cluster.edgeIds) {
+        const edge = EDGES.find((e) => edgeId(e) === id);
+        if (edge)
+          segment(
+            NODES[edge.a],
+            NODES[edge.b],
+            3.5,
+            confirmed ? 0xd43f3f : 0xf2c200,
+            1,
+            warningGroup,
+          );
+      }
+      // 표시는 대표 신고 위치에 하나만 찍습니다(확정 전에는 가장 최근 사진 신고).
+      const cover = cluster.cover;
       const el = document.createElement("button");
       el.className = confirmed
         ? "road-warning road-warning-confirmed"
         : "road-warning";
-      el.setAttribute(
-        "aria-label",
-        `신고 위치: ${reportLocation(latestReport)}`,
-      );
+      el.setAttribute("aria-label", `신고 위치: ${reportLocation(cover)}`);
       el.innerHTML = confirmed
         ? '<span class="warning-triangle" aria-hidden="true">⛔</span><small>통행 막힘(확정)</small>'
-        : `<span class="warning-triangle" aria-hidden="true">!</span><small>통행 주의 · 신고 ${group.count}건</small>`;
+        : `<span class="warning-triangle" aria-hidden="true">!</span><small>통행 주의 · 신고 ${cluster.count}건</small>`;
       el.onclick = (e) => {
         e.stopPropagation();
-        onRoadSelect({ reportId: latestReport.id });
+        onRoadSelect({ reportId: cover.id });
       };
       const label = new CSS2DObject(el);
-      label.position.set(latestReport.point.x, 12, latestReport.point.z);
+      label.position.set(cover.point.x, 12, cover.point.z);
       label.visible = !homeMode;
       scene.add(label);
       warningLabels.push(label);
@@ -1002,6 +997,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     setReports,
     setWorks,
     setReporting,
+    previewReportSelection,
     clearReportSelection,
     setUserLocation,
     zoom,

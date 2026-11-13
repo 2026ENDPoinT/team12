@@ -41,6 +41,8 @@ export async function insertReportRow({
   reason,
   reasonNote,
   photoPath,
+  gps,
+  takenAt,
 }) {
   const { error } = await supabase.from("road_reports").insert({
     edge_id: edgeId,
@@ -49,25 +51,35 @@ export async function insertReportRow({
     reason,
     reason_note: reason === "other" ? reasonNote : null,
     photo_path: photoPath,
+    // 신고를 시작할 때 GPS 위치(캠퍼스 미터 좌표)와 정확도, 사진 촬영 시각
+    gps_x: gps?.x ?? null,
+    gps_z: gps?.z ?? null,
+    gps_accuracy: gps?.accuracy ?? null,
+    taken_at: takenAt || null,
     reporter_device_id: getDeviceId(),
   });
   if (error) throw error;
 }
 
-export async function deleteReportRow(id) {
-  const { error } = await supabase.from("road_reports").delete().eq("id", id);
-  if (error) throw error;
-}
-
-// 관리자 확정: 같은 구간의 모든 신고를 confirmed로 바꿉니다 (행은 지우지 않고 기록으로 남김).
-export async function confirmReportRows(ids) {
+// 관리자 확정: 구역의 모든 신고를 confirmed로 바꾸고(행은 기록으로 남김), 고른 사진 하나를
+// 대표(is_cover)로 표시합니다. 대표 사진은 사용자에게 빨간색 표시와 함께 보입니다.
+export async function confirmReportRows(ids, coverId) {
   const { data, error } = await supabase
     .from("road_reports")
-    .update({ status: "confirmed", confirmed_at: new Date().toISOString() })
+    .update({
+      status: "confirmed",
+      confirmed_at: new Date().toISOString(),
+      is_cover: false,
+    })
     .in("id", ids)
     .select("id");
   if (error) throw error;
   if (!data?.length) throw new Error("확정 권한이 없어 바뀐 신고가 없습니다.");
+  const cover = await supabase
+    .from("road_reports")
+    .update({ is_cover: true })
+    .eq("id", coverId);
+  if (cover.error) throw cover.error;
 }
 
 // 관리자 반려·확정 해제: 그 구간 신고를 행 id로 전부 지워 집계를 처음부터 다시 시작합니다.
