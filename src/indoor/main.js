@@ -12,6 +12,8 @@ import { createView } from "./view.js";
 import { openAR } from "./ar/ar.js";
 import { playLift, voice } from "./lift.js";
 import { uiIcon, setDirectionIcon } from "./ui.mjs";
+import { createRoutePlaces, routePlaceLabel } from "./route-places.mjs";
+import { bindRouteSearch } from "./route-search.mjs";
 
 const A = "assets/";
 const $ = (s) => document.querySelector(s);
@@ -31,6 +33,8 @@ let indoor,
   view,
   entrances,
   sv = null;
+let routePlaces;
+const routeFields = {};
 
 function toast(msg, ms = 2600) {
   const t = $("#toast");
@@ -57,6 +61,7 @@ async function init() {
   ]);
   indoor = createIndoor(M);
   entrances = E.entrances;
+  routePlaces = createRoutePlaces(indoor, entrances);
   view = createView($("#view"), indoor, { onPick });
   buildFloors();
   await view.load(A + "mirae.glb");
@@ -79,11 +84,15 @@ async function init() {
   syncFloors();
 
   const to = params.get("to");
-  const d = to && (indoor.findDest(to) || indoor.search(to)[0]);
+  const d = to && (routePlaces.resolve(to) || indoor.search(to)[0]);
   if (d) {
     state.dest = d;
     computeRoute();
-  } else openSearch("dest", false);
+  } else {
+    // Plain entry starts on the single-floor 1F map; opening search is explicit.
+    if (!from) view.setFloor(1, true);
+    syncFloors();
+  }
   if (params.has("demo")) startDemo();
   updateVoiceButtons();
   $("#loading-status").textContent = "미래관 실내 지도 준비가 완료됐어요";
@@ -115,7 +124,13 @@ function placeStart(d) {
 }
 function setStart(s) {
   state.start = s;
-  view.setMe({ x: s.x, y: s.y, f: s.f });
+  view.setMe(s);
+  routeFields.origin?.setValue(s?.name || "");
+}
+function destinationStart(d) {
+  return d.kind === "entrance"
+    ? entranceStart(entrances.find((e) => e.id === d.id))
+    : placeStart(d);
 }
 
 // ---------- 층 버튼
@@ -197,14 +212,23 @@ function setSheet(name) {
   $("#sheet").classList.toggle("route-mode", name === "route");
   $("#sheet").classList.toggle("place-mode", name === "place");
   $("#sheet").hidden = name === "home";
-  if (name === "home") openSearch("dest", false);
 }
+new ResizeObserver(() => {
+  const sheet = $("#sheet");
+  if (!sheet.hidden && sheet.classList.contains("place-mode"))
+    document.documentElement.style.setProperty(
+      "--place-card-height",
+      `${Math.ceil(sheet.getBoundingClientRect().height)}px`,
+    );
+}).observe($("#sheet"));
 $("#sheet-handle").onclick = () => {
   const collapsed = $("#sheet").classList.toggle("collapsed");
   $("#sheet-handle").setAttribute("aria-expanded", !collapsed);
   if (state.route) frameRoute();
 };
 function showPlace(d) {
+  const panel = $(".search-panel");
+  const scrollTop = panel.scrollTop;
   state.pending = d;
   view.select(d);
   $("#place-floor").textContent = floorLabel(d.f);
@@ -221,9 +245,13 @@ function showPlace(d) {
     view.focus(p[0], p[1], d.f, 48);
   }
   syncFloors();
+  panel.scrollTop = scrollTop;
 }
 $("#place-close").onclick = () => {
   view.select(null);
+  state.pending = null;
+  for (const button of $$(".search-result-button"))
+    button.setAttribute("aria-pressed", "false");
   if (!$("#search").hidden && !state.route) {
     state.sheet = "home";
     $("#sheet").hidden = true;
@@ -236,18 +264,19 @@ $("#place-route").onclick = () => {
   closeSearch();
   state.dest = state.pending;
   remember(state.dest);
+  syncRouteFields();
   computeRoute();
+  if (!state.start) routeFields.origin.focus();
 };
 $("#place-from").onclick = () => {
   closeSearch();
+  remember(state.pending);
   setStart(placeStart(state.pending));
-  toast(`${state.pending.title}에서 출발해요. 이제 도착지를 검색해 주세요.`);
-  if (state.dest && state.dest.key !== state.pending.key) computeRoute();
-  else {
-    view.select(null);
-    setSheet("home");
-    openSearch();
-  }
+  if (state.dest?.key === state.pending.key) state.dest = null;
+  view.select(null);
+  syncRouteFields();
+  computeRoute();
+  if (!state.dest) requestAnimationFrame(() => routeFields.dest.focus());
 };
 
 // ---------- 최근 검색
@@ -276,7 +305,6 @@ function remember(d) {
 // ---------- 검색
 function openSearch(mode = "dest", focus = true) {
   if (!indoor) return;
-  setFloorOverview(true);
   state.searchMode = mode;
   $("#search").hidden = false;
   document.body.classList.add("searching");
@@ -347,17 +375,13 @@ function resultItem(d) {
   );
   const button = el("button", "search-result-button");
   button.type = "button";
+  button.setAttribute(
+    "aria-pressed",
+    String(state.sheet === "place" && state.pending?.key === d.key),
+  );
   button.append(tag, box);
   li.append(button);
-  button.onclick = () => {
-    closeSearch();
-    remember(d);
-    if (state.searchMode === "origin") {
-      setStart(placeStart(d));
-      refreshFromSelect();
-      if (state.dest) computeRoute();
-    } else showPlace(d);
-  };
+  button.onclick = () => showPlace(d);
   return li;
 }
 function renderResults(q) {
@@ -408,48 +432,53 @@ for (const b of $$("#quick-chips button"))
   };
 
 // ---------- 경로
-function refreshFromSelect() {
-  const sel = $("#route-from");
-  sel.replaceChildren();
-  for (const e of entrances) sel.append(new Option(e.name, `e:${e.id}`));
-  if (state.start.kind === "place")
-    sel.append(new Option(state.start.name, `p:${state.start.id}`));
-  sel.append(new Option("다른 호실에서 출발…", "pick"));
-  sel.value =
-    state.start.kind === "entrance"
-      ? `e:${state.start.id}`
-      : `p:${state.start.id}`;
+function syncRouteFields() {
+  routeFields.origin.setValue(state.start?.name || "");
+  routeFields.dest.setValue(routePlaceLabel(state.dest));
 }
-$("#route-from").onchange = (e) => {
-  const v = e.target.value;
-  if (v === "pick") {
-    refreshFromSelect();
-    openSearch("origin");
-    return;
-  }
-  if (v.startsWith("e:"))
-    setStart(entranceStart(entrances.find((x) => `e:${x.id}` === v)));
-  computeRoute();
-};
-$("#route-to").onclick = () => openSearch();
+for (const [mode, id] of [
+  ["origin", "route-from"],
+  ["dest", "route-to"],
+]) {
+  routeFields[mode] = bindRouteSearch({
+    input: $(`#${id}`),
+    panel: $(`#${id}-panel`),
+    list: $(`#${id}-suggestions`),
+    hint: $(`#${id}-hint`),
+    clear: $(`#${id}-clear`),
+    getMatches: (query) =>
+      routePlaces.search(query, {
+        floor: view.floor,
+        origin: state.start,
+        mode: state.mode,
+      }),
+    onChoose: (place) => {
+      if (mode === "origin") setStart(destinationStart(place));
+      else state.dest = place;
+      if (place.kind !== "entrance") remember(place);
+      computeRoute();
+    },
+    onEdit: () => {
+      if (mode === "origin") {
+        state.start = null;
+        view.setMe(null);
+      } else state.dest = null;
+      computeRoute();
+    },
+  });
+}
 $("#route-swap").onclick = () => {
-  // 출발 ↔ 도착 바꾸기 (출발이 호실일 때만 도착으로 쓸 수 있음)
-  if (!state.dest) return;
-  const newDest =
-    state.start.kind === "place" ? indoor.findDest(state.start.id) : null;
-  if (!newDest) {
-    toast(
-      "출입구는 도착지로 고를 수 없어요. 호실에서 출발하면 바꿀 수 있어요.",
-    );
-    return;
-  }
-  setStart(placeStart(state.dest));
+  const newDest = routePlaces.forStart(state.start);
+  setStart(state.dest ? destinationStart(state.dest) : null);
   state.dest = newDest;
+  syncRouteFields();
   computeRoute();
 };
 $("#route-close").onclick = () => {
   state.route = null;
   state.dest = null;
+  syncRouteFields();
+  for (const field of Object.values(routeFields)) field.close();
   view.clearRoute();
   view.select(null);
   setSheet("home");
@@ -495,10 +524,30 @@ $("#route-share").onclick = async () => {
 
 function computeRoute() {
   const d = state.dest;
-  if (!d) return;
+  if (!d || !state.start) {
+    state.route = null;
+    state.steps = null;
+    state.focusStep = null;
+    view.clearRoute();
+    view.select(null);
+    $("#route-summary").replaceChildren(
+      el(
+        "span",
+        "route-prompt",
+        "검색 결과에서 출발지와 도착지를 선택해 주세요.",
+      ),
+    );
+    $("#route-steps").replaceChildren();
+    $("#ar-open").disabled =
+      $("#walk-open").disabled =
+      $("#route-share").disabled =
+        true;
+    setSheet("route");
+    syncFloors();
+    return;
+  }
   const r = indoor.routeTo(state.start, d, { mode: state.mode });
-  refreshFromSelect();
-  $("#route-to").textContent = `${d.title}${d.name ? " " + d.name : ""}`;
+  syncRouteFields();
   setSheet("route");
   const sum = $("#route-summary");
   sum.replaceChildren();
@@ -507,11 +556,17 @@ function computeRoute() {
     state.route = null;
     view.clearRoute();
     sum.append(el("span", "warn", "경로를 찾지 못했어요."));
-    $("#ar-open").disabled = $("#walk-open").disabled = true;
+    $("#ar-open").disabled =
+      $("#walk-open").disabled =
+      $("#route-share").disabled =
+        true;
     syncFloors();
     return;
   }
-  $("#ar-open").disabled = $("#walk-open").disabled = false;
+  $("#ar-open").disabled =
+    $("#walk-open").disabled =
+    $("#route-share").disabled =
+      false;
   state.route = r;
   state.steps = buildSteps(r, d, { landmarks: indoor.destinations });
   state.focusStep = null;
@@ -544,7 +599,8 @@ function computeRoute() {
   renderSteps();
   $("#sheet").scrollTop = 0;
   view.showRoute(r, d, state.steps);
-  if (!view.floorOverview && view.floor !== r.pts[0].f) view.setFloor(r.pts[0].f);
+  if (!view.floorOverview && view.floor !== r.pts[0].f)
+    view.setFloor(r.pts[0].f);
   view.setMe(state.start);
   frameRoute();
   syncFloors();

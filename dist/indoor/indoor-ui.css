@@ -298,12 +298,12 @@ button:disabled {
 }
 .sheet.place-mode {
   z-index: 41;
-  top: calc(var(--ui-top) + 78px);
-  right: 86px;
-  bottom: auto;
+  top: auto;
+  right: 16px;
+  bottom: max(16px, var(--safe-b));
   left: auto;
-  width: min(380px, calc(100% - 102px));
-  max-height: calc(100dvh - var(--ui-top) - 94px);
+  width: min(380px, calc(100% - 32px));
+  max-height: calc(100dvh - var(--ui-top) - 130px);
   padding: 14px;
   border-radius: 24px;
 }
@@ -418,9 +418,169 @@ button:disabled {
   padding-bottom: 12px;
 }
 .route-ends {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 12px;
+  align-items: start;
+}
+.route-heading {
   display: flex;
-  gap: 8px;
   align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  font-size: 18px;
+  line-height: 26px;
+}
+.route-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.route-field-group {
+  min-width: 0;
+}
+.route-field {
+  position: relative;
+  border: var(--glass-border-width) solid var(--glass-stroke);
+  border-radius: 16px;
+  background: var(--glass-tile);
+}
+.route-field::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+.route-field.destination::before {
+  border-width: 2px;
+  background: var(--lime);
+}
+.route-field label {
+  display: block;
+  padding: 10px 44px 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+.route-field input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 2px 44px 12px;
+  border: 0;
+  border-radius: 0 0 16px 16px;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 24px;
+}
+.route-field input::placeholder {
+  color: var(--muted);
+  font-weight: 400;
+}
+.route-field input::-webkit-search-cancel-button {
+  display: none;
+}
+.route-field input:focus-visible {
+  outline: none;
+}
+.route-field:focus-within {
+  border-color: rgba(121, 80, 255, 0.6);
+}
+.route-field:has(input[aria-invalid="true"]) {
+  border-color: #b34a58;
+}
+.route-field-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 16px;
+}
+.route-field-clear:hover {
+  background: var(--glass-tile);
+}
+.route-suggestion-panel > p {
+  margin: 6px 0 3px;
+  padding-left: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+.route-suggestions {
+  max-height: 180px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  border: var(--glass-border-width) solid var(--glass-stroke);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.85);
+}
+.route-suggestions:empty {
+  display: none;
+}
+.route-suggestions li {
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 20px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.route-suggestions small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+.route-suggestions li:hover,
+.route-suggestions li[aria-selected="true"] {
+  background: rgba(213, 255, 118, 0.35);
+}
+.route-prompt {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+@media (max-width: 819px) {
+  #sheet.route-mode {
+    max-height: min(80dvh, calc(100dvh - var(--ui-top) - 112px));
+  }
+  .route-heading .round-btn.small {
+    width: 32px;
+    height: 32px;
+  }
+  .route-field label {
+    padding: 8px 40px 0 36px;
+  }
+  .route-field input {
+    padding: 1px 40px 9px 36px;
+    font-size: 16px;
+  }
+  .route-field::before {
+    left: 14px;
+    width: 11px;
+    height: 11px;
+    border-width: 2.5px;
+  }
+  .route-field.destination::before {
+    border-width: 2px;
+  }
 }
 .route-points {
   flex: 1;
@@ -458,6 +618,13 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  align-self: center;
+}
+.route-side #route-swap {
+  width: 44px;
+  height: 44px;
+  border: var(--glass-border-width) solid var(--glass-stroke);
+  background: var(--glass-tile);
 }
 .seg {
   padding: 4px;
@@ -650,7 +817,8 @@ button:disabled {
   flex: 1;
   min-width: 0;
 }
-.search-result-button:hover {
+.search-result-button:hover,
+.search-result-button[aria-pressed="true"] {
   background: var(--lime-tint);
 }
 .results .floor-tag {
@@ -677,12 +845,6 @@ body.searching .sheet {
 }
 body.searching .sheet.place-mode {
   visibility: visible;
-}
-@media (max-width: 819px) {
-  body.searching .floor-controls,
-  body.searching .sheet.place-mode {
-    visibility: hidden;
-  }
 }
 .hud-card {
   gap: 14px;
@@ -1061,11 +1223,12 @@ button.ar-status::after {
     max-height: calc(100dvh - 126px);
   }
   .sheet.place-mode {
-    top: 88px;
-    right: 90px;
+    top: auto;
+    right: 24px;
+    bottom: 24px;
     left: auto;
-    width: min(380px, calc(100vw - 524px));
-    max-height: calc(100dvh - 112px);
+    width: 380px;
+    max-height: calc(100dvh - 164px);
     padding: 20px;
   }
   .sheet-handle {
@@ -1282,8 +1445,7 @@ button.ar-status::after {
 .floor-overview-open .view {
   left: 0;
 }
-.floor-overview-open .sheet:not(.place-mode):not(.route-mode),
-body.searching .floor-overview {
+.floor-overview-open .sheet:not(.place-mode):not(.route-mode) {
   display: none;
 }
 .floor-overview-open .view canvas {
@@ -1293,14 +1455,29 @@ body.searching .floor-overview {
   cursor: grabbing;
 }
 
-/* Keep the stacked model visible above the search results on narrow screens. */
+/* Searching keeps the current map mode and all view controls available. */
 @media (max-width: 819px) {
-  body.searching.floor-overview-open .view,
-  body.searching.floor-overview-open .floor-controls {
+  body.searching .view,
+  body.searching .floor-controls {
     visibility: visible;
   }
-  .searching.floor-overview-open .search-panel {
-    flex: 0 1 38dvh;
+  body.searching .search-panel {
+    flex: 0 1 auto;
+    max-height: min(38dvh, calc(100dvh - var(--ui-top) - 310px));
     margin-top: auto;
+  }
+  body.searching:has(#sheet.place-mode:not([hidden])) .search-panel {
+    margin: auto 86px
+      calc(var(--place-card-height, 160px) + max(16px, var(--safe-b)) + 12px)
+      16px;
+    padding: 14px;
+    border-radius: 20px;
+    max-height: min(
+      38dvh,
+      calc(
+        100dvh - var(--ui-top) - 114px - var(--place-card-height, 160px) -
+          max(16px, var(--safe-b)) - 12px
+      )
+    );
   }
 }
