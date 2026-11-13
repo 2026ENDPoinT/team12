@@ -30,6 +30,8 @@ import {
   getAdminSession,
   signInAdmin,
   signOutAdmin,
+  isAdminUser,
+  supabase,
 } from "./backend.mjs";
 import {
   activeWorks,
@@ -76,6 +78,7 @@ let region = "전체",
   guidancePending = false;
 // Supabase에서 비동기로 채워집니다 (아래 loadReports 참고). 처음엔 빈 상태로 시작합니다.
 let reports = [],
+  adminAuthenticated = false,
   confirmedEdges = [],
   reporting = false,
   selectedReport = null,
@@ -1161,7 +1164,7 @@ placeJourneyForm();
 isDesktop.addEventListener("change", placeJourneyForm);
 $("#mobile-route-back").onclick = () => setPanelClosed(true);
 
-// 모바일 오른쪽 둥근 버튼: 길 막힘 제보 패널, 관리자 검토(관리자 기기에서만 보임)
+// 모바일 오른쪽 둥근 버튼: 길 막힘 제보 패널, 관리자·편집기 진입(공개 버튼)
 $("#v2-report").onclick = () =>
   setReportsPanel($("#reports-panel").hidden);
 $("#v2-admin").onclick = () => $("#admin-toggle").click();
@@ -1940,15 +1943,20 @@ function renderAdminPanel() {
     open.filter((c) => !c.needsReview),
   );
 }
-// threshold 이상 쌓여 검토가 필요한 구역 수를 관리자 버튼 배지로 보여줍니다.
+// 진입 버튼은 누구나 보지만 검토 건수는 관리자 세션이 확인된 뒤에만 보여줍니다.
 function renderAdminAlert() {
-  const count = clusters.filter((c) => c.needsReview).length;
-  $("#admin-alert-count").textContent = count;
-  $("#admin-alert-count").hidden = count === 0;
-  $("#v2-admin-count").textContent = count;
-  $("#v2-admin-count").hidden = count === 0;
-  $("#side-alert-count").textContent = count;
-  $("#side-alert-count").hidden = count === 0;
+  const count = adminAuthenticated
+    ? clusters.filter((c) => c.needsReview).length
+    : 0;
+  for (const id of [
+    "#admin-alert-count",
+    "#v2-admin-count",
+    "#side-alert-count",
+    "#admin-menu-count",
+  ]) {
+    $(id).textContent = count;
+    $(id).hidden = count === 0;
+  }
 }
 // 관리자 화면은 ?admin=1에서만 노출하고, 실제 권한은 Supabase Auth + RLS가 검사합니다.
 $("#admin-toggle").hidden = !new URLSearchParams(location.search).has("admin");
@@ -2076,6 +2084,13 @@ $("#admin-logout").onclick = async () => {
   $("#admin-dialog").close();
   toast("관리자 계정에서 로그아웃했어요.");
 };
+
+// 초기 세션 복원·로그인·로그아웃·토큰 갱신 때 같은 권한 기준으로 배지를 갱신합니다.
+// 콜백에서는 Auth API를 다시 호출하지 않고 전달받은 세션만 확인합니다.
+supabase.auth.onAuthStateChange((_event, session) => {
+  adminAuthenticated = isAdminUser(session?.user);
+  renderAdminAlert();
+});
 
 // ===== 건물 공사 (관리자가 건물을 골라 기간과 함께 등록 → 지도에 🚧 표시만, 경로는 그대로) =====
 async function loadWorks() {
