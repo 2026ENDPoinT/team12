@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap");
 :root {
+  --font-ui: "Noto Sans KR", sans-serif;
   --violet: #7950ff;
   --deep: #5330d2;
   --lime: #d5ff76;
@@ -19,12 +20,13 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: "Noto Sans KR", sans-serif;
+  font-family: var(--font-ui);
   letter-spacing: -0.5px;
 }
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 button,
@@ -439,7 +441,8 @@ h2 {
   gap: 32px;
 }
 kbd {
-  font: 12px sans-serif;
+  font-family: inherit;
+  font-size: 12px;
   color: #aaa0ba;
   background: #f6f3fc;
   border: 1px solid #e7e1f0;
@@ -1893,7 +1896,7 @@ select:focus-visible {
   }
 }
 .building-label {
-  font-family: "Noto Sans KR", sans-serif;
+  font-family: var(--font-ui);
   font-size: 9px;
   font-weight: 600;
   letter-spacing: -0.5px;
@@ -2063,7 +2066,9 @@ body {
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
   background: #ffc247;
   color: #583c16;
-  font: bold 17px sans-serif;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 700;
   display: grid;
   place-items: center;
   width: 31px;
@@ -2159,6 +2164,28 @@ body {
 .report-list button > span:last-child {
   margin-left: auto;
   color: #b58a45;
+}
+/* 지도 제보 패널은 기존 관리자 목록과 별도로 읽기 크기를 맞춥니다. */
+.reports-panel .report-list button {
+  gap: 12px;
+  padding: 14px;
+}
+.reports-panel .report-list button > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.reports-panel .report-list b {
+  color: var(--v2-ink);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.reports-panel .report-list small {
+  color: var(--v2-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-top: 6px;
 }
 /* 관리자 검토 목록: report-list 틀을 그대로 쓰고 항목 안쪽만 다릅니다. */
 .admin-item {
@@ -5449,7 +5476,9 @@ body {
    지도는 화면 전체, 위쪽은 건물 검색 알약(길찾기 중에는 출발·도착 카드),
    아래는 상황에 따라 하나의 시트(캠퍼스 안내 · 검색 결과 · 건물 정보 · 경로 · 길 막힘 제보). */
 .mobile-route-top,
+.mobile-admin-control,
 #v2-report,
+#v2-entrances,
 #v2-admin {
   display: none;
 }
@@ -6406,25 +6435,26 @@ body {
     height: 18px;
   }
 
-  /* 오른쪽 둥근 버튼: 길 막힘 제보 · 관리자 검토 · 내 위치 · 시점 초기화 */
+  /* 오른쪽 둥근 버튼: 길 막힘 제보 · 출입구 표시 · 내 위치 · 시점 초기화 */
   .v2-map-controls {
     position: absolute;
     z-index: 15;
-    top: calc(80px + env(safe-area-inset-top, 0px));
+    top: calc(92px + env(safe-area-inset-top, 0px));
     right: 12px;
     bottom: auto;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 16px;
   }
   #v2-report,
-  #v2-admin {
+  #v2-entrances {
     display: grid;
   }
   #v2-admin[hidden] {
     display: none;
   }
-  .v2-map-controls > button {
+  .v2-map-controls > button,
+  .mobile-admin-control > button {
     position: relative;
     width: 46px;
     height: 46px;
@@ -6439,17 +6469,20 @@ body {
     box-shadow: var(--v2-glass-shadow);
     color: var(--v2-ink);
   }
-  .v2-map-controls > button[aria-pressed="true"] {
+  .v2-map-controls > button[aria-pressed="true"],
+  .mobile-admin-control > button[aria-pressed="true"] {
     background: var(--lime);
   }
-  .v2-map-controls .icon {
+  .v2-map-controls .icon,
+  .mobile-admin-control .icon {
     width: 20px;
     height: 20px;
   }
   .v2-map-controls > button > span:not(.map-sidebar-badge) {
     display: none;
   }
-  .v2-map-controls .map-sidebar-badge {
+  .v2-map-controls .map-sidebar-badge,
+  .mobile-admin-control .map-sidebar-badge {
     position: absolute;
     top: 2px;
     right: 2px;
@@ -6465,10 +6498,14 @@ body {
   }
   /* 길찾기 위쪽 카드·요약 줄은 더 높으니 버튼을 그 아래로 내립니다. */
   .map-view:not(.panel-closed) .v2-map-controls {
-    top: calc(170px + env(safe-area-inset-top, 0px));
+    top: calc(194px + env(safe-area-inset-top, 0px));
   }
   .map-view.panel-closed.route-shown .v2-map-controls {
-    top: calc(124px + env(safe-area-inset-top, 0px));
+    top: calc(140px + env(safe-area-inset-top, 0px));
+  }
+  /* 모바일에서는 관리자·편집기 진입을 표시하지 않습니다. */
+  .mobile-admin-control {
+    display: none;
   }
   .map-attribution {
     display: none;
@@ -6695,8 +6732,12 @@ body {
   .map-overlay-heading .map-data-status {
     display: none;
   }
+  /* 위쪽 입력 카드만 열려 있을 때도 캠퍼스 카드는 남깁니다. */
+  .map-view:not(.panel-closed):not(.places-ready):not(:has(#result-panel:not([hidden]), #reports-panel:not([hidden]), #building-results:not([hidden]))) .map-overlay-heading {
+    display: block;
+  }
   /* 다른 시트가 떠 있으면 숨깁니다. */
-  .map-view:not(.panel-closed) .map-overlay-heading,
+  .map-view:not(.panel-closed).places-ready .map-overlay-heading,
   .map-view.panel-closed.route-shown .map-overlay-heading,
   .map-view:has(#result-panel:not([hidden])) .map-overlay-heading,
   .map-view:has(#reports-panel:not([hidden])) .map-overlay-heading,
@@ -7479,7 +7520,7 @@ body {
   background: rgba(255, 255, 255, 0.4);
 }
 #admin-dialog .admin-section-urgent {
-  border-color: rgba(229, 72, 77, 0.3);
+  border-color: transparent;
   background: rgba(253, 236, 236, 0.5);
 }
 #admin-dialog .admin-item {
@@ -7526,7 +7567,8 @@ body {
 }
 
 /* 확정 · 반려 · 해제 버튼: 건물 정보 카드 버튼과 같은 모양(50px 알약 · 가운데 글자) */
-#admin-dialog .admin-actions button {
+#admin-dialog .admin-actions button,
+#admin-dialog .work-form button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -7556,6 +7598,102 @@ body {
 }
 #admin-dialog .admin-actions button:disabled {
   opacity: 0.5;
+}
+/* 창 크기는 유지하고 제목 아래의 내역만 스크롤합니다. */
+#admin-dialog {
+  height: min(820px, 90dvh);
+  box-sizing: border-box;
+  padding: 0;
+  overflow: hidden;
+}
+#admin-dialog .dialog-body {
+  height: 100%;
+  box-sizing: border-box;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+#admin-dialog .admin-panel-header {
+  display: grid;
+  gap: 16px;
+  padding-right: 44px;
+}
+#admin-dialog .admin-panel-content {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+#admin-dialog .admin-panel-content > small {
+  color: var(--v2-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+#admin-dialog .admin-section,
+#admin-dialog .admin-section .report-list,
+#admin-dialog .admin-item {
+  min-width: 0;
+}
+#admin-dialog .admin-photos {
+  display: flex;
+  overflow-x: auto;
+  gap: 16px;
+  padding: 0 0 12px;
+  overscroll-behavior-x: contain;
+  cursor: grab;
+}
+#admin-dialog .admin-photos.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+#admin-dialog .admin-photo {
+  flex: 0 0 220px;
+  max-width: none;
+  margin: 0;
+}
+#admin-dialog .admin-photo img,
+#admin-dialog .admin-photo-empty {
+  box-sizing: border-box;
+}
+#admin-dialog .admin-photo small {
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+#admin-dialog .admin-photo-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+#admin-dialog .admin-photo-actions a,
+#admin-dialog .admin-photo-actions button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 13px;
+  text-align: center;
+  white-space: nowrap;
+}
+#admin-dialog .admin-photo-actions > :only-child {
+  grid-column: 1 / -1;
+}
+#admin-dialog .work-form button {
+  background: var(--lime);
+}
+#admin-dialog .work-form select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 44px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2315212b' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  background-size: 20px;
 }
 @media (max-width: 760px) {
   #admin-dialog .dialog-body {

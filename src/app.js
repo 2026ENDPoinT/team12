@@ -1060,6 +1060,7 @@ function setEntranceLayer(visible) {
   map?.setEntrancesVisible(visible);
   side("entrances").setAttribute("aria-pressed", String(visible));
   $("#entrance-toggle").setAttribute("aria-pressed", String(visible));
+  $("#v2-entrances").setAttribute("aria-pressed", String(visible));
 }
 side("entrances").onclick = () =>
   setEntranceLayer(
@@ -1069,6 +1070,8 @@ $("#entrance-toggle").onclick = () =>
   setEntranceLayer(
     $("#entrance-toggle").getAttribute("aria-pressed") !== "true",
   );
+$("#v2-entrances").onclick = () =>
+  setEntranceLayer($("#v2-entrances").getAttribute("aria-pressed") !== "true");
 side("layers").onclick = () => {
   const on = !$("#map-view").classList.contains("show-legend");
   $("#map-view").classList.toggle("show-legend", on);
@@ -1824,6 +1827,47 @@ function clusterHeading(li, cluster, summary) {
   );
 }
 // 사진 한 장: 고르기(라디오) + 사유·시각 + 크게 보기 + 이 신고만 빼기
+function enablePhotoDrag(photos) {
+  photos.tabIndex = 0;
+  photos.setAttribute("aria-label", "신고 사진 목록, 좌우로 스크롤");
+  let drag = null;
+  let suppressClick = false;
+  photos.addEventListener("pointerdown", (event) => {
+    // 터치는 브라우저의 기본 스크롤을 사용하고 버튼·라디오는 그대로 작동합니다.
+    if (event.pointerType !== "mouse" || event.button !== 0 ||
+        event.target.closest("button, a, input")) return;
+    suppressClick = false;
+    drag = { id: event.pointerId, x: event.clientX, left: photos.scrollLeft, moved: false };
+  });
+  photos.addEventListener("pointermove", (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const offset = event.clientX - drag.x;
+    if (!drag.moved && Math.abs(offset) < 6) return;
+    drag.moved = true;
+    photos.setPointerCapture(event.pointerId);
+    photos.classList.add("is-dragging");
+    photos.scrollLeft = drag.left - offset;
+    event.preventDefault();
+  });
+  const finish = (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    suppressClick = drag.moved;
+    drag = null;
+    photos.classList.remove("is-dragging");
+    if (photos.hasPointerCapture(event.pointerId)) photos.releasePointerCapture(event.pointerId);
+  };
+  photos.addEventListener("pointerup", finish);
+  photos.addEventListener("pointercancel", finish);
+  photos.addEventListener("pointerleave", (event) => {
+    if (drag && !drag.moved) finish(event);
+  });
+  photos.addEventListener("click", (event) => {
+    if (!suppressClick) return;
+    suppressClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+}
 function photoCard(cluster, report, { selectable }) {
   const card = el("li", "admin-photo");
   const label = el("label");
@@ -1842,6 +1886,7 @@ function photoCard(cluster, report, { selectable }) {
     img.src = url;
     img.alt = `${reasonLabel(report)} 신고 사진`;
     img.loading = "lazy";
+    img.draggable = false;
     label.append(img);
   } else label.append(el("span", "admin-photo-empty", "사진 없음"));
   // 촬영 시각과, 촬영한 GPS 위치에서 신고 지점까지 거리·GPS 정확도(현장 신고 판단 근거)
@@ -1890,6 +1935,7 @@ function renderAdminSection(listId, emptyId, list) {
       `신고 ${cluster.count}건 · 최근 ${new Date(cluster.latestAt).toLocaleString("ko-KR")}`,
     );
     const photos = el("ul", "admin-photos");
+    enablePhotoDrag(photos);
     for (const report of cluster.reports)
       photos.append(photoCard(cluster, report, { selectable: true }));
     const ids = cluster.reports.map((r) => r.id);
@@ -1928,6 +1974,7 @@ function renderConfirmedSection() {
       `통행 막힘(확정) · 신고 ${cluster.count}건 · 사용자에게 보이는 대표 사진`,
     );
     const photos = el("ul", "admin-photos");
+    enablePhotoDrag(photos);
     photos.append(photoCard(cluster, cluster.cover, { selectable: false }));
     const actions = el("div", "admin-actions");
     actions.append(

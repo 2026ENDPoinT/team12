@@ -711,9 +711,8 @@
             <button id="v2-report" aria-label="길 막힘 제보" aria-pressed="false">
               <svg class="icon"><use href="#i-alert" /></svg>
             </button>
-            <button id="v2-admin" aria-label="관리자 · 편집기" aria-pressed="false">
-              <svg class="icon"><use href="#i-edit" /></svg
-              ><span id="v2-admin-count" class="map-sidebar-badge" hidden>0</span>
+            <button id="v2-entrances" aria-label="출입구 표시" title="출입구 표시" aria-pressed="false">
+              <svg class="icon"><use href="#i-pin" /></svg>
             </button>
             <button
               id="v2-locate"
@@ -726,6 +725,12 @@
             </button>
             <button id="v2-reset" aria-label="지도 시점 초기화">
               <svg class="icon"><use href="#i-cube" /></svg>
+            </button>
+          </div>
+          <div class="mobile-admin-control" aria-label="관리자 도구">
+            <button id="v2-admin" aria-label="관리자 · 편집기" aria-pressed="false">
+              <svg class="icon"><use href="#i-edit" /></svg
+              ><span id="v2-admin-count" class="map-sidebar-badge" hidden>0</span>
             </button>
           </div>
           <small class="map-attribution"
@@ -880,10 +885,13 @@
     <dialog id="admin-dialog" class="report-dialog admin-dialog">
       <button class="dialog-close" aria-label="닫기">✕</button>
       <div class="dialog-body">
+        <header class="admin-panel-header">
         <span class="report-dialog-symbol" aria-hidden="true">🛠</span
         ><span class="eyebrow">관리자 검토 · 시연</span>
         <h2>신고된 구간</h2>
         <button id="admin-logout" class="admin-logout" type="button">로그아웃</button>
+        </header>
+        <div class="admin-panel-content" tabindex="0" aria-label="관리자 검토 내역">
         <section class="admin-section admin-section-urgent">
           <h3><i class="admin-dot urgent" aria-hidden="true"></i>검토 필요 · 3건 이상</h3>
           <p id="admin-empty-urgent">지금은 검토가 급한 구간이 없어요.</p>
@@ -923,6 +931,7 @@
           <p id="work-empty">등록된 공사가 없어요.</p>
           <ul id="work-list" class="report-list"></ul>
         </section>
+        </div>
       </div>
     </dialog>
     <dialog id="info-dialog" class="info-dialog">

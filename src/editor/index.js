@@ -444,7 +444,7 @@ function startEditor(api) {
     "position:absolute;right:12px;top:64px;z-index:30;width:268px;" +
     "max-height:calc(100% - 150px);overflow:auto;background:rgba(255,255,255,.97);" +
     "color:#1f2430;border:1px solid #d9dbe3;border-radius:12px;padding:12px;" +
-    "font:13px/1.5 system-ui,sans-serif;box-shadow:0 6px 18px rgba(20,20,40,.14)";
+    "font:13px/1.5 var(--font-ui);box-shadow:0 6px 18px rgba(20,20,40,.14)";
   host?.append(panel);
   const fileInput = document.createElement("input");
   fileInput.type = "file";
