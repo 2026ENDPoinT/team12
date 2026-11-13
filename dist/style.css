@@ -3888,6 +3888,11 @@ body.exploring .header {
   display: none;
 }
 
+/* 이전 배포 HTML이 캐시에 남아도 삭제된 아이콘 설명이 본문처럼 보이지 않게 합니다. */
+.sidebar-tooltip {
+  display: none !important;
+}
+
 @media (min-width: 761px) {
   /* 기존 위쪽 바의 뒤로가기·로고, 오른쪽 위 빠른 버튼, 예전 지도 컨트롤은
      사이드바와 새 지도 컨트롤로 옮겼습니다(버튼 자체는 그대로 두고 연결). */
