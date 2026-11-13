@@ -5168,3 +5168,101 @@ body.exploring .header {
     font-size: 0;
   }
 }
+
+/* 글래스 테두리(stroke)를 더 얇고 옅게 (사용자 요청) */
+@media (min-width: 761px) {
+  .map-view {
+    --v2-stroke: rgba(255, 255, 255, 0.3);
+    --v2-glass-shadow:
+      inset 0 0.5px 0 rgba(255, 255, 255, 0.6),
+      0 12px 40px rgba(21, 33, 43, 0.16);
+  }
+  .map-sidebar,
+  .map-topbar,
+  .route-panel,
+  .map-view.panel-closed .route-panel,
+  .reports-panel,
+  .route-summary-bar,
+  .result-card,
+  .result-panel .building-card,
+  .map-overlay-heading,
+  .map-view.panel-closed .map-overlay-heading,
+  .v2-dimension,
+  .v2-zoom,
+  .v2-map-controls > button,
+  .indoor-loading-card,
+  .indoor-loading-back,
+  .building-results,
+  .building-card-stats > span,
+  .mode-tabs button,
+  .swap-places,
+  .journey-form > label,
+  #origin,
+  #destination {
+    border-width: 0.5px;
+  }
+}
+@media (min-width: 761px) {
+  /* 출발·도착 칸은 라벨(위)과 입력(아래)이 한 칸처럼 이어지도록 맞닿는 쪽 테두리를 뺍니다. */
+  .journey-form > label,
+  .journey-form > .destination-label {
+    border-width: 0.5px 0.5px 0;
+  }
+  #origin,
+  #destination {
+    border-width: 0 0.5px 0.5px;
+  }
+  .mode-tabs button.active {
+    border-width: 1.5px;
+  }
+}
+
+/* 테두리를 한 단계 더 보이게 (사용자 요청): 0.5px·30% → 0.75px·60% */
+@media (min-width: 761px) {
+  .map-view {
+    --v2-stroke: rgba(255, 255, 255, 0.6);
+    --v2-glass-shadow:
+      inset 0 0.75px 0 rgba(255, 255, 255, 0.75),
+      0 12px 40px rgba(21, 33, 43, 0.16);
+  }
+  .map-sidebar,
+  .map-topbar,
+  .route-panel,
+  .map-view.panel-closed .route-panel,
+  .reports-panel,
+  .route-summary-bar,
+  .result-card,
+  .result-panel .building-card,
+  .map-overlay-heading,
+  .map-view.panel-closed .map-overlay-heading,
+  .v2-dimension,
+  .v2-zoom,
+  .v2-map-controls > button,
+  .indoor-loading-card,
+  .indoor-loading-back,
+  .building-results,
+  .building-card-stats > span,
+  .mode-tabs button,
+  .swap-places {
+    border-width: 0.75px;
+  }
+  .journey-form > label,
+  .journey-form > .destination-label {
+    border-width: 0.75px 0.75px 0;
+  }
+  #origin,
+  #destination {
+    border-width: 0 0.75px 0.75px;
+  }
+  .mode-tabs button.active {
+    border-width: 1.5px;
+  }
+}
+@media (min-width: 761px) {
+  /* 오른쪽 카드 묶음이 스크롤 영역이면 카드 그림자가 네모로 잘려 모서리 밖으로 비칩니다.
+     지금은 건물 정보 카드 하나만 두므로 잘라 내지 않습니다. */
+  .result-panel {
+    overflow: visible;
+    max-height: none;
+  }
+}
