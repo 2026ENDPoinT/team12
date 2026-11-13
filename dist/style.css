@@ -6586,3 +6586,10 @@ body {
     font-size: 17.8px;
   }
 }
+@media (max-width: 760px) {
+  /* 첫 화면 캠퍼스 안내 시트는 모바일에서 보이지 않게 합니다(사용자 요청). */
+  .map-view .map-overlay-heading,
+  .map-view.panel-closed .map-overlay-heading {
+    display: none;
+  }
+}
