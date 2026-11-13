@@ -24,6 +24,8 @@ export function shortestPath(
     Object.keys(nodes).map((id) => [id, Infinity]),
   );
   const previous = {};
+  // 각 노드에 실제로 들어온 간선(같은 두 노드 사이에 보행로와 계단이 함께 있을 수 있음)
+  const previousEdge = {};
   const pending = new Set(Object.keys(nodes));
   distance[start] = 0;
 
@@ -44,6 +46,7 @@ export function shortestPath(
       if (cost < distance[next]) {
         distance[next] = cost;
         previous[next] = current;
+        previousEdge[next] = edge;
       }
     }
   }
@@ -58,16 +61,8 @@ export function shortestPath(
     path,
     meters: distance[end],
     minutes: Math.ceil(distance[end] / 70),
-    stairs: path.some(
-      (id, i) =>
-        i &&
-        edges.some(
-          (edge) =>
-            edge.stairs &&
-            ((edge.a === id && edge.b === path[i - 1]) ||
-              (edge.b === id && edge.a === path[i - 1])),
-        ),
-    ),
+    // 실제로 지난 간선만 봄(같은 두 노드를 잇는 다른 계단 간선은 무시)
+    stairs: path.slice(1).some((id) => Boolean(previousEdge[id]?.stairs)),
   };
 }
 // [팀 알고리즘 교체 지점 — 끝]

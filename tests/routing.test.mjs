@@ -68,6 +68,19 @@ test("step-free routing chooses longer non-stair alternative on a controlled gra
   assert.equal(shortestPath("a", "c", "shortest", nodes, edges).meters, 1);
   assert.equal(shortestPath("a", "c", "stepfree", nodes, edges).meters, 4);
 });
+test("stairs flag follows the edge actually taken when a walkway and stairs join the same nodes", () => {
+  const nodes = { a: {}, b: {} },
+    edges = [
+      { a: "a", b: "b", meters: 5, stairs: true },
+      { a: "a", b: "b", meters: 9 },
+    ];
+  const free = shortestPath("a", "b", "stepfree", nodes, edges);
+  assert.equal(free.meters, 9);
+  assert.equal(free.stairs, false);
+  const fast = shortestPath("a", "b", "shortest", nodes, edges);
+  assert.equal(fast.meters, 5);
+  assert.equal(fast.stairs, true);
+});
 test("missing or disconnected nodes return no route; already there returns zero", () => {
   assert.equal(shortestPath("missing"), null);
   assert.equal(shortestPath("gate", "missing"), null);
