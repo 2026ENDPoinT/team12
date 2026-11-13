@@ -719,7 +719,7 @@ function walkStep(now) {
         title: `${floorLabel(ev.to)}로 이동 중`,
         hint: ev.sub,
       });
-      w.lift.arrive().then(() => {
+      w.lift.finished.then(() => {
         if (walking !== w) return;
         w.lift = null;
         w.s = ev.s + 0.02;

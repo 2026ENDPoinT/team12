@@ -28,7 +28,9 @@ function ding() {
   } catch {}
 }
 
-/** opts: { from, to, title, hint, hold:boolean, onSkip } → { arrive(): Promise, close() } */
+/** opts: { from, to, title, hint, hold:boolean, onSkip }
+ * → { finished: Promise(화면이 닫힐 때), arrive(): 지금 층에 도착 처리(AR), close() }
+ * 층 표시는 항상 현재 층에서 시작해 한 층씩 바뀝니다. */
 export function playLift({ from, to, title, hint, hold = false, onSkip }) {
   const el = $("#lift"),
     num = el.querySelector(".lift-floor"),
@@ -40,7 +42,10 @@ export function playLift({ from, to, title, hint, hold = false, onSkip }) {
   let cur = from,
     done = false,
     arrived = false,
-    timer = null;
+    timer = null,
+    moving = null;
+  let finish;
+  const finished = new Promise((r) => (finish = r));
   el.hidden = false;
   el.className = "lift";
   arrow.textContent = up ? "▲" : "▼";
@@ -66,22 +71,21 @@ export function playLift({ from, to, title, hint, hold = false, onSkip }) {
     el.classList.add("closed"); // 문 닫힘
     await wait(700);
     el.classList.add("moving");
-    const tick = async () => {
-      while (!done && cur !== to) {
-        await wait(1100);
-        if (done) return;
-        cur += up ? 1 : -1;
-        setFloor(cur);
-      }
-    };
-    await tick();
-    if (!hold) await api.arrive();
+    // 출발 전 잠깐 현재 층을 보여 준 뒤 한 층씩
+    while (!done && !arrived && cur !== to) {
+      await wait(1100);
+      if (done || arrived) return;
+      cur += up ? 1 : -1;
+      setFloor(cur);
+    }
   }
   const api = {
+    finished,
     async arrive() {
-      if (arrived) return;
+      if (arrived || done) return finished;
       arrived = true;
-      // 남은 층을 빠르게 넘김
+      // 문이 닫히고 출발할 때까지 기다린 뒤, 남은 층을 차례로 넘김
+      await moving;
       while (cur !== to) {
         cur += up ? 1 : -1;
         setFloor(cur);
@@ -98,7 +102,9 @@ export function playLift({ from, to, title, hint, hold = false, onSkip }) {
       api.close();
     },
     close() {
+      if (done) return;
       done = true;
+      finish();
       clearTimeout(timer);
       el.classList.remove("show");
       setTimeout(() => (el.hidden = true), 250);
@@ -107,7 +113,8 @@ export function playLift({ from, to, title, hint, hold = false, onSkip }) {
       return arrived;
     },
   };
-  run();
+  moving = run().catch(() => {});
+  if (!hold) moving.then(() => api.arrive());
   return api;
 }
 
