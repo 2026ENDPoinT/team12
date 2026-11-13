@@ -6661,3 +6661,45 @@ body {
     border: 0.75px solid var(--v2-stroke);
   }
 }
+@media (max-width: 760px) {
+  /* 경로 시트도 손잡이 대신 오른쪽 위 ✕로 닫습니다(사용자 요청). */
+  .route-panel::before {
+    content: none;
+  }
+  .route-panel,
+  .map-view.panel-closed .route-panel {
+    padding-top: 16px;
+  }
+  .map-view:not(.panel-closed) .route-panel > .route-panel-head {
+    display: flex;
+    justify-content: flex-end;
+    height: 0;
+    margin: 0;
+    overflow: visible;
+  }
+  .route-panel > .route-panel-head > b {
+    display: none;
+  }
+  .route-panel #route-panel-close {
+    position: relative;
+    z-index: 1;
+    width: 40px;
+    height: 40px;
+    margin-top: -4px;
+    border: 0.75px solid var(--v2-stroke);
+    border-radius: 50%;
+    background: var(--v2-tile);
+    color: var(--v2-ink);
+    font-size: 18px;
+  }
+  /* "어떤 길로 갈까요?" 줄이 ✕와 겹치지 않게 오른쪽 여백 */
+  .route-panel .mode-heading {
+    margin-top: 10px;
+    padding-right: 48px;
+  }
+  /* 경로만 보일 때(길찾기 닫음)도 경로 카드 ✕를 같은 둥근 버튼으로 */
+  .route-panel #route-card-close {
+    border: 0.75px solid var(--v2-stroke);
+    background: var(--v2-tile);
+  }
+}

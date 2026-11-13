@@ -915,13 +915,15 @@ function renderRouteCard(start, destination, nodes) {
   if (!$("#building-card").hidden) closeBuildingCard();
   renderResultPanel();
 }
-$("#route-card-close").onclick = () => {
-  endGuidance({ silent: true });
-  routeShown = false;
-  currentRoute = null;
-  map?.setRoute(null);
-  renderResultPanel();
-};
+// 길찾기를 끝냅니다: 출발·도착 칸까지 비워야, 칸에서 초점이 빠질 때 생기는 change 이벤트로
+// 경로가 다시 그려지지 않습니다.
+function endRouteSearch() {
+  document.activeElement?.blur();
+  $("#origin").value = "";
+  $("#destination").value = "";
+  clearRouteResult();
+}
+$("#route-card-close").onclick = endRouteSearch;
 function renderGuidanceButton() {
   const button = $("#route-card-start");
   $("#route-card-start-label").textContent = guidanceActive
@@ -1010,7 +1012,11 @@ $$("[data-summary-mode]").forEach(
       $(`.mode-tabs [data-mode="${b.dataset.summaryMode}"]`).click()),
 );
 $("#summary-edit").onclick = () => setPanelClosed(false);
-$("#route-panel-close").onclick = () => setPanelClosed(true);
+// 모바일 경로 시트의 ✕는 길찾기를 끝내고(경로 지움) 지도로 돌아갑니다. 데스크톱은 패널만 닫습니다.
+$("#route-panel-close").onclick = () => {
+  if (!isDesktop.matches) endRouteSearch();
+  setPanelClosed(true);
+};
 // 출발·도착 칸의 지우기(✕)와 바꾸기(⇅) 버튼
 function clearRouteResult() {
   endGuidance({ silent: true });
