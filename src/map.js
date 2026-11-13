@@ -28,6 +28,7 @@ import {
   reportLocation,
   clusterReports,
 } from "./reports.mjs";
+import { insideBuilding, projectToSegment } from "./geo.mjs";
 import { buildingLabel, worksPeriod } from "./buildings.mjs";
 import { createGraphOverlay } from "./graph-overlay.js";
 const VIOLET = 0x7950ff;
@@ -318,7 +319,9 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     entranceDotGeometry = new THREE.SphereGeometry(1.75, 12, 8),
     entranceRingGeometry = new THREE.RingGeometry(2.2, 3.1, 20);
   // 등록된 출입구(team-survey.json)를 초록 점으로 그립니다. 편집기로 바꾸면 다시 그립니다.
+  let mappedEntrances = ENTRANCES;
   function setEntrances(list) {
+    mappedEntrances = list;
     for (const child of [...entranceGroup.children])
       entranceGroup.remove(child);
     for (const entrance of list) addEntranceMarker(entrance);
@@ -1094,11 +1097,95 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     movingDot.rotation.y = walkerHeading;
     technyong.update(t / 1000, { moving, dt: dt || 1 });
   }
+  let entryFlight;
+  function resolveEntryView(record, entranceId) {
+    if (!record) return null;
+    if (!entranceId && record.entryView) return record.entryView;
+
+    const building = record.b;
+    const entrance = mappedEntrances.find(
+      (item) => item.buildingId === building.id && (!entranceId || item.id === entranceId),
+    );
+    const anchor = entrance ?? NODES[building.entry];
+    if (!anchor) return null;
+
+    let wall;
+    for (const ring of [building.outline, ...building.holes]) {
+      for (let i = 0; i < ring.length; i++) {
+        const [ax, az] = ring[i];
+        const [bx, bz] = ring[(i + 1) % ring.length];
+        if (ax === bx && az === bz) continue;
+        const projection = projectToSegment(anchor, { x: ax, z: az }, { x: bx, z: bz });
+        if (wall && wall.distance <= projection.distance) continue;
+        wall = { ...projection, outward: new THREE.Vector3(az - bz, 0, bx - ax).normalize() };
+      }
+    }
+    if (!wall) return null;
+    const { point, outward } = wall;
+    if (insideBuilding({ x: point.x + outward.x * 0.25, z: point.z + outward.z * 0.25 }, building)) {
+      outward.negate();
+    }
+    return { door: new THREE.Vector3(point.x, 2.6, point.z), outward };
+  }
+
+  function flyIntoBuilding(id, entranceId, onApproach) {
+    const record = buildingLayer.records.find(({ b }) => b.id === id);
+    const entry = resolveEntryView(record, entranceId);
+    if (!entry || !host.clientHeight) return Promise.resolve();
+
+    cancelAnimationFrame(zoomAnimation);
+    keyboardPan.clear();
+    controls.enabled = false;
+    labels.domElement.style.visibility = "hidden";
+    const view = new THREE.PerspectiveCamera(42, host.clientWidth / host.clientHeight, 0.08, 3500);
+    const target = controls.target.clone();
+    const distance = (camera.top - camera.bottom) / camera.zoom /
+      (2 * Math.tan(THREE.MathUtils.degToRad(view.fov / 2)));
+    const start = camera.position.clone().sub(target).setLength(distance).add(target);
+    const approach = entry.door.clone().addScaledVector(entry.outward, 38);
+    approach.y += 13;
+    const threshold = entry.door.clone().addScaledVector(entry.outward, 0.5);
+    const aim = entry.door.clone().addScaledVector(entry.outward, -6);
+    return new Promise((resolve) => {
+      entryFlight = { view, start, target, approach, threshold, aim, onApproach, resolve };
+    });
+  }
+
+  function restoreBuildingFlight() {
+    entryFlight = null;
+    controls.enabled = true;
+    labels.domElement.style.visibility = "";
+  }
+
+  function renderBuildingFlight(t) {
+    const flight = entryFlight;
+    flight.started ??= t;
+    const elapsed = t - flight.started;
+    const approach = THREE.MathUtils.smootherstep(elapsed, 0, 950);
+    const entry = THREE.MathUtils.smootherstep(elapsed, 800, 1500);
+    flight.view.position.lerpVectors(flight.start, flight.approach, approach)
+      .lerp(flight.threshold, entry);
+    flight.view.lookAt(flight.target.clone().lerp(flight.aim, approach));
+    const entrancesVisible = entranceGroup.visible;
+    entranceGroup.visible = false;
+    renderer.render(scene, flight.view);
+    entranceGroup.visible = entrancesVisible;
+    if (elapsed >= 1280 && flight.onApproach) {
+      flight.onApproach();
+      flight.onApproach = null;
+    }
+    if (elapsed >= 1500) flight.resolve();
+  }
+
   function animate(t) {
     frame = requestAnimationFrame(animate);
     const deltaSeconds = previousFrameTime ? (t - previousFrameTime) / 1000 : 0;
     previousFrameTime = t;
     if (document.hidden || !host.getBoundingClientRect().height) return;
+    if (entryFlight) {
+      renderBuildingFlight(t);
+      return;
+    }
     const profileStart = profiler?.begin(t);
     keyboardPan.update(deltaSeconds);
     controls.update();
@@ -1127,6 +1214,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   });
   return {
     moveTo,
+    flyIntoBuilding,
+    restoreBuildingFlight,
     // 편집 모드 전용: 보행 그래프 디버그 오버레이. graph가 null이면 끕니다.
     setGraphOverlay: (graph) => graphOverlay.set(graph),
     // 편집 모드 전용: 미리보기 도형(점·선)과 클릭·이동 처리기. null이면 지웁니다.
