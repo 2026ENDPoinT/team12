@@ -746,6 +746,14 @@ a {
 .ar video {
   object-fit: cover;
 }
+/* WebXR(ARCore): 카메라 화면과 경로는 브라우저가 그리고, 이 요소는 안내 글자만 위에 겹침 */
+.ar.xr {
+  background: transparent;
+}
+.ar.xr video,
+.ar.xr #ar-gl {
+  display: none;
+}
 .ar-top {
   position: absolute;
   top: calc(12px + var(--safe-t));

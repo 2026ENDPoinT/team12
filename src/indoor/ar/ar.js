@@ -1,4 +1,8 @@
 // AR 길안내: 카메라(또는 데모 영상) 화면 위에 경로를 겹쳐 그립니다.
+//  ★ WebXR(안드로이드 크롬 ARCore)이 되면: VIO가 휴대폰 6축 움직임을 cm 단위로 추적하고,
+//    같은 카메라 영상으로 입자 필터가 '건물 ↔ VIO 좌표' 정렬을 잡습니다(xr.js, xr-math.mjs).
+//    경로는 실제 바닥에 고정되고, 방향·속도는 VIO가, 절대 위치는 사진 비교가 맡습니다.
+//  아래 1)~4)는 WebXR이 없는 기기(아이폰 사파리 등)와 데모 영상에서 쓰는 기존 방식입니다.
 //  1) 화면을 수평 기준으로 펴서 워커로 보내면, 입자 필터가 촬영 사진 비교 + 걸음 + 벽·층 연결을
 //     시간에 따라 합쳐 위치·층·방향(센서 기준 차이)을 추정합니다. (pf.mjs)
 //  2) 걸음은 가속도 봉우리로 세고(보행자 추측항법), 방향은 자이로로 매 프레임 이어 갑니다.
@@ -24,6 +28,16 @@ import {
   relTurn,
 } from "./calib.mjs";
 import { playLift, voice } from "../lift.js";
+import { xrSupported, startSession, CameraGrab } from "./xr.js";
+import {
+  poseFromXR,
+  intrinsicsFromProjection,
+  yawOf,
+  Anchor,
+  LevelTracker,
+  worldTransform,
+  VisualAligner,
+} from "./xr-math.mjs";
 
 const D2R = Math.PI / 180;
 const $ = (s) => document.querySelector(s);
@@ -181,7 +195,10 @@ export async function openAR(opts) {
   } catch {}
   let fovLong = urlFov || savedFov || PHONE_FOV_LONG;
   let fovCal = null;
-  const DEBUG = new URLSearchParams(location.search).has("debug");
+  const params = new URLSearchParams(location.search);
+  const DEBUG = params.has("debug");
+  // WebXR AR(VIO)을 쓸 수 있으면 그쪽으로. ?legacy 로 기존 방식 강제
+  let xrMode = !demoWanted && !params.has("legacy") && (await xrSupported());
 
   // ---- 화면 소스: 카메라 → 실패하면 데모 안내
   async function startCamera() {
@@ -218,7 +235,7 @@ export async function openAR(opts) {
   }
   try {
     if (demoWanted) await startDemo();
-    else await startCamera();
+    else if (!xrMode) await startCamera();
   } catch (e) {
     showError(e);
     // 카메라를 못 켰을 때: 아래 장면을 만들기 전이므로 간단히 정리하고 끝냄
@@ -265,7 +282,7 @@ export async function openAR(opts) {
   // ---- 센서
   let ori = null;
   const onOri = (e) => {
-    if (e.alpha == null) return;
+    if (e.alpha == null || xrMode) return;
     ori = {
       alpha: e.alpha,
       beta: e.beta,
@@ -279,7 +296,7 @@ export async function openAR(opts) {
   const pdr = { on: false, lp: 9.8, hi: false, lastT: 0, lo: 99, top: 0 };
   const onMotion = (e) => {
     const a = e.accelerationIncludingGravity;
-    if (!a || a.x == null) return;
+    if (!a || a.x == null || xrMode) return;
     pdr.on = true;
     pdr.lp += (Math.hypot(a.x, a.y, a.z) - pdr.lp) * 0.25;
     pdr.lo = Math.min(pdr.lo, pdr.lp);
@@ -324,7 +341,8 @@ export async function openAR(opts) {
         busy = false;
         lastMs = m.ms;
       }
-      onPose(m.r);
+      if (m.cands) onCands(m.id, m.cands);
+      onPose(m.r, m.id);
     } else if (m.type === "motion") onMove(m.r);
   };
   const Mg = indoor.M;
@@ -480,17 +498,65 @@ export async function openAR(opts) {
       worker.postMessage({ type: "heading", off: vpF.value, sd: 5 });
   }
 
+  // WebXR: 사진 비교 후보 + 그 순간 VIO 자세 → 정렬(RANSAC). 정렬이 잡히면 매 프레임 VIO로 위치·방향 계산
+  function onCands(id, cands) {
+    const sq = xrs.q.get(id);
+    if (!xrMode || !sq || lift || closed) return;
+    const now = performance.now();
+    aligner.add(sq.t, sq, sq.lvl, cands);
+    const a = aligner.solve();
+    if (!a || !xrs.last) return;
+    const s = xrs.last;
+    const c = Math.cos(a.off * D2R),
+      sn = Math.sin(a.off * D2R);
+    const b = { x: c * s.x - sn * s.y + a.tx, y: sn * s.x + c * s.y + a.ty };
+    const conf = Math.min(1, a.n / 12);
+    const first = !anchor.ok;
+    const st = anchor.update(b, { x: s.x, y: s.y }, a.off, conf);
+    if (st === "hold") return;
+    const f = level.idx + a.df;
+    if (indoor.floors.includes(f)) pose.f = f;
+    pose.conf = conf;
+    pose.off = anchor.off;
+    pose.lastFix = now;
+    if (st === "set" || st === "snap") rebuildPath = true;
+    if (first) {
+      ui.coach.hidden = true;
+      buzz(40);
+    }
+    lostSince = 0;
+    lostSaid = false;
+    setStatus("ok", `위치 확인됨 · ${floorName(pose.f)}`);
+    // 입자 필터도 같은 자리로 맞춰 둠(층 판단·엘리베이터 도착 확인에 씀)
+    if (now - xrs.fixT > 2000) {
+      xrs.fixT = now;
+      worker.postMessage({
+        type: "fix",
+        fix: { f: pose.f, x: b.x, y: b.y, yaw: s.yaw + anchor.off, conf: 0.8 },
+        yaw: s.yaw,
+      });
+    }
+  }
+
   function sensorHeading() {
     if (!ori) return null;
     return (headingOf(deviceR(ori)) * 180) / Math.PI;
   }
-  function onPose(r) {
+  function onPose(r, id) {
     if (closed) return;
     const now = performance.now();
+    if (id) xrs.q.delete(id);
     // 엘리베이터 탑승 중: 도착 층에서 확실히 잡히면 내린 것으로 봄
     if (lift) {
       if (r.ok && liftStep && r.f === liftStep.to && r.conf > 0.2) finishLift();
       else return;
+    }
+    // WebXR: 위치·방향은 VIO + 사진 후보 정렬(onCands)이 정함. 입자 필터 추정은 쓰지 않음
+    // (비슷한 복도에 잘못 붙어도 일관돼 보일 수 있어서). 정렬 전에는 안내만.
+    if (xrMode) {
+      if (!anchor.ok)
+        setStatus("searching", "주변을 비추며 몇 걸음 걸어 주세요");
+      return;
     }
     if (r.ok && pose.ok) {
       // 크게 튀는 위치(5m 넘게·다른 층)는 같은 곳이 두 번 연속 나와야 받아들임
@@ -532,7 +598,8 @@ export async function openAR(opts) {
       updateProgress();
     } else {
       // 걸음으로 이어 가는 동안(최근 15초 안 확인)은 위치를 유지
-      if (pose.ok && now - pose.lastFix > HOLD * 1000) pose.ok = false;
+      if (pose.ok && now - pose.lastFix > HOLD * 1000 && !(xrMode && anchor.ok))
+        pose.ok = false;
       if (!pose.ok || now - pose.lastFix > 3000) {
         lostSince = lostSince || now;
         setStatus(
@@ -588,6 +655,7 @@ export async function openAR(opts) {
   function startLift(st) {
     liftStep = st;
     liftDone.add(st.s);
+    if (xrMode) aligner.clear();
     voice.say(`엘리베이터를 타고 ${floorName(st.to)} 버튼을 누르세요`);
     buzz([30, 60, 30]);
     // 위치 후보를 도착 층 엘리베이터 문 앞으로 옮겨 둠 → 내려서 비추면 바로 확인
@@ -613,6 +681,11 @@ export async function openAR(opts) {
     lift = null;
     hintS = st.s;
     pose.f = st.to;
+    // WebXR: 엘리베이터 안에서는 VIO 높이가 믿을 만하지 않으므로 지금 높이를 새 층 기준으로
+    if (xrMode && xrs.last) {
+      level.reset(xrs.last.h, xrs.last.h - xrs.eye);
+      level.shift(st.to - st.f);
+    }
     shown.init = false;
     voice.say(`${floorName(st.to)}에 도착했어요`);
     rebuildPath = true;
@@ -727,6 +800,9 @@ export async function openAR(opts) {
   const scene = new THREE.Scene();
   scene.add(new THREE.HemisphereLight(0xffffff, 0x8877aa, 2.2));
   const cam = new THREE.PerspectiveCamera(60, 1, 0.05, 200);
+  // 경로·화살표·핀은 건물 좌표로 이 묶음 안에 둡니다. WebXR에서는 묶음을 '건물 → VIO 좌표'로 옮김
+  const world = new THREE.Group();
+  scene.add(world);
   const T = (x, y, z) => new THREE.Vector3(x, z, -y);
 
   // 흐르는 화살표 텍스처
@@ -777,7 +853,7 @@ export async function openAR(opts) {
   // 높이는 항상 지금 층 바닥(계단 오르막을 그리면 공중에 떠 보임)
   function buildPath(sAt) {
     if (pathMesh) {
-      scene.remove(pathMesh);
+      world.remove(pathMesh);
       pathMesh.geometry.dispose();
     }
     pathMesh = null;
@@ -829,7 +905,7 @@ export async function openAR(opts) {
     g.setIndex(idx);
     pathMesh = new THREE.Mesh(g, pathMat);
     pathMesh.renderOrder = 1;
-    scene.add(pathMesh);
+    world.add(pathMesh);
   }
 
   // 회전 지점 화살표: 바닥에 눕혀 꺾인 뒤 방향을 가리킴
@@ -862,7 +938,7 @@ export async function openAR(opts) {
     grp.add(m, edge);
     grp.renderOrder = 2;
     grp.visible = false;
-    scene.add(grp);
+    world.add(grp);
     return grp;
   })();
   // 목적지 핀 + 이름표
@@ -904,7 +980,7 @@ export async function openAR(opts) {
     label.position.y = 2.45;
     label.renderOrder = 5;
     grp.add(head, cone, label);
-    scene.add(grp);
+    world.add(grp);
     return grp;
   })();
 
@@ -1145,8 +1221,11 @@ export async function openAR(opts) {
     } else Rcb = levelR(shown.yaw * D2R, demoPitch);
     const z = indoor.FL(pose.f).z + EYE;
     setCamera(Rcb, shown.x, shown.y, z);
+    drawOverlay(now, dt, heading);
+  }
 
-    // 경로·화살표·핀
+  // 경로·화살표·핀·안내 (두 방식 공통). heading: 지금 보는 건물 방위(도)
+  function drawOverlay(now, dt, heading) {
     const sShow = shown.s ?? pose.s;
     if (
       rebuildPath ||
@@ -1221,7 +1300,9 @@ export async function openAR(opts) {
     if (dbg && now - dbgT > 300) {
       dbgT = now;
       dbg.textContent = [
-        `센서 ${ori ? "켜짐" : "없음"} · 걸음 ${pdr.on ? pdr.n || 0 : "없음"} · 질의 ${Math.round(lastMs)}ms`,
+        xrMode
+          ? `WebXR(VIO) ${xrs.tracking ? "추적 중" : "추적 끊김"} · 정렬 ${anchor.ok ? `${anchor.n}회` : "-"} · 높이 ${xrs.last ? xrs.last.h.toFixed(2) : "-"}m · 질의 ${Math.round(lastMs)}ms`
+          : `센서 ${ori ? "켜짐" : "없음"} · 걸음 ${pdr.on ? pdr.n || 0 : "없음"} · 질의 ${Math.round(lastMs)}ms`,
         `화각 ${fovLong.toFixed(1)}° ${urlFov ? "(주소)" : fovCal ? `(보정 표본 ${fovCal.samples.length})` : ""}`,
         `방향기준 ${headOff == null ? "-" : headOff.toFixed(1)} / 소실점 ${vpF.value == null ? "-" : vpF.value.toFixed(1)} (${vpF.n}) / 사진·걸음 ${offF.value == null ? "-" : offF.value.toFixed(1)} (${offF.n})`,
         `위치 ${pose.ok ? "OK" : "--"} ${floorLabel(pose.f)} (${pose.x.toFixed(1)}, ${pose.y.toFixed(1)}) 신뢰 ${pose.conf.toFixed(2)}`,
@@ -1230,7 +1311,175 @@ export async function openAR(opts) {
     drawMini(heading);
     renderer.render(scene, cam);
   }
-  requestAnimationFrame(frame);
+
+  // ---- WebXR(VIO) 방식
+  const xrs = {
+    q: new Map(), // 질의 번호 → 그 순간 VIO 평면 위치
+    last: null, // 마지막 VIO 자세
+    mx: 0, // 아직 입자 필터에 안 보낸 이동량
+    my: 0,
+    tracking: false,
+    eye: 1.35, // 바닥에서 휴대폰까지 높이(서 있는 동안 평균)
+    progT: 0,
+    fixT: 0,
+    nq: 0,
+  };
+  const aligner = new VisualAligner();
+  const anchor = new Anchor();
+  const level = new LevelTracker(indoor.M.FH || 4);
+  let session = null,
+    grab = null;
+  function frameXR(now, xf) {
+    if (closed) return;
+    const dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    const vp = xf?.getViewerPose(renderer.xr.getReferenceSpace());
+    let heading = shown.yaw;
+    if (vp) {
+      const view = vp.views[0];
+      const P = poseFromXR(view.transform.matrix);
+      const was = xrs.tracking;
+      xrs.tracking = !vp.emulatedPosition;
+      // 이동량 누적: 추적이 끊겼다 이어지거나 한 프레임에 1.5m 넘게 튀면 버림
+      if (xrs.last && xrs.tracking && was) {
+        const dx = P.x - xrs.last.x,
+          dy = P.y - xrs.last.y;
+        if (Math.hypot(dx, dy) < 1.5 && !lift) {
+          xrs.mx += dx;
+          xrs.my += dy;
+        }
+      }
+      xrs.last = { ...P, yaw: yawOf(P.R) };
+      // 계단: VIO 높이로 층 이동
+      if (xrs.tracking && !lift) {
+        const d = level.update(P.h);
+        if (d) {
+          worker.postMessage({ type: "shiftFloor", d });
+          if (indoor.floors.includes(pose.f + d)) pose.f += d;
+          rebuildPath = true;
+        } else if (Math.abs(P.h - level.floorY - xrs.eye) < 0.4)
+          xrs.eye += (P.h - level.floorY - xrs.eye) * 0.01;
+      }
+      // 사진 비교 질의(초당 최대 5번): VIO 카메라 영상 + VIO 자세(중력 정확)
+      if (
+        ready &&
+        !busy &&
+        !paused &&
+        xrs.tracking &&
+        now - lastQ > 200 &&
+        view.camera
+      ) {
+        const raw = grab.grab(view.camera);
+        if (raw) {
+          const K = intrinsicsFromProjection(
+            view.projectionMatrix,
+            raw.w,
+            raw.h,
+          );
+          const c = {
+            img: {
+              data: blurGray(raw.g, raw.w, raw.h, blurSigma(K.fx)),
+              w: raw.w,
+              h: raw.h,
+            },
+            K,
+            raw,
+          };
+          vanishing(c, P.R, now);
+          const pitch = Math.asin(P.R[8]) / D2R;
+          if (pitch < -35 || pitch > 25)
+            setStatus(
+              "weak",
+              pitch < 0
+                ? "휴대폰을 조금 더 세워 주세요"
+                : "휴대폰을 조금 내려 주세요",
+            );
+          else {
+            if (xrs.mx || xrs.my)
+              worker.postMessage({ type: "move", dx: xrs.mx, dy: xrs.my });
+            xrs.mx = xrs.my = 0;
+            const q = sampleQuery(c.img, c.K, P.R);
+            busy = true;
+            lastQ = now;
+            const syaw = yawOf(P.R);
+            xrs.q.set(++qid, {
+              x: P.x,
+              y: P.y,
+              yaw: syaw,
+              lvl: level.idx,
+              t: now / 1000,
+            });
+            // 후보를 찾을 층: 정렬 뒤엔 지금 층, 그 전엔 경로상 층. 4번에 1번은 전 층
+            const fNow = anchor.ok ? pose.f : pointAt(route, cum, hintS).f;
+            const floors = ++xrs.nq % 4 === 0 ? indoor.floors : [fNow];
+            if (xrs.q.size > 20) xrs.q.delete(xrs.q.keys().next().value);
+            worker.postMessage(
+              {
+                type: "query",
+                id: qid,
+                q,
+                yaw: syaw,
+                xr: true,
+                floors,
+                floorHint:
+                  liftStep && lift ? liftStep.to : pointAt(route, cum, hintS).f,
+              },
+              [q.buffer],
+            );
+          }
+        }
+      }
+      // 정렬이 잡혔으면 지금 위치·방향은 VIO로 매 프레임 계산(부드럽고 정확)
+      if (anchor.ok && !lift) {
+        const b = anchor.toBuilding(P.x, P.y);
+        pose.x = b.x;
+        pose.y = b.y;
+        pose.ok = true;
+        if (xrs.tracking) pose.lastFix = now;
+        heading = yawOf(P.R) + anchor.off;
+        pose.yaw = heading;
+        const pr = progressOn(route, cum, pose, hintS);
+        shown.x = b.x;
+        shown.y = b.y;
+        shown.yaw = heading;
+        shown.init = true;
+        shown.s = pr && pr.off < 3 ? pr.s : null;
+        if (now - xrs.progT > 200) {
+          xrs.progT = now;
+          updateProgress();
+        }
+        // 경로 묶음: 건물 좌표 → VIO 좌표(지금 층 바닥 = VIO 바닥 높이)
+        const wt = worldTransform(anchor, level.floorY - indoor.FL(pose.f).z);
+        world.rotation.set(0, wt.rotY, 0);
+        world.position.set(wt.px, wt.py, wt.pz);
+      }
+    }
+    if (!anchor.ok) world.visible = false;
+    else world.visible = true;
+    drawOverlay(now, dt, heading);
+  }
+
+  if (xrMode) {
+    try {
+      session = await startSession(renderer, root);
+      grab = new CameraGrab(renderer, 220, params.has("xrflip"));
+      root.classList.add("xr");
+      session.addEventListener("end", () => {
+        if (!closed) close();
+      });
+      renderer.setAnimationLoop(frameXR);
+    } catch (e) {
+      // WebXR을 못 쓰면 기존 방식으로
+      xrMode = false;
+      toast("이 기기는 기본 AR 방식으로 안내해요");
+      try {
+        await startCamera();
+      } catch (e2) {
+        showError(e2);
+      }
+      requestAnimationFrame(frame);
+    }
+  } else requestAnimationFrame(frame);
 
   // ---- 층 직접 고르기: 상태 표시를 누르면 층 버튼
   const floorBox = $("#ar-floors");
@@ -1244,6 +1493,12 @@ export async function openAR(opts) {
       worker.postMessage({ type: "floor", f: n });
       pose.ok = false;
       pose.f = n;
+      // WebXR: 지금 VIO 층을 고른 층으로 보고 정렬을 다시 모음
+      if (xrMode) {
+        level.idx = 0;
+        aligner.clear();
+        anchor.off = null;
+      }
       shown.init = false;
       setStatus("searching", `${floorName(n)}에서 위치를 찾는 중`);
       toast(`${floorName(n)}로 맞췄어요`);
@@ -1338,6 +1593,10 @@ export async function openAR(opts) {
     if (voice.supported) speechSynthesis.cancel();
     removeEventListener("deviceorientation", onOri);
     removeEventListener("devicemotion", onMotion);
+    renderer.setAnimationLoop(null);
+    if (session) session.end().catch(() => {});
+    grab?.dispose();
+    root.classList.remove("xr");
     removeEventListener("resize", resize);
     stream?.getTracks().forEach((t) => t.stop());
     video.pause();
