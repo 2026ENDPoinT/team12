@@ -1,3 +1,6 @@
+import { touchGestureMode } from "./map/touch-gesture.mjs";
+import { createNavigationBounds } from "./map/navigation-bounds.mjs";
+import { createKeyboardPan } from "./map/keyboard-pan.mjs";
 import { createMapProfiler } from "./map/performance.mjs";
 import { createGroundMaterial } from "./map/landscape/ground-materials.mjs";
 import { createRoadLayer } from "./map/landscape/road-layer.mjs";
@@ -54,11 +57,12 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   renderer.domElement.tabIndex = 0;
   renderer.domElement.setAttribute(
     "aria-label",
-    "서울과기대 3D 지도. 드래그 이동, 휠·두 손가락 스크롤 확대, 더블클릭 확대, 오른쪽 드래그 회전·기울이기. 터치: 한 손가락 이동, 두 손가락 벌리기 확대, 비틀기 회전, 함께 위아래로 밀기 기울이기. 신고 모드에서 지도 위치 클릭. 방향키 회전, Enter로 지도 가운데 위치 신고.",
+    "서울과기대 3D 지도. 왼쪽 드래그 지도 이동, 지도 클릭 후 W/S 확대·축소, A/D 좌우 이동, Space 상승, Shift 하강, Ctrl 가속, 휠·두 손가락 벌리기 확대, 더블클릭 확대, 오른쪽 드래그 회전·기울이기. 터치: 한 손가락 이동, 두 손가락 벌리기 확대, 함께 좌우로 밀기 회전, 위아래로 밀기 기울이기. 신고 모드에서 지도 위치 클릭. 방향키 회전, Enter로 지도 가운데 위치 신고.",
   );
   const scene = new THREE.Scene(),
     camera = new THREE.OrthographicCamera(-600, 600, 600, -600, 1, 3500);
   const controls = new OrbitControls(camera, renderer.domElement);
+  const constrainNavigation = createNavigationBounds(CAMPUS_GEOMETRY.boundary);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.minPolarAngle = 0.12;
@@ -591,10 +595,10 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     controls.enablePan = !value;
     // 첫 화면 미리보기는 이동 대신 한 손가락으로 둘러보기를 유지합니다.
     controls.touches.ONE = value ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN;
-    // 마우스도 같은 규칙: 지도 화면은 왼쪽 드래그 이동·오른쪽 드래그 회전(네이버지도 웹 방식),
-    // 첫 화면 미리보기는 왼쪽 드래그로 둘러보기.
+    // One-finger/left drag pans; two-finger movement or right drag rotates.
     controls.mouseButtons.LEFT = value ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN;
     controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
+    keyboardPan.clear();
     entranceGroup.visible = !value;
     for (const { id, label } of labelObjects) {
       label.visible =
@@ -684,7 +688,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     );
   }
   // ===== 두 손가락 제스처 (지도 앱 방식) =====
-  // 벌리기/오므리기 = 확대·축소, 비틀기 = 방향 회전, 손가락 사이 지점 = 이동.
+  // 벌리기/오므리기 = 확대·축소, 함께 좌우 이동 = 회전.
   // 두 손가락을 함께 위아래로 밀면 기울기(위에서 보기 ↔ 비스듬히 보기)를 바꿉니다.
   const touchPoints = new Map(),
     upAxis = new THREE.Vector3(0, 1, 0),
@@ -715,9 +719,10 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     const f = twoFingers();
     gesture = { start: f, last: f, mode: null };
   }
-  function tilt(deltaPixels) {
+  function tilt(deltaPixels, horizontalPixels = 0) {
     const offset = camera.position.clone().sub(controls.target),
       s = new THREE.Spherical().setFromVector3(offset);
+    s.theta -= horizontalPixels * 0.004;
     // 위로 밀면 비스듬히(지평선 쪽), 아래로 밀면 위에서 내려다보는 쪽입니다.
     s.phi = THREE.MathUtils.clamp(
       s.phi - deltaPixels * 0.006,
@@ -757,35 +762,27 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     }
     controls.update();
   }
-  function transform(previous, next) {
-    let turn = next.angle - previous.angle;
-    if (turn > Math.PI) turn -= Math.PI * 2;
-    if (turn < -Math.PI) turn += Math.PI * 2;
-    moveCamera(
-      previous.mid,
-      next.mid,
-      previous.distance > 0 ? next.distance / previous.distance : 1,
-      turn,
-    );
+  function applyTouchGesture() {
+    touchFrame = null;
+    if (!gesture || touchPoints.size !== 2) return;
+    const f = twoFingers();
+    if (!gesture.mode) {
+      gesture.mode = touchGestureMode(gesture.start, f);
+      if (!gesture.mode) return;
+    }
+    if (gesture.mode === "zoom") {
+      moveCamera(
+        gesture.start.mid,
+        gesture.start.mid,
+        gesture.last.distance > 0 ? f.distance / gesture.last.distance : 1,
+      );
+    } else {
+      tilt(f.mid.y - gesture.last.mid.y, f.mid.x - gesture.last.mid.x);
+    }
+    gesture.last = f;
+    controls.update();
   }
-  function chooseMode(f) {
-    const { start } = gesture,
-      da = { x: f.a.x - start.a.x, y: f.a.y - start.a.y },
-      db = { x: f.b.x - start.b.x, y: f.b.y - start.b.y },
-      travel = Math.max(Math.hypot(da.x, da.y), Math.hypot(db.x, db.y));
-    if (travel < 10) return null;
-    let twist = Math.abs(f.angle - start.angle);
-    if (twist > Math.PI) twist = Math.PI * 2 - twist;
-    const sameVertical =
-        Math.sign(da.y) === Math.sign(db.y) &&
-        Math.abs(da.y) > Math.abs(da.x) * 1.5 &&
-        Math.abs(db.y) > Math.abs(db.x) * 1.5,
-      fingersSideBySide = Math.abs(Math.cos(start.angle)) > 0.6,
-      steady =
-        Math.abs(f.distance - start.distance) < start.distance * 0.12 &&
-        twist < 0.12;
-    return sameVertical && fingersSideBySide && steady ? "tilt" : "transform";
-  }
+  let touchFrame = null;
   const canvas = renderer.domElement;
   canvas.addEventListener("pointerdown", (e) => {
     if (e.pointerType !== "touch") return;
@@ -799,19 +796,15 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     if (!touchPoints.has(e.pointerId)) return;
     touchPoints.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (!gesture || touchPoints.size !== 2) return;
-    const f = twoFingers();
-    if (!gesture.mode) {
-      gesture.mode = chooseMode(f);
-      if (!gesture.mode) return;
-      // 판정 전까지 움직인 만큼도 반영해 손가락과 지도가 어긋나지 않게 합니다.
-      gesture.last = gesture.start;
-    }
-    if (gesture.mode === "tilt") tilt(f.mid.y - gesture.last.mid.y);
-    else transform(gesture.last, f);
-    gesture.last = f;
-    controls.update();
+    // Coalesce the two pointer events before interpreting a two-finger movement.
+    if (touchFrame === null)
+      touchFrame = requestAnimationFrame(applyTouchGesture);
   });
   function endTouch(e) {
+    if (touchFrame !== null) {
+      cancelAnimationFrame(touchFrame);
+      applyTouchGesture();
+    }
     if (!touchPoints.delete(e.pointerId)) return;
     if (touchPoints.size === 2) startGesture();
     else gesture = null;
@@ -820,8 +813,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   canvas.addEventListener("pointerup", endTouch);
   canvas.addEventListener("pointercancel", endTouch);
 
-  // ===== 마우스·트랙패드 (네이버지도 웹 방식) =====
-  // 왼쪽 드래그 = 이동, 휠·트랙패드 두 손가락 스크롤·오므리기 = 커서 기준 확대·축소,
+  // ===== 마우스·트랙패드 =====
+  // 왼쪽 드래그 = 이동, 휠·트랙패드 오므리기 = 확대·축소, 두 손가락 스크롤 = 회전·기울이기,
   // 더블클릭 = 확대, 오른쪽 드래그(트랙패드 두 손가락 클릭 드래그) = 회전·기울이기.
   let lastTrackpadWheel = -Infinity,
     safariGesture = null,
@@ -856,12 +849,11 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       if (homeMode && !mouseWheel) return;
       e.preventDefault();
       cancelAnimationFrame(zoomAnimation);
-      // 마우스 휠은 한 칸이 크고, 트랙패드는 작은 값이 촘촘히 들어옵니다.
-      moveCamera(
-        point,
-        point,
-        Math.exp(-e.deltaY * (mouseWheel ? 0.0015 : 0.005)),
-      );
+      if (mouseWheel) moveCamera(point, point, Math.exp(-e.deltaY * 0.0015));
+      else {
+        tilt(-e.deltaY, -e.deltaX);
+        controls.update();
+      }
     },
     { passive: false },
   );
@@ -904,6 +896,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     safariGesture = null;
   });
   renderer.domElement.addEventListener("pointerdown", (e) => {
+    renderer.domElement.focus({ preventScroll: true });
     down = { x: e.clientX, y: e.clientY };
   });
   // 편집 모드: 클릭·마우스 이동을 땅 위 좌표(x, z)로 편집기에 넘깁니다.
@@ -958,6 +951,12 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     raycaster.setFromCamera(mouse, camera);
     const hit = raycaster.intersectObjects(buildingMeshes)[0];
     if (hit) onSelect(hit.object.userData.building);
+  });
+  const keyboardPan = createKeyboardPan({
+    element: renderer.domElement,
+    camera,
+    controls,
+    isEnabled: () => !homeMode && !reporting && !editHandler,
   });
   renderer.domElement.addEventListener("keydown", (e) => {
     if (reporting && e.key === "Enter") {
@@ -1065,12 +1064,17 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   reset();
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const profiler = createMapProfiler(renderer, campusTrees, mapStartedAt);
-  let frame;
+  let frame,
+    previousFrameTime = 0;
   function animate(t) {
     frame = requestAnimationFrame(animate);
+    const deltaSeconds = previousFrameTime ? (t - previousFrameTime) / 1000 : 0;
+    previousFrameTime = t;
     if (document.hidden || !host.getBoundingClientRect().height) return;
     const profileStart = profiler?.begin(t);
+    keyboardPan.update(deltaSeconds);
     controls.update();
+    if (!homeMode) constrainNavigation(camera, controls);
     campusTrees.updateDetail(
       (renderer.domElement.clientHeight * camera.zoom) /
         (camera.top - camera.bottom),
@@ -1115,6 +1119,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       cancelAnimationFrame(frame);
       profiler?.dispose();
       observer.disconnect();
+      if (touchFrame !== null) cancelAnimationFrame(touchFrame);
+      keyboardPan.dispose();
       controls.dispose();
       scene.traverse((o) => {
         o.geometry?.dispose();
