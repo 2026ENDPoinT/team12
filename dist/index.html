@@ -356,10 +356,11 @@
           </div>
           <div id="gps-status" class="gps-status" role="status" hidden></div>
           <div id="report-picker" class="report-picker" hidden>
-            <b>공사 중인 도로를 직접 눌러주세요.</b>
+            <b>현재 위치(파란 점)에서 신고해요.</b>
             <p>
-              같은 구간에 신고가 쌓이면 주의(노란색)로 표시되고, 관리자가
-              확정하면 통행 막힘(빨간색)으로 바뀝니다.
+              다른 길이면 파란 점 30m 안의 길을 눌러 다시 고르세요. 같은 구역에
+              신고가 쌓이면 주의(노란색), 관리자가 확정하면 통행
+              막힘(빨간색)으로 바뀝니다.
             </p>
             <small
               >키보드: 지도에 초점을 두고 Enter를 누르면 화면 가운데 길을
@@ -435,17 +436,27 @@
           />
         </fieldset>
         <p class="report-scope"></p>
-        <label id="report-photo-field" class="report-photo-field">
-          <span>현장 사진 (필수) · 휴대폰에서는 카메라가 바로 열려요</span>
-          <input
-            type="file"
-            id="report-photo-input"
-            accept="image/*"
-            capture="environment"
-            required
-          />
-          <img id="report-photo-preview" alt="첨부한 사진 미리보기" hidden />
-        </label>
+        <div id="report-photo-field" class="report-photo-field">
+          <span>현장 사진 (필수) · 지금 이 자리에서 찍어 주세요</span>
+          <video
+            id="report-camera"
+            class="report-camera"
+            playsinline
+            muted
+            hidden
+          ></video>
+          <img id="report-photo-preview" alt="찍은 사진 미리보기" hidden />
+          <p
+            id="report-camera-error"
+            class="report-camera-error"
+            role="alert"
+            hidden
+          ></p>
+          <div class="camera-actions">
+            <button type="button" id="report-shoot" hidden>📷 촬영</button
+            ><button type="button" id="report-retake" hidden>다시 찍기</button>
+          </div>
+        </div>
         <img
           id="report-existing-photo"
           class="report-existing-photo"
@@ -525,16 +536,15 @@
         </p>
         <div class="indoor-options">
           <div>
-            <b>실내 지도 · 호실 검색</b><span>층별 3D 도면에서 호실을 찾고 경로 보기</span
+            <b>실내 지도 · 호실 검색</b
+            ><span>층별 3D 도면에서 호실을 찾고 경로 보기</span
             ><small>지하 1층 ~ 3층 · 계단 없는 길 안내</small
-            ><a id="indoor-link" hidden>실내 지도 열기 →</a
-            >
+            ><a id="indoor-link" hidden>실내 지도 열기 →</a>
           </div>
           <div>
             <b>AR 실내 안내</b><span>카메라 화면 위에 경로를 겹치기</span
             ><small>촬영한 미래관 사진으로 위치 인식</small
-            ><a id="ar-link" hidden>AR 데모 보기 →</a
-            >
+            ><a id="ar-link" hidden>AR 데모 보기 →</a>
           </div>
         </div>
         <p class="dialog-note">

@@ -105,13 +105,31 @@ export function sanitizeReports(value, edges = EDGES, nodes = NODES) {
       ...(typeof report.photoPath === "string"
         ? { photoPath: report.photoPath }
         : {}),
+      ...(report.gps &&
+      Number.isFinite(report.gps.x) &&
+      Number.isFinite(report.gps.z)
+        ? {
+            gps: {
+              x: report.gps.x,
+              z: report.gps.z,
+              accuracy: Number.isFinite(report.gps.accuracy)
+                ? report.gps.accuracy
+                : null,
+            },
+          }
+        : {}),
+      ...(typeof report.takenAt === "string"
+        ? { takenAt: report.takenAt }
+        : {}),
+      ...(report.confirmed === true ? { confirmed: true } : {}),
+      ...(report.isCover === true ? { isCover: true } : {}),
     });
   }
   return [...unique.values()];
 }
 // Supabase road_reports 행을 클라이언트 report 모양으로 바꿉니다. DB 컬럼은
 // snake_case(edge_id, point_x...), 클라이언트 쪽은 기존 로컬 데모와 같은
-// camelCase 모양을 그대로 써서 groupReportsByEdge 등 아래 함수들을 바꿀 필요가 없게 합니다.
+// camelCase 모양을 씁니다.
 export function rowToReport(row) {
   return {
     id: row.id,
@@ -122,6 +140,12 @@ export function rowToReport(row) {
     createdAt: row.created_at,
     ...(row.reporter_device_id ? { deviceId: row.reporter_device_id } : {}),
     ...(row.photo_path ? { photoPath: row.photo_path } : {}),
+    ...(row.gps_x != null && row.gps_z != null
+      ? { gps: { x: row.gps_x, z: row.gps_z, accuracy: row.gps_accuracy } }
+      : {}),
+    ...(row.taken_at ? { takenAt: row.taken_at } : {}),
+    ...(row.status === "confirmed" ? { confirmed: true } : {}),
+    ...(row.is_cover ? { isCover: true } : {}),
   };
 }
 // 신고 사유: 1. 공사 중 2. 장애물·통제 3. 기타(직접 입력)
@@ -170,54 +194,84 @@ export function sanitizeConfirmedEdges(value, edges = EDGES) {
   ].slice(0, 500);
 }
 
-// 같은 구간(edge)에 쌓인 신고를 하나로 묶어 개수·최신 시각을 셉니다.
-export function groupReportsByEdge(reports) {
-  const groups = new Map();
-  for (const report of sanitizeReports(reports)) {
-    const group = groups.get(report.edgeId) || {
-      edgeId: report.edgeId,
-      reports: [],
-    };
-    group.reports.push(report);
-    groups.set(report.edgeId, group);
-  }
-  for (const group of groups.values()) {
-    // 같은 기기가 여러 번 신고해도 1건으로 셉니다. 기기 ID가 없는 신고는 각각 1건입니다.
-    group.count = new Set(group.reports.map((r) => r.deviceId || r.id)).size;
-    group.latestAt = group.reports.reduce(
-      (latest, r) =>
-        Date.parse(r.createdAt) > Date.parse(latest) ? r.createdAt : latest,
-      group.reports[0].createdAt,
-    );
-  }
-  return groups;
+// 신고 위치끼리 이 거리(m) 안이면 같은 구역으로 묶습니다. 이웃의 이웃도 같은 구역입니다.
+export const CLUSTER_RADIUS = 30;
+
+// 촬영한 GPS 위치에서 신고 지점까지 거리(m). GPS 정보가 없는 예전 신고는 null.
+export const gpsDistance = (report) =>
+  report.gps
+    ? Math.hypot(report.point.x - report.gps.x, report.point.z - report.gps.z)
+    : null;
+
+// 대표 사진: 관리자가 고른 것(isCover) → 사진이 있는 신고 중 촬영 위치가 신고 지점에서
+// 30m 안인 가장 최근 신고 → 그다음 사진이 있는 가장 최근 신고.
+export function pickCover(reports) {
+  const newest = [...reports].sort(
+    (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+  );
+  const withPhoto = newest.filter((r) => r.photoPath);
+  return (
+    withPhoto.find((r) => r.isCover) ||
+    withPhoto.find((r) => {
+      const d = gpsDistance(r);
+      return d !== null && d <= CLUSTER_RADIUS;
+    }) ||
+    withPhoto[0] ||
+    newest[0]
+  );
 }
 
-// pending(신고 접수, 지도엔 안 보임) → caution(threshold 이상, 노란색)
+// 신고를 구역으로 묶습니다. 구역 상태:
+// pending(신고 접수, 지도엔 안 보임) → caution(서로 다른 기기 threshold 이상, 노란색)
 // → confirmed(관리자 확정, 빨간색 차단).
-export function edgeStatus(
-  edgeId,
-  groups,
-  confirmedEdges,
-  threshold = REPORT_THRESHOLD,
-) {
-  if (confirmedEdges.includes(edgeId)) return "confirmed";
-  const count = groups.get(edgeId)?.count || 0;
-  if (count >= threshold) return "caution";
-  return count ? "pending" : "none";
-}
-
-// 관리자 검토 화면에 띄울 구간 목록입니다. 1건부터 전부 보이며(확정된 구간은 제외).
-// needsReview: threshold 이상 쌓여 관리자 확인이 필요하다고 알려야 하는 구간.
-export function reviewGroups(
+// ponytail: 모든 쌍 비교 O(n²). 신고는 최대 500건이라 충분합니다.
+export function clusterReports(
   reports,
-  confirmedEdges,
+  radius = CLUSTER_RADIUS,
   threshold = REPORT_THRESHOLD,
 ) {
-  const groups = groupReportsByEdge(reports);
-  return [...groups.values()]
-    .filter((g) => !confirmedEdges.includes(g.edgeId))
-    .map((g) => ({ ...g, needsReview: g.count >= threshold }))
+  const list = sanitizeReports(reports);
+  const parent = list.map((_, i) => i);
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  for (let i = 0; i < list.length; i++)
+    for (let j = i + 1; j < list.length; j++) {
+      const a = list[i].point,
+        b = list[j].point;
+      if (Math.hypot(a.x - b.x, a.z - b.z) <= radius) parent[find(i)] = find(j);
+    }
+  const byRoot = new Map();
+  list.forEach((r, i) => {
+    const root = find(i);
+    byRoot.set(root, [...(byRoot.get(root) || []), r]);
+  });
+  return [...byRoot.values()]
+    .map((members) => {
+      // 같은 기기가 여러 번 신고해도 1건으로 셉니다. 기기 ID가 없는 신고는 각각 1건입니다.
+      const count = new Set(members.map((r) => r.deviceId || r.id)).size;
+      const cover = pickCover(members);
+      const status = members.some((r) => r.confirmed)
+        ? "confirmed"
+        : count >= threshold
+          ? "caution"
+          : "pending";
+      return {
+        // 구역 id는 가장 오래된 신고 id로 정해 새로고침해도 같게 둡니다.
+        id: [...members].sort(
+          (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
+        )[0].id,
+        reports: members,
+        count,
+        status,
+        needsReview: status === "caution",
+        cover,
+        edgeIds: [...new Set(members.map((r) => r.edgeId))],
+        latestAt: members.reduce(
+          (latest, r) =>
+            Date.parse(r.createdAt) > Date.parse(latest) ? r.createdAt : latest,
+          members[0].createdAt,
+        ),
+      };
+    })
     .sort(
       (a, b) =>
         Number(b.needsReview) - Number(a.needsReview) ||
@@ -226,16 +280,8 @@ export function reviewGroups(
     );
 }
 
-// 관리자 알림용: 지금 검토가 필요한(threshold 이상 쌓인) 구간 수.
-export function reviewAlertCount(
-  reports,
-  confirmedEdges,
-  threshold = REPORT_THRESHOLD,
-) {
-  return reviewGroups(reports, confirmedEdges, threshold).filter(
-    (g) => g.needsReview,
-  ).length;
-}
+export const clusterOf = (reportId, clusters) =>
+  clusters.find((c) => c.reports.some((r) => r.id === reportId));
 
 // 관리자가 확정한 구간만 경로에서 제외합니다. 신고가 쌓인 것만으로는 막지 않습니다.
 export function availableEdges(confirmedEdges, edges = EDGES) {
