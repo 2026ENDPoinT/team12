@@ -8601,3 +8601,17 @@ body:has(#map-view.map-night) .shortcut-dialog {
   height: auto;
   border: 0;
 }
+
+/* 위치 추적 말풍선: 다른 지도 버튼과 맞춰 알약 모양으로 */
+.gps-status {
+  border-radius: 999px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* 데스크톱: GIS 현황을 빼면서 길찾기 패널이 짧아져, 패널 아래로 지도 안내 카드가 비치지 않게 패널이 열린 동안 숨깁니다. */
+@media (min-width: 761px) {
+  .map-view:not(.panel-closed) .map-overlay-heading {
+    display: none;
+  }
+}

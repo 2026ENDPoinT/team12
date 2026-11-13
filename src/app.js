@@ -114,10 +114,6 @@ let reports = [],
   // 30m 안 신고를 묶은 구역 (loadReports에서 다시 계산)
   clusters = [];
 const GIS_SUMMARY = gisSummary(CAMPUS_GEOMETRY, ENTRANCES);
-for (const [key, value] of Object.entries(GIS_SUMMARY)) {
-  const element = document.querySelector(`[data-gis-count="${key}"]`);
-  if (element) element.textContent = value.toLocaleString("ko-KR");
-}
 $(".map-data-status").textContent =
   `건물 ${GIS_SUMMARY.buildings} · 등록 출입구 ${GIS_SUMMARY.entrances}`;
 const normalize = normalizeSearch;
