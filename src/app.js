@@ -1167,7 +1167,9 @@ $("#v2-report").onclick = () =>
   setReportsPanel($("#reports-panel").hidden);
 $("#v2-admin").onclick = () => $("#admin-toggle").click();
 function syncAdminButton() {
-  $("#v2-admin").hidden = $("#admin-toggle").hidden;
+  const hidden = $("#admin-toggle").hidden;
+  $("#v2-admin").hidden = hidden;
+  side("alerts").hidden = hidden;
 }
 syncAdminButton();
 new MutationObserver(syncAdminButton).observe($("#admin-toggle"), {
