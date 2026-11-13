@@ -1023,6 +1023,15 @@ a {
   background: var(--lime);
   color: var(--ink);
 }
+.route-summary .note {
+  flex-basis: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8a5a00;
+  background: #fff4d6;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
 .route-summary .chip.elev {
   background: #e4dcff;
   color: var(--deep);

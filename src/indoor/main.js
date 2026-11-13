@@ -449,9 +449,7 @@ function computeRoute() {
       el(
         "span",
         "warn",
-        state.mode === "elevator"
-          ? `계단 없이 ${floorName(d.f)}에 갈 수 있는 길이 등록되어 있지 않아요. (지하 1층은 계단으로만 연결돼요)`
-          : "경로를 찾지 못했어요.",
+        "경로를 찾지 못했어요.",
       ),
     );
     $("#ar-open").disabled = $("#walk-open").disabled = true;
@@ -476,6 +474,19 @@ function computeRoute() {
           `${st.kind === "elev" ? "엘리베이터" : "계단"} ${floorLabel(st.f)}→${floorLabel(st.to)}`,
         ),
       );
+  // 계단 없이 골랐지만 엘리베이터가 닿지 않는 층이 있어 계단을 쓰는 경우 알림
+  if (state.mode === "elevator" && r.stairFloors) {
+    const parts = state.steps
+      .filter((st) => st.kind === "stair")
+      .map((st) => `${floorLabel(st.f)}→${floorLabel(st.to)}`);
+    sum.append(
+      el(
+        "span",
+        "note",
+        `엘리베이터가 닿지 않는 층이 있어 ${parts.join(", ")} 구간만 계단을 이용해요`,
+      ),
+    );
+  }
   renderSteps();
   $("#sheet").scrollTop = 0;
   view.showRoute(r, d, state.steps);

@@ -66,17 +66,33 @@ test("multi-floor route from the lobby reaches 313 with stairs", () => {
   assert.match(steps.at(-1).text, /313호 도착/);
 });
 
-test("step-free mode uses only elevators and reports unreachable B1", () => {
+test("step-free mode uses only elevators where they reach", () => {
   const r = I.routeTo(start, I.findDest("3:313"), { mode: "elevator" });
   assert.ok(r);
   assert.ok(
     r.vertical.length > 0 && r.vertical.every((l) => l.kind === "elev"),
   );
-  assert.equal(
-    I.routeTo(start, I.findDest("0:B104"), { mode: "elevator" }),
-    null,
-  );
-  assert.ok(I.routeTo(start, I.findDest("0:B104"), { mode: "stairs" }));
+  assert.equal(r.stairFloors, 0);
+});
+
+test("step-free mode falls back to the fewest stairs (313 → B104)", () => {
+  const d313 = I.findDest("3:313");
+  const from = { f: 3, x: d313.doors[0][0], y: d313.doors[0][1] };
+  const r = I.routeTo(from, I.findDest("0:B104"), { mode: "elevator" });
+  assert.ok(r, "route exists");
+  // 엘리베이터로 1층까지, B1은 엘리베이터가 없으므로 계단 한 개 층만
+  assert.equal(r.stairFloors, 1);
+  const kinds = r.vertical.map((l) => `${l.kind}${l.from}>${l.to}`);
+  assert.deepEqual(kinds, ["elev3>1", "stair1>0"]);
+  // 빠른 길은 그대로 계단
+  const fast = I.routeTo(from, I.findDest("0:B104"), { mode: "stairs" });
+  assert.ok(fast.stairFloors >= 3);
+  // 모든 목적지에 계단 없이 경로가 나오고, 계단은 꼭 필요한 B1 구간만
+  for (const d of I.destinations) {
+    const x = I.routeTo(from, d, { mode: "elevator" });
+    assert.ok(x, d.key);
+    assert.ok(x.stairFloors <= (d.f === 0 ? 1 : 0), d.key);
+  }
 });
 
 test("route does not cut through other rooms when a corridor exists", () => {

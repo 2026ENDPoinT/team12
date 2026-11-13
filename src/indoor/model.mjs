@@ -5,6 +5,8 @@
 const K = 3; // 경로 탐색 격자: 원본 0.15m 칸 3개 = 0.45m
 const ROOM_COST = 4; // 목적지가 아닌 방 안을 지나갈 때 거리 가중치 (복도 우선)
 const STAIR_EXTRA = 4; // 계단 한 번에 더하는 비용(m)
+// 계단 없이 모드: 엘리베이터가 닿지 않는 층(B1 등)만 계단을 쓰도록 계단 한 개 층마다 큰 비용
+const STAIR_AVOID = 2000;
 const ELEV_WAIT = 40; // 엘리베이터 대기·탑승 비용(m 환산, 약 30초)
 const ELEV_PER_FLOOR = 3;
 
@@ -276,7 +278,6 @@ export function createIndoor(M) {
     D[S] = 0;
     const linkAt = new Map();
     links.forEach((l, k) => {
-      if (mode === "elevator" && l.kind === "stair") return;
       const A = fi(l.fa) * NPF + l.ca,
         B = fi(l.fb) * NPF + l.cb;
       (linkAt.get(A) || linkAt.set(A, []).get(A)).push([B, k]);
@@ -355,7 +356,10 @@ export function createIndoor(M) {
       const ls = linkAt.get(u);
       if (ls)
         for (const [v, k] of ls) {
-          const nd = d + links[k].cost;
+          const nd =
+            d +
+            links[k].cost +
+            (mode === "elevator" && links[k].kind === "stair" ? STAIR_AVOID : 0);
           if (nd < D[v]) {
             D[v] = nd;
             prev[v] = u;
@@ -449,7 +453,11 @@ export function createIndoor(M) {
       if (!(pts[i].kind === "elev" && pts[i - 1].kind === "elev"))
         len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
     const vertical = legs.filter((l) => l.kind !== "walk");
-    return { pts, legs, len, cost: D[hit], target, vertical, mode };
+    // 계단으로 오르내린 층 수(계단 없이 모드에서 피할 수 없었던 구간 안내용)
+    const stairFloors = vertical
+      .filter((l) => l.kind === "stair")
+      .reduce((n, l) => n + Math.abs(l.to - l.from), 0);
+    return { pts, legs, len, cost: D[hit], target, vertical, mode, stairFloors };
   }
 
   // 같은 층 걷기 구간: 시야가 트인 점만 남기는 줄당기기
