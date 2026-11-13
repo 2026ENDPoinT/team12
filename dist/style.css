@@ -7467,13 +7467,23 @@ body {
   font: inherit;
   font-size: 13px;
 }
-#admin-dialog .work-form button {
+#admin-dialog .work-form button,
+#admin-dialog #photo-cleanup {
   min-height: 46px;
   border: 0;
   border-radius: 999px;
   background: var(--lime);
   color: var(--v2-ink);
   font-weight: 800;
+}
+/* 사진 정리 (관리자): 공사 등록 버튼과 같은 모양 */
+#admin-dialog #photo-cleanup {
+  width: 100%;
+  margin-top: 4px;
+}
+#admin-dialog #photo-cleanup:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 
 @media (max-width: 760px) {
@@ -7924,4 +7934,92 @@ body {
     font-size: 32px;
     pointer-events: none;
   }
+}
+
+/* Night palette for campus controls and map overlays. */
+#map-view.map-night {
+  --v2-ink: #f4f7ff;
+  --v2-muted: #bcc9e0;
+  --v2-accent-text: #d8ff87;
+  --v2-stroke: #8294b45c;
+  --v2-glass: #202a40;
+  --v2-glass-strong: #202a40;
+  --v2-glass-bg: #202a40;
+  --v2-sheet: #202a40;
+  --v2-tile: #2e3a53;
+  --ink: var(--v2-ink);
+  --violet: #a88bff;
+  --night-control: #2e3a53;
+  color-scheme: dark;
+  color: var(--v2-ink);
+  background: #161e33;
+}
+#map-view.map-night :is(
+  .map-sidebar, .map-topbar, .route-panel, .route-summary-bar, .result-card,
+  .building-card, .map-overlay-heading, .building-results, .place-suggestions,
+  #reports-panel, .map-legend, .map-instructions, .building-popover,
+  .v2-dimension, .v2-zoom, .v2-map-controls > button
+),
+#map-view.map-night :is(.map-topbar, .result-panel, .route-panel)::before {
+  color: var(--v2-ink);
+  background: var(--v2-glass);
+  border-color: var(--v2-stroke);
+  text-shadow: none;
+}
+#map-view.map-night :is(
+  .building-search, .journey-form, .building-card-stats > span, .building-card-actions button,
+  .mode-tabs button, .field-clear, .swap-places, #back-home, #panel-toggle,
+  #building-card-close, #route-panel-close, .road-reports li, .route-card,
+  .building-option-icon
+) {
+  color: var(--v2-ink);
+  background: var(--night-control);
+  border-color: var(--v2-stroke);
+}
+#map-view.map-night :is(input, select, .place-suggestions li, .building-option) {
+  color: var(--v2-ink);
+}
+#map-view.map-night input::placeholder {
+  color: var(--v2-muted);
+  opacity: 1;
+}
+#map-view.map-night :is(.map-attribution, .map-school-name, .map-legend, .map-data-status) {
+  color: var(--v2-muted);
+}
+#map-view.map-night :is(
+  .map-sidebar > button[aria-pressed="true"], .v2-map-controls > button[aria-pressed="true"],
+  .v2-dimension button[aria-pressed="true"], .mode-tabs button.active,
+  .building-card-actions .primary, .result-card-primary, .map-live,
+  .building-card-icon
+) {
+  color: #15212b;
+  background: var(--lime);
+}
+#map-view.map-night :is(.mode-tabs button.active, .result-card-primary) :is(small, span, b) {
+  color: inherit;
+}
+#map-view.map-night .building-card-indoor {
+  background: #6840ec;
+  color: #fff;
+}
+#map-view.map-night :is(.building-option, .place-suggestions li):is(:hover, [aria-selected="true"]) {
+  background: #3b4966;
+  color: var(--v2-ink);
+}
+#map-view.map-night .campus-map .building-label {
+  background: #202a40;
+  color: #f4f7ff;
+  border-color: #8294b47a;
+  text-shadow: none;
+}
+#map-view.map-night .campus-map .building-label:is(.is-selected, .destination) {
+  background: #3b3266;
+  color: #fff;
+  border-color: #b49aff;
+}
+
+#map-view.map-night .map-overlay-heading .map-data-status {
+  color: #f4f7ff;
+  background: var(--night-control);
+  border-color: var(--v2-stroke);
 }

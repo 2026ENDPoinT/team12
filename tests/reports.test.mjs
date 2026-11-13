@@ -357,3 +357,23 @@ test("GPS shot position flows from DB rows and drives the auto-picked cover", ()
     });
   assert.equal(pickCover([near, far]).id, "near");
 });
+
+test("orphanPhotos picks only old photos that no report points to", async () => {
+  const { orphanPhotos } = await import("../src/reports.mjs");
+  const now = Date.parse("2026-11-14T12:00:00Z");
+  const files = [
+    { path: "dev1/1.jpg", createdAt: "2026-11-12T12:00:00Z" }, // 오래됨 + 신고 있음 → 남김
+    { path: "dev1/2.jpg", createdAt: "2026-11-12T12:00:00Z" }, // 오래됨 + 신고 없음 → 지움
+    { path: "dev2/3.png", createdAt: "2026-11-14T11:00:00Z" }, // 1시간 전(신고 저장 중일 수 있음) → 남김
+    { path: "dev2/4.png", createdAt: "날짜 없음" }, // 날짜를 모르면 → 남김
+    { path: "", createdAt: "2026-11-01T00:00:00Z" }, // 경로 없음 → 무시
+  ];
+  assert.deepEqual(orphanPhotos(files, ["dev1/1.jpg", null], { now }), [
+    "dev1/2.jpg",
+  ]);
+  assert.deepEqual(
+    orphanPhotos(files, [], { now, minAgeMs: 0 }).sort(),
+    ["dev1/1.jpg", "dev1/2.jpg", "dev2/3.png"],
+  );
+  assert.deepEqual(orphanPhotos(null, null), []);
+});

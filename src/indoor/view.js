@@ -33,6 +33,9 @@ export function createView(el, indoor, { onPick } = {}) {
     powerPreference: "high-performance",
   });
   renderer.setPixelRatio(PR_HIGH);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.autoUpdate = false;
   let pr = PR_HIGH,
     lastMove = -1e9;
   function setPR(v) {
@@ -54,11 +57,23 @@ export function createView(el, indoor, { onPick } = {}) {
   el.appendChild(lr.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xeef0f6);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xe6e0d2, LIGHTING.hemi));
-  const sun = new THREE.DirectionalLight(0xffffff, LIGHTING.sun);
-  sun.position.set(30, 80, 20);
+  scene.background = new THREE.Color(0xecebe8);
+  const ambient = new THREE.HemisphereLight(0xffffff, 0xe6e0d2, 0.82);
+  scene.add(ambient);
+  const sun = new THREE.DirectionalLight(0xffffff, 0.88);
+  sun.position.set(-45, 85, 50);
   scene.add(sun);
+  const daylight = new THREE.DirectionalLight(0xfff3e0, 0.45);
+  daylight.position.set(40, 45, -30);
+  scene.add(daylight);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, {
+    left: -82, right: 82, top: 84, bottom: -84, near: 1, far: 195,
+  });
+  sun.shadow.camera.updateProjectionMatrix();
+  sun.shadow.normalBias = 0.09;
+  sun.shadow.bias = -0.0002;
 
   const cam = new THREE.PerspectiveCamera(38, 1, 0.5, 2000);
   const fp = new THREE.PerspectiveCamera(70, 1, 0.08, 600);
@@ -77,6 +92,7 @@ export function createView(el, indoor, { onPick } = {}) {
     dirty = true;
   const nodes = {};
   const floorBounds = new Map();
+  const floorFinishes = new Map();
   const meshBaseHeight = new Map();
   let floorOverview = false;
   let overviewCamera = null;
@@ -150,8 +166,9 @@ export function createView(el, indoor, { onPick } = {}) {
           roughness: 0.9,
           side: THREE.DoubleSide,
         });
-      } else
-        texturize(
+      } else {
+        const n = +o.name.slice(1);
+        const finishes = texturize(
           o,
           renderer,
           // D<층>: 벽·바닥과 같은 평면에 붙은 문짝·걸레받이·바닥 무늬(scripts/clean-mirae.py).
@@ -163,8 +180,15 @@ export function createView(el, indoor, { onPick } = {}) {
                 polygonOffsetUnits: -4,
               }
             : {},
-          { elevDoors: elevDoorsOf(+o.name.slice(1)) },
+          { elevDoors: elevDoorsOf(n), floorHeight: M.floors.find((f) => f.n === n)?.z },
         );
+        if (finishes) {
+          floorFinishes.set(o, finishes);
+          o.material = finishes.cutaway;
+        }
+      }
+      o.castShadow = /^[FD]/.test(o.name);
+      o.receiveShadow = o.castShadow;
       nodes[o.name] = o;
       meshBaseHeight.set(o, o.position.y);
     });
@@ -305,6 +329,8 @@ export function createView(el, indoor, { onPick } = {}) {
   }
 
   function applyVisibility() {
+    sun.castShadow = !firstPerson && !floorOverview;
+    renderer.shadowMap.needsUpdate = true;
     facilityGroup.visible = !firstPerson && !floorOverview;
     me.visible = !firstPerson && !floorOverview && me.userData.floor === floor;
     for (const label of labels) {
@@ -1052,6 +1078,13 @@ export function createView(el, indoor, { onPick } = {}) {
   function setFirstPerson(on) {
     firstPerson = on;
     ctl.enabled = !on;
+    scene.background.setHex(on ? 0xeef0f6 : 0xecebe8);
+    ambient.intensity = on ? LIGHTING.hemi : 0.82;
+    sun.intensity = on ? LIGHTING.sun : 0.88;
+    sun.position.set(...(on ? [30, 80, 20] : [-45, 85, 50]));
+    daylight.visible = !on;
+    for (const [mesh, finishes] of floorFinishes)
+      mesh.material = on ? finishes.firstPerson : finishes.cutaway;
     // 위에서 내려다볼 때는 바닥이 칙칙해 보이지 않게 조금 더 밝게
     renderer.toneMappingExposure = on
       ? LIGHTING.exposure

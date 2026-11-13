@@ -1,3 +1,4 @@
+import { createStreetLights, windowLights } from "./map/night-lighting.mjs";
 import { touchGestureMode } from "./map/touch-gesture.mjs";
 import { cameraOffsetForHeading, smoothHeading, headingDelta } from "./heading.mjs";
 import { createNavigationBounds } from "./map/navigation-bounds.mjs";
@@ -86,7 +87,8 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     "position:absolute;inset:0;pointer-events:none;overflow:hidden";
   host.append(renderer.domElement, labels.domElement);
   // Softer sky fill and a stronger sun give surfaces a clear light/shade split.
-  scene.add(new THREE.HemisphereLight(0xeaf2ff, 0x899579, 1.15));
+  const sky = new THREE.HemisphereLight(0xeaf2ff, 0x899579, 1.15);
+  scene.add(sky);
   const sun = new THREE.DirectionalLight(0xfff2da, 2.65);
   sun.position.set(-450, 750, 550);
   sun.castShadow = true;
@@ -281,6 +283,19 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     }),
   );
   scene.add(createRoadLayer(CAMPUS_GEOMETRY.roads, crosswalkLines));
+  const streetLights = createStreetLights(CAMPUS_GEOMETRY.roads);
+  scene.add(streetLights);
+  function setNightMode(enabled) {
+    scene.background = enabled ? new THREE.Color(0x161e33) : null;
+    sky.color.setHex(enabled ? 0x9ab4f4 : 0xeaf2ff);
+    sky.groundColor.setHex(enabled ? 0x48556f : 0x899579);
+    sky.intensity = enabled ? 0.65 : 1.15;
+    sun.color.setHex(enabled ? 0xa6bbff : 0xfff2da);
+    sun.intensity = enabled ? 0.45 : 2.65;
+    streetLights.visible = enabled;
+    windowLights.value = enabled ? 1 : 0;
+  }
+
   const buildingLayer = createBuildingLayer(BUILDINGS, ENTRANCES);
   scene.add(buildingLayer.group);
   const buildingMeshes = buildingLayer.pickables,
@@ -1297,6 +1312,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   });
   return {
     moveTo,
+    setNightMode,
     flyIntoBuilding,
     restoreBuildingFlight,
     // 편집 모드 전용: 보행 그래프 디버그 오버레이. graph가 null이면 끕니다.

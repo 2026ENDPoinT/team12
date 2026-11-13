@@ -22,6 +22,7 @@ import {
   getDeviceId,
   confirmReportRows,
   deleteReportRows,
+  cleanupOrphanPhotos,
   uploadReportPhoto,
   photoUrlFor,
   fetchWorkRows,
@@ -1295,6 +1296,14 @@ $("#v2-3d").onclick = () => setDimension(false);
 $("#v2-plus").onclick = () => map?.zoom(1.18);
 $("#v2-minus").onclick = () => map?.zoom(1 / 1.18);
 $("#v2-locate").onclick = () => $("#gps-toggle").click();
+const nightToggle = $("#v2-night");
+nightToggle.disabled = !map;
+nightToggle.onclick = () => {
+  const enabled = nightToggle.getAttribute("aria-pressed") !== "true";
+  map?.setNightMode(enabled);
+  $("#map-view").classList.toggle("map-night", enabled);
+  nightToggle.setAttribute("aria-pressed", String(enabled));
+};
 $("#v2-reset").onclick = () => setDimension(false);
 
 // ===== 트랙패드 확대 제스처로 페이지가 커지지 않게 합니다(표지·지도 화면 모두) =====
@@ -2422,6 +2431,26 @@ $("#work-form").onsubmit = async (e) => {
   await loadWorks();
 };
 loadWorks();
+
+// 관리자 "사진 정리": 신고와 연결되지 않은 지 하루 넘은 사진을 Storage에서 지웁니다.
+$("#photo-cleanup").onclick = async () => {
+  const button = $("#photo-cleanup"),
+    status = $("#photo-cleanup-status");
+  button.disabled = true;
+  status.hidden = false;
+  status.textContent = "사진을 확인하고 있어요…";
+  try {
+    const { checked, removed } = await cleanupOrphanPhotos();
+    status.textContent = removed
+      ? `사진 ${checked}장 중 남아 있던 ${removed}장을 지웠어요.`
+      : `사진 ${checked}장을 확인했어요. 지울 사진이 없어요.`;
+  } catch {
+    status.textContent =
+      "사진 정리에 실패했어요. 관리자 로그인을 확인해주세요.";
+  } finally {
+    button.disabled = false;
+  }
+};
 
 // 다른 사람(사용자↔관리자)이 바꾼 내용을 가져옵니다. 10초마다, 그리고 탭으로 돌아올 때 다시 읽습니다.
 // 신고 창이 열려 있거나 위치를 고르는 중에는 선택이 지워지지 않게 건너뜁니다.
