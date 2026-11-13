@@ -6,6 +6,7 @@ import {
   buildSteps,
   routeMetrics,
   progressOn,
+  pointAt,
   nextStep,
 } from "../src/indoor/guide.mjs";
 import { createAlign } from "../src/indoor/align.mjs";
@@ -65,17 +66,34 @@ test("multi-floor route from the lobby reaches 313 with stairs", () => {
   assert.match(steps.at(-1).text, /313호 도착/);
 });
 
-test("step-free mode uses only elevators and reports unreachable B1", () => {
+test("step-free mode uses only elevators where they reach", () => {
   const r = I.routeTo(start, I.findDest("3:313"), { mode: "elevator" });
   assert.ok(r);
   assert.ok(
     r.vertical.length > 0 && r.vertical.every((l) => l.kind === "elev"),
   );
-  assert.equal(
-    I.routeTo(start, I.findDest("0:B104"), { mode: "elevator" }),
-    null,
-  );
-  assert.ok(I.routeTo(start, I.findDest("0:B104"), { mode: "stairs" }));
+  assert.equal(r.stairFloors, 0);
+});
+
+test("step-free mode falls back to the fewest stairs (313 → B104)", () => {
+  const d313 = I.findDest("3:313");
+  const from = { f: 3, x: d313.doors[0][0], y: d313.doors[0][1] };
+  const r = I.routeTo(from, I.findDest("0:B104"), { mode: "elevator" });
+  assert.ok(r, "route exists");
+  // 엘리베이터로 1층까지, B1은 엘리베이터가 없으므로 계단 한 개 층만
+  assert.equal(r.stairFloors, 1);
+  const kinds = r.vertical.map((l) => `${l.kind}${l.from}>${l.to}`);
+  assert.deepEqual(kinds, ["elev3>1", "stair1>0"]);
+  // 빠른 길도 계단 3개 층 이상이면 엘리베이터 우선 → 같은 경로
+  const fast = I.routeTo(from, I.findDest("0:B104"), { mode: "stairs" });
+  assert.ok(fast.preferElev);
+  assert.equal(fast.stairFloors, 1);
+  // 모든 목적지에 계단 없이 경로가 나오고, 계단은 꼭 필요한 B1 구간만
+  for (const d of I.destinations) {
+    const x = I.routeTo(from, d, { mode: "elevator" });
+    assert.ok(x, d.key);
+    assert.ok(x.stairFloors <= (d.f === 0 ? 1 : 0), d.key);
+  }
 });
 
 test("route does not cut through other rooms when a corridor exists", () => {
@@ -132,4 +150,128 @@ test("offset and yaw conversions are inverse", () => {
   for (const yaw of [-170, -30, 0, 45, 179])
     for (const o of [0, 7.5, 14, 28])
       assert.ok(Math.abs(L.yawToOffset(yaw, L.offsetToYaw(yaw, o)) - o) < 1e-9);
+});
+
+// ---- 안내 문구가 실제 경로와 맞는지 (v2)
+const cases = [
+  ["3:313", "stairs"],
+  ["2:228", "stairs"],
+  ["1:125", "stairs"],
+  ["3:330", "elevator"],
+  ["2:216", "elevator"],
+  ["0:B104", "stairs"],
+];
+const turnAt = (r, cum, s) => {
+  const p = (v) => pointAt(r, cum, Math.max(0, Math.min(cum.at(-1), v)));
+  const a = p(s - 3),
+    b = p(s),
+    c = p(s + 3);
+  let d =
+    (Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(b.y - a.y, b.x - a.x)) *
+    (180 / Math.PI);
+  while (d > 180) d -= 360;
+  while (d < -180) d += 360;
+  return d;
+};
+
+test("guidance steps follow the route order and skip trivial 1m steps", () => {
+  for (const [key, mode] of cases) {
+    const d = I.findDest(key);
+    const r = I.routeTo(start, d, { mode });
+    const steps = buildSteps(r, d, { landmarks: I.destinations });
+    for (let i = 1; i < steps.length; i++)
+      assert.ok(steps[i].s >= steps[i - 1].s - 1e-6, `${key} order`);
+    for (const st of steps.slice(1, -1))
+      if (st.kind === "walk")
+        assert.ok(
+          st.dist >= 2.4,
+          `${key}: "${st.text}" ${st.dist.toFixed(1)}m`,
+        );
+    assert.equal(steps.at(-1).kind, "arrive");
+  }
+});
+
+test("announced turn direction matches the path geometry", () => {
+  for (const [key, mode] of cases) {
+    const d = I.findDest(key);
+    const r = I.routeTo(start, d, { mode });
+    const cum = routeMetrics(r);
+    const steps = buildSteps(r, d, { landmarks: I.destinations });
+    for (const st of steps) {
+      if (st.kind !== "walk" || st.exit) continue;
+      const g = turnAt(r, cum, st.s);
+      if (st.dir.includes("left"))
+        assert.ok(g > 20, `${key}: "${st.text}" but geometry ${g.toFixed(0)}°`);
+      if (st.dir.includes("right"))
+        assert.ok(
+          g < -20,
+          `${key}: "${st.text}" but geometry ${g.toFixed(0)}°`,
+        );
+    }
+  }
+});
+
+test("lobby to 228 announces the turns the old guidance dropped", () => {
+  const d = I.findDest("2:228");
+  const steps = buildSteps(I.routeTo(start, d), d, {
+    landmarks: I.destinations,
+  });
+  const walkTurns = steps.filter(
+    (s) => s.kind === "walk" && s.dir !== "straight",
+  );
+  assert.ok(walkTurns.length >= 2, steps.map((s) => s.text).join(" | "));
+  assert.ok(steps.some((s) => s.exit === "stair"));
+});
+
+test("elevator ride has floor info and an exit direction", () => {
+  const d = I.findDest("3:330");
+  const r = I.routeTo(start, d, { mode: "elevator" });
+  const steps = buildSteps(r, d, { landmarks: I.destinations });
+  const ev = steps.find((s) => s.kind === "elev");
+  assert.equal(ev.to, 3);
+  assert.match(ev.text, /엘리베이터를 타고 3층으로/);
+  const exit = steps.find((s) => s.exit === "elev");
+  assert.ok(exit);
+  assert.match(exit.text, /엘리베이터에서 내려/);
+});
+
+test("route stops in front of the destination door, outside the room", () => {
+  const inPoly = (P, x, y) => {
+    let c = false;
+    for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+      const [xi, yi] = P[i],
+        [xj, yj] = P[j];
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)
+        c = !c;
+    }
+    return c;
+  };
+  for (const d of I.destinations) {
+    const r = I.routeTo(start, d);
+    assert.ok(r, d.key);
+    const e = r.pts.at(-1),
+      door = r.target.door;
+    const gap = Math.hypot(e.x - door[0], e.y - door[1]);
+    assert.ok(gap > 0.3 && gap < 1.3, `${d.key} gap ${gap}`);
+    const room = M.floors
+      .find((f) => f.n === d.f)
+      .rooms.filter((rm) => rm.id === d.id);
+    assert.ok(!room.some((rm) => inPoly(rm.poly, e.x, e.y)), `${d.key} inside`);
+  }
+});
+
+test("fast route keeps stairs for 1–2 floors, prefers elevator for 3+", () => {
+  for (const d of I.destinations) {
+    for (const f of [0, 1, 2, 3]) {
+      const src = I.destinations.find((x) => x.f === f && x.numbered);
+      if (!src) continue;
+      const from = { f, x: src.doors[0][0], y: src.doors[0][1] };
+      const r = I.routeTo(from, d, { mode: "stairs" });
+      assert.ok(r, `${src.key}→${d.key}`);
+      assert.ok(r.stairFloors < 3, `${src.key}→${d.key} stairs ${r.stairFloors}`);
+    }
+  }
+  // 1개 층은 계단 그대로
+  const r = I.routeTo(start, I.findDest("2:216"), { mode: "stairs" });
+  assert.ok(!r.preferElev && r.stairFloors === 1);
 });

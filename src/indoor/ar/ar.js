@@ -12,7 +12,8 @@ import {
   walkMinutes,
   buildSteps,
 } from "../guide.mjs";
-import { floorName } from "../model.mjs";
+import { floorName, floorLabel } from "../model.mjs";
+import { playLift, voice } from "../lift.js";
 
 const D2R = Math.PI / 180;
 const $ = (s) => document.querySelector(s);
@@ -194,8 +195,45 @@ export async function openAR(opts) {
     else await startCamera();
   } catch (e) {
     showError(e);
-    if (!demoWanted) return { close };
+    // 카메라를 못 켰을 때: 아래 장면을 만들기 전이므로 간단히 정리하고 끝냄
+    const bail = () => {
+      closed = true;
+      stream?.getTracks().forEach((t) => t.stop());
+      root.hidden = true;
+      onClose?.();
+    };
+    $("#ar-error-close").onclick = bail;
+    $("#ar-demo").onclick = () => {
+      bail();
+      opts.onDemo?.();
+    };
+    return { close: bail };
   }
+
+  // 안내 중 화면이 꺼지지 않게
+  let wake = null;
+  const lockScreen = async () => {
+    try {
+      wake = await navigator.wakeLock?.request("screen");
+    } catch {}
+  };
+  lockScreen();
+  // 다른 앱으로 갔다 오면 위치를 다시 찾음
+  let paused = false;
+  const onVis = () => {
+    if (document.hidden) {
+      paused = true;
+      if (demo) video.pause();
+    } else if (paused) {
+      paused = false;
+      lockScreen();
+      worker?.postMessage({ type: "reset" });
+      pose.ok = false;
+      if (demo) video.play().catch(() => {});
+      else video.play().catch(() => {});
+    }
+  };
+  document.addEventListener("visibilitychange", onVis);
 
   // ---- 센서
   let ori = null;
@@ -293,11 +331,16 @@ export async function openAR(opts) {
   let headOff = null,
     headOffN = 0; // 건물 방위 − 센서 방위
   let cum = routeMetrics(route),
-    steps = opts.steps || buildSteps(route, dest),
+    steps =
+      opts.steps || buildSteps(route, dest, { landmarks: indoor.destinations }),
     hintS = 0,
     offCount = 0,
     arrived = false,
-    lastStepIdx = -1;
+    lastStepIdx = -1,
+    lift = null, // 엘리베이터 탑승 중 화면
+    liftStep = null,
+    spoken = new Set();
+  const liftDone = new Set();
   const demoPitch = demo ? (demo.pitchDeg || -6) * D2R : 0;
 
   function sensorHeading() {
@@ -306,7 +349,9 @@ export async function openAR(opts) {
   }
   function onPose(r, ms) {
     if (closed) return;
+    if (r.ok && lift && liftStep && r.f !== liftStep.to) return; // 탑승 중엔 도착 층만 받음
     if (r.ok) {
+      if (lift && liftStep && r.f === liftStep.to) finishLift();
       const firstFix = !pose.ok;
       Object.assign(pose, {
         ok: true,
@@ -347,11 +392,53 @@ export async function openAR(opts) {
     }
   }
 
+  // 엘리베이터: 문 앞에 오면 탑승 화면 → 도착 층에서 위치가 다시 잡히면 문이 열림
+  function startLift(st) {
+    liftStep = st;
+    liftDone.add(st.s);
+    voice.say(`엘리베이터를 타고 ${floorName(st.to)} 버튼을 누르세요`);
+    buzz([30, 60, 30]);
+    worker.postMessage({ type: "reset" });
+    pose.ok = false;
+    lift = playLift({
+      from: st.f,
+      to: st.to,
+      title: `${floorLabel(st.to)} 버튼을 누르세요`,
+      hint: "내린 뒤 휴대폰을 세워 복도를 비추면 이어서 안내해요",
+      hold: true,
+      onSkip: () => finishLift(true),
+    });
+  }
+  function finishLift(manual = false) {
+    if (!lift) return;
+    const st = liftStep;
+    if (!manual) lift.arrive();
+    lift = null;
+    hintS = st.s;
+    pose.f = st.to;
+    voice.say(`${floorName(st.to)}에 도착했어요`);
+    rebuildPath = true;
+  }
+  function hudFor(nx, pr) {
+    const st = nx.step,
+      n = Math.round(nx.dist);
+    if (st.kind === "arrive")
+      return pr.remain < 3
+        ? `${dest.title} 도착`
+        : `${Math.round(pr.remain)}m 앞 ${dest.title}`;
+    if (st.kind === "stair" || st.kind === "elev")
+      return nx.dist < 3
+        ? st.text
+        : `${n}m 앞 ${st.kind === "elev" ? "엘리베이터" : "계단"}`;
+    return nx.dist < 4 ? `지금 ${st.action}` : `${n}m 앞에서 ${st.action}`;
+  }
   function updateProgress() {
+    if (lift) return;
     const pr = progressOn(route, cum, pose, hintS);
     if (!pr) return;
     if (pr.off > 6) {
-      if (++offCount >= 4) {
+      // 확실히 벗어났을 때만 다시 찾기 (흔들림으로 재탐색하지 않게)
+      if (pose.conf > 0.45 && ++offCount >= 4) {
         offCount = 0;
         const nr = indoor.routeTo({ f: pose.f, x: pose.x, y: pose.y }, dest, {
           mode,
@@ -359,12 +446,14 @@ export async function openAR(opts) {
         if (nr) {
           route = nr;
           cum = routeMetrics(route);
-          steps = buildSteps(route, dest);
+          steps = buildSteps(route, dest, { landmarks: indoor.destinations });
           hintS = 0;
           lastStepIdx = -1;
+          spoken.clear();
           rebuildPath = true;
           onRoute?.(route, steps);
           toast("경로를 다시 찾았어요");
+          voice.say("경로를 다시 찾았어요");
         }
       }
       return;
@@ -379,30 +468,39 @@ export async function openAR(opts) {
     }
     const st = nx.step;
     ui.arrow.dataset.dir = st.dir;
-    if (st.dir === "arrive")
-      ui.step.textContent =
-        pr.remain < 3
-          ? `${dest.title} 도착`
-          : `${Math.round(pr.remain)}m 앞 ${dest.title}`;
-    else if (st.dir.startsWith("stair") || st.dir === "elev")
-      ui.step.textContent =
-        nx.dist < 3
-          ? st.text
-          : `${Math.round(nx.dist)}m 앞 ${st.dir === "elev" ? "엘리베이터" : "계단"}`;
-    else
-      ui.step.textContent =
-        nx.dist < 4
-          ? st.turn
-            ? st.turn.replace(" 방향으로", "") + " 도세요"
-            : st.text
-          : `${Math.round(nx.dist)}m 앞에서 ${st.turn ? st.turn.replace("으로", "").replace(" 방향", "") : "직진"}`;
+    ui.step.textContent = hudFor(nx, pr);
+    const after = steps[nx.index + 1];
     ui.sub.textContent =
-      st.dir.startsWith("stair") || st.dir === "elev"
-        ? st.text
-        : nx.index + 1 < steps.length
-          ? `다음: ${steps[Math.min(steps.length - 1, nx.index + 1)].text}`
-          : "";
+      st.kind === "arrive"
+        ? st.sub || ""
+        : after
+          ? `${st.text} · 다음: ${after.text}`
+          : st.text;
     ui.remain.textContent = `남은 거리 ${Math.round(pr.remain)}m · 약 ${walkMinutes(pr.remain)}`;
+    // 음성: 다가올 때 한 번, 바로 앞에서 한 번
+    const k1 = nx.index * 2,
+      k2 = k1 + 1;
+    if (
+      st.kind !== "arrive" &&
+      nx.dist < 15 &&
+      nx.dist >= 4 &&
+      !spoken.has(k1)
+    ) {
+      spoken.add(k1);
+      voice.say(`${Math.round(nx.dist)}미터 앞, ${st.text}`);
+    } else if (nx.dist < 4 && !spoken.has(k2) && st.kind !== "elev") {
+      spoken.add(k2);
+      voice.say(
+        st.kind === "arrive" ? `${dest.title}, ${st.side || ""}` : st.text,
+      );
+    }
+    if (
+      st.kind === "elev" &&
+      nx.dist < 3 &&
+      pose.f === st.f &&
+      !liftDone.has(st.s)
+    )
+      startLift(st);
     if (
       pr.remain < 2.5 &&
       pose.f === route.pts[route.pts.length - 1].f &&
@@ -410,7 +508,9 @@ export async function openAR(opts) {
     ) {
       arrived = true;
       buzz([60, 40, 60]);
-      ui.arrive.querySelector("b").textContent = `${dest.title}에 도착했어요`;
+      const side = steps[steps.length - 1].side;
+      ui.arrive.querySelector("b").textContent =
+        `${dest.title}에 도착했어요${side && side !== "정면" ? ` · 문은 ${side}` : ""}`;
       ui.arrive.hidden = false;
     }
     pose.s = pr.s;
@@ -696,7 +796,13 @@ export async function openAR(opts) {
     last = now;
 
     // 질의 보내기 (워커가 쉬고 있을 때, 초당 최대 5번)
-    if (ready && !busy && now - lastQ > 200 && video.readyState >= 2) {
+    if (
+      ready &&
+      !busy &&
+      !paused &&
+      now - lastQ > 200 &&
+      video.readyState >= 2
+    ) {
       if (demo && video.currentTime < lastVT - 1)
         worker.postMessage({ type: "reset" }); // 영상 반복
       lastVT = video.currentTime;
@@ -730,7 +836,11 @@ export async function openAR(opts) {
               q,
               t,
               yawHint,
-              floorHint: pose.ok ? null : route.pts[0].f,
+              floorHint: pose.ok
+                ? null
+                : liftStep && lift
+                  ? liftStep.to
+                  : pointAt(route, cum, hintS).f,
             },
             [q.buffer],
           );
@@ -778,7 +888,8 @@ export async function openAR(opts) {
       rebuildPath = false;
     }
     tex.offset.y -= dt * 1.6;
-    const showOverlay = pose.ok && (demo || headOffN > 0);
+    const showOverlay =
+      pose.ok && !lift && pose.conf > 0.25 && (demo || headOffN > 0);
     if (pathMesh) pathMesh.visible = showOverlay;
     const end = route.pts[route.pts.length - 1];
     pin.visible =
@@ -863,6 +974,10 @@ export async function openAR(opts) {
     if (closed) return;
     closed = true;
     worker.terminate();
+    lift?.close();
+    wake?.release?.().catch(() => {});
+    document.removeEventListener("visibilitychange", onVis);
+    if (voice.supported) speechSynthesis.cancel();
     removeEventListener("deviceorientation", onOri);
     removeEventListener("resize", resize);
     stream?.getTracks().forEach((t) => t.stop());
@@ -886,12 +1001,15 @@ export async function openAR(opts) {
     arrived = false;
     route = opts.route;
     cum = routeMetrics(route);
-    steps = opts.steps || buildSteps(route, dest);
+    steps =
+      opts.steps || buildSteps(route, dest, { landmarks: indoor.destinations });
     hintS = 0;
     lastStepIdx = -1;
     rebuildPath = true;
     pose.ok = false;
     shown.init = false;
+    spoken.clear();
+    liftDone.clear();
     worker.postMessage({ type: "reset" });
     video.currentTime = 0;
     video.play().catch(() => {});
