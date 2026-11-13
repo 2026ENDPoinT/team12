@@ -67,6 +67,9 @@
           <rect x="5" y="3" width="14" height="18" rx="2" />
           <path d="m9 9 3-3 3 3m-6 6 3 3 3-3" />
         </symbol>
+        <symbol id="i-edit" viewBox="0 0 24 24">
+          <path d="M4 20h4L19 9l-4-4L4 16Zm9-13 4 4M14 20h6" />
+        </symbol>
         <symbol id="i-chevron" viewBox="0 0 24 24">
           <path d="m9 6 6 6-6 6" />
         </symbol>
@@ -274,13 +277,8 @@
           <svg class="icon"><use href="#i-pin" /></svg>
         </button>
         <span class="map-sidebar-spacer" aria-hidden="true"></span>
-        <button
-          data-side="alerts"
-          aria-label="관리자 검토 알림"
-          title="관리자 검토"
-          hidden
-        >
-          <svg class="icon"><use href="#i-bell" /></svg
+        <button data-side="alerts" aria-label="관리자 · 편집기" aria-pressed="false" title="관리자 · 편집기">
+          <svg class="icon"><use href="#i-edit" /></svg
           ><span id="side-alert-count" class="map-sidebar-badge" hidden>0</span>
         </button>
         <button
@@ -718,8 +716,8 @@
             <button id="v2-report" aria-label="길 막힘 제보" aria-pressed="false">
               <svg class="icon"><use href="#i-alert" /></svg>
             </button>
-            <button id="v2-admin" aria-label="관리자 검토" hidden>
-              <svg class="icon"><use href="#i-bell" /></svg
+            <button id="v2-admin" aria-label="관리자 · 편집기" aria-pressed="false">
+              <svg class="icon"><use href="#i-edit" /></svg
               ><span id="v2-admin-count" class="map-sidebar-badge" hidden>0</span>
             </button>
             <button
@@ -848,6 +846,33 @@
         <button id="admin-login-submit" type="submit">관리자 로그인</button>
       </form>
     </dialog>
+    <dialog id="admin-menu-dialog" class="admin-login-dialog admin-menu-dialog">
+      <button class="dialog-close" aria-label="닫기">✕</button>
+      <div class="dialog-body">
+        <span class="eyebrow purple">ADMIN</span>
+        <h2>관리자 메뉴</h2>
+        <p>무엇을 열까요?</p>
+        <div class="admin-menu-actions">
+          <button id="admin-menu-editor" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-edit" /></svg
+            ><span
+              ><b id="admin-menu-editor-title">편집기 열기</b
+              ><small>건물·길·출입구 조사 데이터를 고쳐요</small></span
+            >
+          </button>
+          <button id="admin-menu-review" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-alert" /></svg
+            ><span
+              ><b>관리자 검토 <em id="admin-menu-count" hidden>0</em></b
+              ><small>신고된 길 막힘 구간을 확인해요</small></span
+            >
+          </button>
+        </div>
+        <button id="admin-menu-logout" class="admin-logout" type="button">
+          로그아웃
+        </button>
+      </div>
+    </dialog>
     <dialog id="admin-dialog" class="report-dialog admin-dialog">
       <button class="dialog-close" aria-label="닫기">✕</button>
       <div class="dialog-body">
@@ -856,17 +881,17 @@
         <h2>신고된 구간</h2>
         <button id="admin-logout" class="admin-logout" type="button">로그아웃</button>
         <section class="admin-section admin-section-urgent">
-          <h3>🔴 검토 필요 · 3건 이상</h3>
+          <h3><i class="admin-dot urgent" aria-hidden="true"></i>검토 필요 · 3건 이상</h3>
           <p id="admin-empty-urgent">지금은 검토가 급한 구간이 없어요.</p>
           <ul id="admin-list-urgent" class="report-list"></ul>
         </section>
-        <section class="admin-section">
-          <h3>⛔ 확정된 구간 · 우회 안내 중</h3>
+        <section class="admin-section admin-section-confirmed">
+          <h3><i class="admin-dot confirmed" aria-hidden="true"></i>확정된 구간 · 우회 안내 중</h3>
           <p id="admin-empty-confirmed">확정된 구간이 없어요.</p>
           <ul id="admin-list-confirmed" class="report-list"></ul>
         </section>
         <section class="admin-section">
-          <h3>참고용 · 3건 미만</h3>
+          <h3><i class="admin-dot minor" aria-hidden="true"></i>참고용 · 3건 미만</h3>
           <p id="admin-empty-minor">3건 미만으로 쌓인 신고가 없어요.</p>
           <ul id="admin-list-minor" class="report-list"></ul>
         </section>
@@ -877,7 +902,7 @@
           집계합니다.</small
         >
         <section class="admin-section admin-works">
-          <h3>🚧 건물 공사</h3>
+          <h3><i class="admin-dot works" aria-hidden="true"></i>건물 공사</h3>
           <form id="work-form" class="work-form">
             <label>건물<select id="work-building" required></select></label
             ><label>시작일<input type="date" id="work-start" required /></label
