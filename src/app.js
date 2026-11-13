@@ -1,3 +1,4 @@
+import { normalizeSearch, suggestMatches } from "./search-suggestions.mjs";
 import { shortestPath } from "./routing.mjs";
 import { routeBetween } from "./route-target.mjs";
 import { attachGps } from "./gps-start.mjs";
@@ -84,20 +85,23 @@ for (const [key, value] of Object.entries(GIS_SUMMARY)) {
 }
 $(".map-data-status").textContent =
   `건물 ${GIS_SUMMARY.buildings} · 등록 출입구 ${GIS_SUMMARY.entrances}`;
-const normalize = (s) => s.toLowerCase().replace(/\s/g, "");
+const normalize = normalizeSearch;
 const schoolData = [
   catalog.find((s) => s[0] === CAMPUS.name),
   ...catalog.filter((s) => s[0] !== CAMPUS.name),
 ];
 function renderSchools() {
   const q = normalize($("#school-search").value),
-    all = schoolData.filter(
-      (s) =>
-        (region === "전체" || s[3] === region) &&
-        normalize(s.join(" ")).includes(q),
-    );
+    regional = schoolData.filter((s) => region === "전체" || s[3] === region),
+    matches = regional.filter((s) => normalize(s.join(" ")).includes(q)),
+    suggested = q && !matches.length
+      ? suggestMatches(q, regional, (s) => [s[0]])
+      : [],
+    all = matches.length ? matches : suggested;
   const displayed = q || showAll ? all : all.slice(0, 6);
-  $("#school-count").textContent = `${all.length}개 캠퍼스`;
+  $("#school-count").textContent = suggested.length
+    ? `추천 캠퍼스 ${suggested.length}곳`
+    : `${all.length}개 캠퍼스`;
   $("#show-all").hidden = !!q || all.length <= 6;
   $("#show-all").firstChild.textContent = showAll
     ? "학교 접기 "
@@ -159,17 +163,9 @@ $("#show-all").onclick = () => {
   renderSchools();
 };
 const placesById = new Map(PLACES.map((place) => [place.id, place])),
-  placesByName = new Map(PLACES.map((place) => [place.name, place])),
-  gpsOption = document.createElement("option"),
-  gpsOptions = [gpsOption];
-gpsOption.value = "내 현재 위치";
-gpsOption.disabled = true;
-$("#route-places").append(gpsOption);
-for (const place of PLACES) {
-  const option = document.createElement("option");
-  option.value = place.name;
-  $("#route-places").append(option);
-}
+  placesByName = new Map(PLACES.map((place) => [place.name, place]));
+const locationPlace = { id: "gps", name: "내 현재 위치" };
+const closePlaceSuggestions = new Map();
 function routePlaceId(selector) {
   const value = $(selector).value.trim();
   return value === "내 현재 위치" ? "gps" : placesByName.get(value)?.id;
@@ -178,6 +174,7 @@ function setRoutePlace(selector, id) {
   $(selector).value =
     id === "gps" ? "내 현재 위치" : placesById.get(id)?.name || "";
   $(selector).removeAttribute("aria-invalid");
+  closePlaceSuggestions.get(selector)?.();
 }
 setRoutePlace("#origin", activeStart);
 setRoutePlace("#destination", activeDestination);
@@ -408,16 +405,101 @@ if (!map) {
 }
 for (const selector of ["#origin", "#destination"]) {
   const input = $(selector);
-  input.oninput = () => input.removeAttribute("aria-invalid");
-  input.onchange = () => {
-    if (!routePlaceId(selector)) {
-      input.setAttribute("aria-invalid", "true");
-      toast("검색 결과에 있는 장소를 선택해주세요.");
-      return;
-    }
+  const list = $(`${selector}-suggestions`);
+  const hint = $(`${selector}-suggestion-hint`);
+  const panel = list.parentElement;
+  let choices = [];
+  let active = -1;
+
+  function closeSuggestions() {
+    choices = [];
+    active = -1;
+    panel.hidden = true;
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("aria-activedescendant");
+  }
+  closePlaceSuggestions.set(selector, closeSuggestions);
+
+  function choose(place) {
+    setRoutePlace(selector, place.id);
     updateRoute();
     closeBuildingPopover();
-  };
+  }
+
+  function renderSuggestions() {
+    closeSuggestions();
+    const q = normalize(input.value);
+    const places = gpsStartNode ? [locationPlace, ...PLACES] : PLACES;
+    if (q && places.some((place) => place.name === input.value.trim())) return;
+
+    const matches = places.filter((place) => normalize(place.name).includes(q));
+    choices = matches.length
+      ? matches.slice(0, 6)
+      : suggestMatches(q, places, (place) => [place.name]);
+    if (!choices.length) return;
+
+    hint.textContent = matches.length ? "검색 결과" : "추천 장소";
+    list.replaceChildren(...choices.map((place, index) => {
+      const option = document.createElement("li");
+      option.id = `${list.id}-${index}`;
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", "false");
+      option.textContent = place.name;
+      option.onpointerdown = (event) => {
+        if (event.pointerType === "mouse") event.preventDefault();
+      };
+      option.onclick = () => choose(place);
+      return option;
+    }));
+    panel.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+  }
+
+  input.addEventListener("input", () => {
+    input.removeAttribute("aria-invalid");
+    renderSuggestions();
+  });
+  input.addEventListener("focus", renderSuggestions);
+  document.addEventListener("focusin", (event) => {
+    if (event.target !== input) closeSuggestions();
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (event.target !== input && !list.contains(event.target)) closeSuggestions();
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === "Escape" && !panel.hidden) {
+      event.preventDefault();
+      closeSuggestions();
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (active >= 0) choose(choices[active]);
+      else if (routePlaceId(selector)) updateRoute();
+      else if (choices.length) choose(choices[0]);
+      else updateRoute({ announce: true });
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (panel.hidden) renderSuggestions();
+      if (!choices.length) return;
+      event.preventDefault();
+      if (active >= 0) list.children[active].setAttribute("aria-selected", "false");
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      active = active < 0
+        ? (step > 0 ? 0 : choices.length - 1)
+        : (active + step + choices.length) % choices.length;
+      const option = list.children[active];
+      option.setAttribute("aria-selected", "true");
+      input.setAttribute("aria-activedescendant", option.id);
+      option.scrollIntoView({ block: "nearest" });
+    }
+  });
+  input.addEventListener("change", () => {
+    if (routePlaceId(selector)) {
+      updateRoute();
+      closeBuildingPopover();
+    } else if (!choices.length && input.value.trim()) {
+      input.setAttribute("aria-invalid", "true");
+    }
+  });
 }
 $("#find-route").onclick = () => {
   updateRoute({ announce: true });
@@ -465,10 +547,6 @@ function stopGps({ keepStatus = false } = {}) {
   gpsWatchId = null;
   gpsPosition = null;
   gpsStartNode = null;
-  for (const option of gpsOptions) {
-    option.disabled = true;
-    option.textContent = "내 현재 위치 · GPS 필요";
-  }
   let changed = false;
   if (routePlaceId("#origin") === "gps") {
     setRoutePlace("#origin", "gate");
@@ -509,7 +587,6 @@ $("#gps-toggle").onclick = () => {
       gpsPosition = { ...point, accuracy: coords.accuracy };
       if (!nearest || nearest.distance > 350) {
         gpsStartNode = null;
-        gpsOptions.forEach((option) => (option.disabled = true));
         map?.setUserLocation(null);
         setGpsStatus(
           `현재 위치가 서울과기대 지도 범위 밖이에요. 캠퍼스에 들어오면 자동으로 표시됩니다.`,
@@ -518,10 +595,6 @@ $("#gps-toggle").onclick = () => {
         return;
       }
       gpsStartNode = nearest.id;
-      for (const option of gpsOptions) {
-        option.disabled = false;
-        option.textContent = "내 현재 위치";
-      }
       map?.setUserLocation(gpsPosition, { follow: true });
       setGpsStatus(
         `현재 위치 추적 중 · 정확도 약 ${Math.round(coords.accuracy)}m`,
