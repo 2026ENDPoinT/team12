@@ -1,7 +1,9 @@
 // AR 길안내: 카메라(또는 데모 영상) 화면 위에 경로를 겹쳐 그립니다.
-//  1) 화면을 수평 기준으로 펴서 워커로 보내면, 촬영 사진과 비교해 위치·방향을 추정합니다.
-//  2) 휴대폰은 자이로·나침반으로 방향을 매 프레임 이어 가고, 사진 비교 결과로 방향 기준을 보정합니다.
-//  3) 추정 자세로 three 카메라를 맞춰 바닥 경로·회전 화살표·목적지 핀을 그립니다.
+//  1) 화면을 수평 기준으로 펴서 워커로 보내면, 입자 필터가 촬영 사진 비교 + 걸음 + 벽·층 연결을
+//     시간에 따라 합쳐 위치·층·방향(센서 기준 차이)을 추정합니다. (pf.mjs)
+//  2) 걸음은 가속도 봉우리로 세고(보행자 추측항법), 방향은 자이로로 매 프레임 이어 갑니다.
+//  3) 화면에 보이는 위치는 경로 근처면 경로 위에 붙이고 부드럽게 따라가, 경로·화살표가 흔들리지 않게 합니다.
+//  4) ?loc=<주소> 를 주면 위치 계산 서버(특징점 측위)의 결과도 함께 반영합니다(docs/decisions.md 참고).
 import * as THREE from "three";
 import { sampleQuery, blurGray, blurSigma, headingOf } from "./localize.mjs";
 import {
@@ -13,11 +15,20 @@ import {
   buildSteps,
 } from "../guide.mjs";
 import { floorName, floorLabel } from "../model.mjs";
+import { portalsFrom } from "./pf.mjs";
+import {
+  FovCalib,
+  OffsetFilter,
+  columnProfile,
+  manhattanAxis,
+  relTurn,
+} from "./calib.mjs";
 import { playLift, voice } from "../lift.js";
 
 const D2R = Math.PI / 180;
 const $ = (s) => document.querySelector(s);
-const EYE = 1.4; // 휴대폰 높이(m)
+const EYE = 1.35; // 휴대폰 높이(m): 가슴 앞에 들고 볼 때
+const HOLD = 15; // 사진으로 확인한 뒤 걸음만으로 이어 가는 최대 시간(초)
 const PHONE_FOV_LONG = 65; // 휴대폰 기본 카메라 긴 변 화각(도) — ?fov= 로 바꿀 수 있음
 
 // 사용자가 화면을 한 번이라도 누른 뒤에만 진동 (브라우저 정책)
@@ -149,13 +160,28 @@ export async function openAR(opts) {
     } catch {
       sensorOK = false;
     }
+    // 걸음 감지용 가속도(iOS는 따로 허락 필요)
+    try {
+      if (
+        typeof DeviceMotionEvent !== "undefined" &&
+        typeof DeviceMotionEvent.requestPermission === "function"
+      )
+        await DeviceMotionEvent.requestPermission();
+    } catch {}
   }
 
   let closed = false;
   let stream = null,
     demo = null;
-  const fovLong =
-    +new URLSearchParams(location.search).get("fov") || PHONE_FOV_LONG;
+  // 카메라 화각: ?fov= > 이 기기에서 자동 보정해 둔 값 > 기본값. 쓰는 동안 자동 보정으로 갱신.
+  const urlFov = +new URLSearchParams(location.search).get("fov") || 0;
+  let savedFov = 0;
+  try {
+    savedFov = +localStorage.getItem("sai-ar-fov") || 0;
+  } catch {}
+  let fovLong = urlFov || savedFov || PHONE_FOV_LONG;
+  let fovCal = null;
+  const DEBUG = new URLSearchParams(location.search).has("debug");
 
   // ---- 화면 소스: 카메라 → 실패하면 데모 안내
   async function startCamera() {
@@ -229,6 +255,7 @@ export async function openAR(opts) {
       lockScreen();
       worker?.postMessage({ type: "reset" });
       pose.ok = false;
+      shown.init = false;
       if (demo) video.play().catch(() => {});
       else video.play().catch(() => {});
     }
@@ -248,21 +275,43 @@ export async function openAR(opts) {
   };
   if (!demo && sensorOK) addEventListener("deviceorientation", onOri);
 
+  // ---- 걸음 감지: 중력 포함 가속도 크기의 봉우리 하나 = 한 걸음
+  const pdr = { on: false, lp: 9.8, hi: false, lastT: 0, lo: 99, top: 0 };
+  const onMotion = (e) => {
+    const a = e.accelerationIncludingGravity;
+    if (!a || a.x == null) return;
+    pdr.on = true;
+    pdr.lp += (Math.hypot(a.x, a.y, a.z) - pdr.lp) * 0.25;
+    pdr.lo = Math.min(pdr.lo, pdr.lp);
+    pdr.top = Math.max(pdr.top, pdr.lp);
+    const now = performance.now();
+    if (!pdr.hi && pdr.lp > 10.8 && now - pdr.lastT > 280) pdr.hi = true;
+    else if (pdr.hi && pdr.lp < 9.9) {
+      pdr.hi = false;
+      pdr.lastT = now;
+      // 걸음 길이: 가속도 폭의 네제곱근에 비례(Weinberg), 0.45~0.85m
+      const len = Math.max(
+        0.45,
+        Math.min(0.85, 0.48 * Math.pow(Math.max(0.5, pdr.top - pdr.lo), 0.25)),
+      );
+      pdr.lo = 99;
+      pdr.top = 0;
+      const yaw = sensorHeading();
+      pdr.n = (pdr.n || 0) + 1;
+      if (yaw != null && ready && !lift) {
+        worker.postMessage({ type: "step", len, yaw });
+        corridorAlign(yaw);
+      }
+    }
+  };
+  if (!demo) addEventListener("devicemotion", onMotion);
+
   // ---- 워커
-  const portals = indoor.links.map((l) =>
-    l.kind === "stair"
-      ? {
-          fa: l.fa,
-          pa: l.ramp.pts[0],
-          fb: l.fb,
-          pb: l.ramp.pts[l.ramp.pts.length - 1],
-        }
-      : { fa: l.fa, pa: l.pa, fb: l.fb, pb: l.pb },
-  );
   const worker = new Worker("ar-worker.js");
   let ready = false,
     busy = false,
-    qid = 0;
+    qid = 0,
+    lastMs = 0;
   worker.onmessage = (e) => {
     const m = e.data;
     if (m.type === "ready") ready = true;
@@ -271,15 +320,27 @@ export async function openAR(opts) {
         new Error(`위치 인식 데이터를 불러오지 못했어요. ${m.message}`),
       );
     else if (m.type === "pose") {
-      busy = false;
-      onPose(m.r, m.ms);
-    }
+      if (m.id) {
+        busy = false;
+        lastMs = m.ms;
+      }
+      onPose(m.r);
+    } else if (m.type === "motion") onMove(m.r);
   };
+  const Mg = indoor.M;
   worker.postMessage({
     type: "init",
     indexUrl: new URL(assets + "ar-index.bin", location.href).href,
     svUrl: new URL(assets + "sv.json", location.href).href,
-    portals,
+    portals: portalsFrom(indoor.links),
+    grid: {
+      gx0: Mg.gx0,
+      gy1: Mg.gy1,
+      cell: Mg.cell,
+      gw: Mg.gw,
+      gh: Mg.gh,
+      floors: Mg.floors.map((f) => ({ n: f.n, grid: f.grid })),
+    },
   });
 
   // ---- 질의 만들기
@@ -314,7 +375,11 @@ export async function openAR(opts) {
       const f = Math.max(w, h) / 2 / Math.tan((fovLong / 2) * D2R);
       K = { fx: f, fy: f, cx: w / 2, cy: h / 2 };
     }
-    return { img: { data: blurGray(g, w, h, blurSigma(K.fx)), w, h }, K };
+    return {
+      img: { data: blurGray(g, w, h, blurSigma(K.fx)), w, h },
+      K,
+      raw: { g, w, h },
+    };
   }
 
   // ---- 자세 상태
@@ -328,8 +393,11 @@ export async function openAR(opts) {
     lastFix: 0,
   };
   const shown = { x: 0, y: 0, yaw: 90, init: false };
-  let headOff = null,
-    headOffN = 0; // 건물 방위 − 센서 방위
+  let headOff = null, // 화면에 쓰는 '건물 방위 − 센서 방위' (부드럽게 따라감)
+    offF = new OffsetFilter(), // 방향 기준 측정값(사진 비교·복도 걷기) 모음
+    stepYaws = [],
+    lostSince = 0,
+    lostSaid = false;
   let cum = routeMetrics(route),
     steps =
       opts.steps || buildSteps(route, dest, { landmarks: indoor.destinations }),
@@ -343,16 +411,101 @@ export async function openAR(opts) {
   const liftDone = new Set();
   const demoPitch = demo ? (demo.pitchDeg || -6) * D2R : 0;
 
+  // ---- 벽 방향: 도면 방 테두리의 주된 방향(90° 주기). 미래관은 본관 0°, 옆 동 약 9.8°.
+  const wallEdges = new Map();
+  for (const n of indoor.floors) {
+    const E = [];
+    for (const r of indoor.FL(n).rooms) {
+      const P = r.poly;
+      for (let i = 0; i < P.length; i++) {
+        const a = P[i],
+          b = P[(i + 1) % P.length];
+        const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        if (L < 1) continue;
+        let t = Math.atan2(b[1] - a[1], b[0] - a[0]) / D2R;
+        t = ((t % 90) + 90) % 90;
+        E.push({ x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2, L, t });
+      }
+    }
+    wallEdges.set(n, E);
+  }
+  // 근처 10m 벽 방향: 한 방향이 75% 넘게 차지할 때만(두 동이 만나는 곳은 판단 안 함)
+  function axisAt(f, x, y) {
+    const bins = [];
+    let tot = 0;
+    for (const e of wallEdges.get(f) || []) {
+      if (Math.hypot(e.x - x, e.y - y) > 10) continue;
+      tot += e.L;
+      const b = bins.find((q) => Math.abs(angDiff(q.t * 4, e.t * 4)) / 4 < 2);
+      if (b) {
+        b.t =
+          (b.t * b.L + (b.t + angDiff(e.t * 4, b.t * 4) / 4) * e.L) /
+          (b.L + e.L);
+        b.L += e.L;
+      } else bins.push({ t: e.t, L: e.L });
+    }
+    const best = bins.sort((a, b) => b.L - a.L)[0];
+    return best && best.L > tot * 0.75 ? best.t : null;
+  }
+  // 방향 기준: 소실점 나침반(가장 정확) → 사진 비교·복도 걷기 순
+  const vpF = new OffsetFilter(15);
+  let vpLast = 0,
+    prevVR = null,
+    prevVT = 0;
+  function offTarget(now) {
+    if (vpF.n >= 3 && now - vpLast < 20000) return vpF.value;
+    return offF.value;
+  }
+  function vanishing(c, R, now) {
+    const pr = prevVR,
+      pt = prevVT;
+    prevVR = R;
+    prevVT = now;
+    if (!pose.ok || !pr || now - pt > 400) return;
+    // 돌리는 중이면 영상과 센서 시각이 어긋나므로 거의 멈춰 있을 때만
+    const tr = relTurn(pr, R);
+    if (Math.abs(tr.yaw) > 2.5 || Math.abs(tr.pitch) > 2.5) return;
+    const A = axisAt(pose.f, shown.x, shown.y);
+    if (A == null) return;
+    const v = manhattanAxis(c.raw.g, c.raw.w, c.raw.h, c.K, R);
+    if (!v || v.ratio < 2.5) return;
+    const ref = headOff ?? offF.value ?? pose.off;
+    if (ref == null) return;
+    const base = A - v.axis;
+    const off = base + 90 * Math.round(angDiff(ref, base) / 90);
+    if (Math.abs(angDiff(off, ref)) > 30) return;
+    vpF.add(off, Math.min(3, v.ratio / 2));
+    vpLast = now;
+    if (vpF.n >= 3)
+      worker.postMessage({ type: "heading", off: vpF.value, sd: 5 });
+  }
+
   function sensorHeading() {
     if (!ori) return null;
     return (headingOf(deviceR(ori)) * 180) / Math.PI;
   }
-  function onPose(r, ms) {
+  function onPose(r) {
     if (closed) return;
-    if (r.ok && lift && liftStep && r.f !== liftStep.to) return; // 탑승 중엔 도착 층만 받음
+    const now = performance.now();
+    // 엘리베이터 탑승 중: 도착 층에서 확실히 잡히면 내린 것으로 봄
+    if (lift) {
+      if (r.ok && liftStep && r.f === liftStep.to && r.conf > 0.2) finishLift();
+      else return;
+    }
+    if (r.ok && pose.ok) {
+      // 크게 튀는 위치(5m 넘게·다른 층)는 같은 곳이 두 번 연속 나와야 받아들임
+      const far = r.f !== pose.f || Math.hypot(r.x - pose.x, r.y - pose.y) > 5;
+      if (far) {
+        const pj = pose.jump;
+        pose.jump = { f: r.f, x: r.x, y: r.y };
+        if (!pj || pj.f !== r.f || Math.hypot(pj.x - r.x, pj.y - r.y) > 2.5)
+          return;
+      }
+      pose.jump = null;
+    }
     if (r.ok) {
-      if (lift && liftStep && r.f === liftStep.to) finishLift();
       const firstFix = !pose.ok;
+      pose.off = r.off;
       Object.assign(pose, {
         ok: true,
         x: r.x,
@@ -360,36 +513,75 @@ export async function openAR(opts) {
         f: r.f,
         yaw: r.yaw,
         conf: r.conf,
-        lastFix: performance.now(),
+        lastFix: now,
       });
+      // 사진 비교로 본 방향 기준: 확실할 때만, 튀는 값은 필터가 버림
+      if (r.off != null && ori && r.conf > 0.35) offF.add(r.off, r.conf);
       if (firstFix) {
         ui.coach.hidden = true;
         buzz(40);
       }
-      const hs = sensorHeading();
-      if (hs != null && r.conf > 0.4) {
-        const off = angDiff(r.yaw, hs);
-        headOff =
-          headOff == null
-            ? off
-            : headOff + angDiff(off, headOff) * (headOffN < 3 ? 0.5 : 0.15);
-        headOffN++;
-      }
+      lostSince = 0;
+      lostSaid = false;
       setStatus(
-        r.conf > 0.55 ? "ok" : "weak",
-        r.conf > 0.55
+        r.conf > 0.35 ? "ok" : "weak",
+        r.conf > 0.35
           ? `위치 확인됨 · ${floorName(r.f)}`
-          : "위치가 조금 불확실해요",
+          : `위치가 조금 불확실해요 · ${floorName(r.f)}`,
       );
       updateProgress();
-    } else if (!pose.ok || performance.now() - pose.lastFix > 4000) {
-      pose.ok = pose.ok && performance.now() - pose.lastFix < 8000;
-      setStatus(
-        "searching",
-        pose.ok ? "위치를 다시 맞추는 중" : "주변을 천천히 비춰 주세요",
-      );
-      if (!pose.ok) ui.coach.hidden = false;
+    } else {
+      // 걸음으로 이어 가는 동안(최근 15초 안 확인)은 위치를 유지
+      if (pose.ok && now - pose.lastFix > HOLD * 1000) pose.ok = false;
+      if (!pose.ok || now - pose.lastFix > 3000) {
+        lostSince = lostSince || now;
+        setStatus(
+          "searching",
+          pose.ok ? "위치를 다시 맞추는 중" : "주변을 천천히 비춰 주세요",
+        );
+        if (!pose.ok) ui.coach.hidden = false;
+        // 오래 못 찾으면 한 번만 음성으로 요령 안내(틀린 방향 안내는 하지 않음)
+        if (!lostSaid && now - lostSince > 6000) {
+          lostSaid = true;
+          voice.say("휴대폰을 세워서 천천히 좌우로 비춰 주세요");
+        }
+      }
     }
+  }
+  // 복도를 곧게 걷는 동안: 걸음 방향(센서) ↔ 경로 방향(도면)으로 방향 기준을 맞춤.
+  // 사진 비교보다 훨씬 정확해서(복도는 곧음) 무게를 크게 줍니다.
+  function corridorAlign(yaw) {
+    const now = performance.now();
+    stepYaws.push({ yaw, t: now });
+    while (stepYaws.length && now - stepYaws[0].t > 5000) stepYaws.shift();
+    if (stepYaws.length < 6 || !pose.ok || shown.s == null || pdr.n % 2) return;
+    const ys = stepYaws.slice(-6).map((o) => o.yaw);
+    let cx = 0,
+      cy = 0;
+    for (const y of ys) {
+      cx += Math.cos(y * D2R);
+      cy += Math.sin(y * D2R);
+    }
+    const mean = Math.atan2(cy, cx) / D2R;
+    if (ys.some((y) => Math.abs(angDiff(y, mean)) > 10)) return; // 곧게 걷는 중이 아님
+    const a = pointAt(route, cum, Math.max(0, shown.s - 3)),
+      m = pointAt(route, cum, shown.s + 1),
+      b = pointAt(route, cum, shown.s + 5);
+    if (a.f !== pose.f || b.f !== pose.f) return;
+    const hd = (p, q) => Math.atan2(q.y - p.y, q.x - p.x) / D2R;
+    if (Math.abs(angDiff(hd(a, m), hd(m, b))) > 8) return; // 경로가 곧지 않음
+    const off = angDiff(hd(a, b), mean);
+    // 사진 비교로 대략 정해진 뒤에만, 그와 45° 안일 때(반대로 걷는 중 등 제외)
+    const ref = offTarget(performance.now());
+    if (ref == null || Math.abs(angDiff(off, ref)) > 45) return;
+    offF.add(off, 2.5);
+  }
+  // 걸음 뒤 입자 필터 추정: 같은 층이고 최근 확인된 상태면 위치만 이어 감
+  function onMove(r) {
+    if (closed || lift || !pose.ok || r.f !== pose.f) return;
+    pose.x = r.x;
+    pose.y = r.y;
+    updateProgress();
   }
 
   // 엘리베이터: 문 앞에 오면 탑승 화면 → 도착 층에서 위치가 다시 잡히면 문이 열림
@@ -398,8 +590,13 @@ export async function openAR(opts) {
     liftDone.add(st.s);
     voice.say(`엘리베이터를 타고 ${floorName(st.to)} 버튼을 누르세요`);
     buzz([30, 60, 30]);
-    worker.postMessage({ type: "reset" });
-    pose.ok = false;
+    // 위치 후보를 도착 층 엘리베이터 문 앞으로 옮겨 둠 → 내려서 비추면 바로 확인
+    const exit = route.pts.find(
+      (p, i) =>
+        p.kind === "elev" && p.f === st.to && route.pts[i - 1]?.kind === "elev",
+    );
+    if (exit)
+      worker.postMessage({ type: "lift", f: st.to, x: exit.x, y: exit.y });
     lift = playLift({
       from: st.f,
       to: st.to,
@@ -416,6 +613,7 @@ export async function openAR(opts) {
     lift = null;
     hintS = st.s;
     pose.f = st.to;
+    shown.init = false;
     voice.say(`${floorName(st.to)}에 도착했어요`);
     rebuildPath = true;
   }
@@ -438,7 +636,7 @@ export async function openAR(opts) {
     if (!pr) return;
     if (pr.off > 6) {
       // 확실히 벗어났을 때만 다시 찾기 (흔들림으로 재탐색하지 않게)
-      if (pose.conf > 0.45 && ++offCount >= 4) {
+      if (pose.conf > 0.4 && ++offCount >= 4) {
         offCount = 0;
         const nr = indoor.routeTo({ f: pose.f, x: pose.x, y: pose.y }, dest, {
           mode,
@@ -477,10 +675,12 @@ export async function openAR(opts) {
           ? `${st.text} · 다음: ${after.text}`
           : st.text;
     ui.remain.textContent = `남은 거리 ${Math.round(pr.remain)}m · 약 ${walkMinutes(pr.remain)}`;
-    // 음성: 다가올 때 한 번, 바로 앞에서 한 번
+    // 음성: 다가올 때 한 번, 바로 앞에서 한 번 (위치가 확실할 때만 — 틀린 안내는 하지 않음)
     const k1 = nx.index * 2,
       k2 = k1 + 1;
+    const sure = pose.conf > 0.3;
     if (
+      sure &&
       st.kind !== "arrive" &&
       nx.dist < 15 &&
       nx.dist >= 4 &&
@@ -488,7 +688,7 @@ export async function openAR(opts) {
     ) {
       spoken.add(k1);
       voice.say(`${Math.round(nx.dist)}미터 앞, ${st.text}`);
-    } else if (nx.dist < 4 && !spoken.has(k2) && st.kind !== "elev") {
+    } else if (sure && nx.dist < 4 && !spoken.has(k2) && st.kind !== "elev") {
       spoken.add(k2);
       voice.say(
         st.kind === "arrive" ? `${dest.title}, ${st.side || ""}` : st.text,
@@ -559,27 +759,44 @@ export async function openAR(opts) {
   });
   let pathMesh = null,
     rebuildPath = true;
-  function buildPath() {
+  // 경로를 어디까지 그릴지: 다음 회전 지점에서 1.2m 꺾인 데까지(모퉁이 너머·벽 뒤는 안 그림),
+  // 계단·엘리베이터·도착은 그 앞까지, 최대 15m
+  function pathEnd(s) {
+    const lim = s + 15;
+    for (let i = 1; i < steps.length; i++) {
+      const st = steps[i];
+      if (st.s <= s + 0.8) continue;
+      if (st.s > lim) break;
+      if (st.kind === "walk" && st.dir !== "straight" && st.dir !== "start")
+        return st.s + 1.2;
+      if (st.kind !== "walk" && st.kind !== "start") return st.s;
+    }
+    return Math.min(lim, cum[cum.length - 1]);
+  }
+  // 발밑(0.8m 앞)부터: 너무 가까운 띠는 화면 아래에서 크게 흔들려 보여서 뺍니다.
+  // 높이는 항상 지금 층 바닥(계단 오르막을 그리면 공중에 떠 보임)
+  function buildPath(sAt) {
     if (pathMesh) {
       scene.remove(pathMesh);
       pathMesh.geometry.dispose();
     }
     pathMesh = null;
     if (!pose.ok) return;
-    const s0 = Math.max(0, (pose.s ?? 0) - 2),
-      s1 = s0 + 32;
+    const sBase = sAt ?? pose.s ?? 0;
+    const s0 = Math.max(0, sBase + 0.8),
+      s1 = pathEnd(sBase);
+    const floorZ = indoor.FL(pose.f).z;
     const pts = [];
-    for (let s = s0; s <= s1; s += 0.5) {
-      const p = pointAt(route, cum, s);
-      if (Math.abs(p.z - indoor.FL(pose.f).z) > 2.2 && pts.length) break;
-      pts.push(p);
-      if (s > cum[cum.length - 1]) break;
+    for (let s = s0; s <= s1 + 1e-6; s += 0.5) {
+      const p = pointAt(route, cum, Math.min(s, s1));
+      if (p.f !== pose.f || Math.abs(p.z - floorZ) > 0.3) break;
+      pts.push({ ...p, z: floorZ });
     }
     if (pts.length < 2) return;
     const pos = [],
       uv = [],
       idx = [];
-    const W = 0.75;
+    const W = 0.6;
     let v = 0;
     for (let i = 0; i < pts.length; i++) {
       const a = pts[Math.max(0, i - 1)],
@@ -615,32 +832,35 @@ export async function openAR(opts) {
     scene.add(pathMesh);
   }
 
-  // 다음 회전 지점의 세운 화살표
+  // 회전 지점 화살표: 바닥에 눕혀 꺾인 뒤 방향을 가리킴
+  const arrowMat = new THREE.MeshBasicMaterial({
+    color: 0x7950ff,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const arrowEdge = new THREE.LineBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+  });
   const arrow3d = (() => {
+    const k = 1.5;
     const s = new THREE.Shape();
-    s.moveTo(0, 0.55);
-    s.lineTo(0.42, 0.1);
-    s.lineTo(0.16, 0.1);
-    s.lineTo(0.16, -0.45);
-    s.lineTo(-0.16, -0.45);
-    s.lineTo(-0.16, 0.1);
-    s.lineTo(-0.42, 0.1);
+    s.moveTo(0, 0.55 * k);
+    s.lineTo(0.42 * k, 0.1 * k);
+    s.lineTo(0.16 * k, 0.1 * k);
+    s.lineTo(0.16 * k, -0.45 * k);
+    s.lineTo(-0.16 * k, -0.45 * k);
+    s.lineTo(-0.16 * k, 0.1 * k);
+    s.lineTo(-0.42 * k, 0.1 * k);
     s.closePath();
-    const g = new THREE.ExtrudeGeometry(s, {
-      depth: 0.08,
-      bevelEnabled: false,
-    });
-    g.translate(0, 0, -0.04);
-    const m = new THREE.Mesh(
-      g,
-      new THREE.MeshLambertMaterial({ color: 0x7950ff, emissive: 0x3a1fa0 }),
-    );
-    const edge = new THREE.LineSegments(
-      new THREE.EdgesGeometry(g),
-      new THREE.LineBasicMaterial({ color: 0xffffff }),
-    );
+    const g = new THREE.ShapeGeometry(s);
+    g.rotateX(-Math.PI / 2); // 바닥에 눕힘: 모양의 위쪽(+y)이 북쪽(-z)
+    const m = new THREE.Mesh(g, arrowMat);
+    const edge = new THREE.LineSegments(new THREE.EdgesGeometry(g), arrowEdge);
     const grp = new THREE.Group();
     grp.add(m, edge);
+    grp.renderOrder = 2;
     grp.visible = false;
     scene.add(grp);
     return grp;
@@ -784,8 +1004,17 @@ export async function openAR(opts) {
     mctx.stroke();
   }
 
+  // ---- 진단 표시(?debug=1)
+  const dbg = DEBUG ? document.createElement("pre") : null;
+  let dbgT = 0;
+  if (dbg) {
+    dbg.className = "ar-debug";
+    root.append(dbg);
+  }
+
   // ---- 루프
   let lastQ = 0,
+    overlayA = 0,
     last = performance.now();
   video.onseeked = () => worker.postMessage({ type: "reset" });
   let lastVT = 0;
@@ -807,14 +1036,28 @@ export async function openAR(opts) {
         worker.postMessage({ type: "reset" }); // 영상 반복
       lastVT = video.currentTime;
       const c = capture();
-      let R = null,
-        yawHint = null;
+      let R = null;
       if (demo) R = levelR(0, demoPitch);
-      else if (ori) {
-        R = deviceR(ori);
-        if (headOff != null && headOffN >= 2)
-          yawHint = (headingOf(R) * 180) / Math.PI + headOff;
-      } else R = levelR(0, -8 * D2R);
+      else if (ori) R = deviceR(ori);
+      else R = levelR(0, -8 * D2R);
+      // 화각 자동 보정(좌우로 돌릴 때마다 표본)
+      if (c && R && !demo && ori && !urlFov) {
+        fovCal =
+          fovCal || new FovCalib(Math.max(c.raw.w, c.raw.h), savedFov || null);
+        const fv = fovCal.add(
+          columnProfile(c.raw.g, c.raw.w, c.raw.h),
+          R,
+          now / 1000,
+        );
+        if (fv && Math.abs(fv - fovLong) > 0.4) {
+          fovLong = fv;
+          resize();
+          try {
+            localStorage.setItem("sai-ar-fov", fv.toFixed(1));
+          } catch {}
+        }
+      }
+      if (c && R && !demo && ori) vanishing(c, R, now);
       if (c && R) {
         const pitch = Math.asin(R[8]) / D2R;
         if (!demo && (pitch < -35 || pitch > 25))
@@ -826,102 +1069,140 @@ export async function openAR(opts) {
           );
         else {
           const q = sampleQuery(c.img, c.K, R);
+          const yaw = demo || !ori ? null : (headingOf(R) * 180) / Math.PI;
+          // 지난 질의 뒤 흐른 시간: 걸음 감지가 있으면 '멈춰 있음', 없으면 '어디로든 움직였을 수 있음'
+          const tdt = lastQ ? Math.min(2, (now - lastQ) / 1000) : 0;
+          if (tdt)
+            worker.postMessage({
+              type: "tick",
+              dt: tdt,
+              yaw,
+              hasSensor: yaw != null,
+              pdr: pdr.on,
+            });
           busy = true;
           lastQ = now;
-          const t = demo ? video.currentTime : now / 1000;
           worker.postMessage(
             {
               type: "query",
               id: ++qid,
               q,
-              t,
-              yawHint,
-              floorHint: pose.ok
-                ? null
-                : liftStep && lift
-                  ? liftStep.to
-                  : pointAt(route, cum, hintS).f,
+              yaw,
+              // 경로상 지금 있어야 할 층(엘리베이터 안이면 도착 층)
+              floorHint:
+                liftStep && lift ? liftStep.to : pointAt(route, cum, hintS).f,
             },
             [q.buffer],
           );
         }
       }
+      remoteFix(now);
     }
 
-    // 보이는 자세: 경로 위로 살짝 끌어당기고 부드럽게
+    // 방향 기준(건물 − 센서)은 천천히 따라가 경로가 좌우로 흔들리지 않게
+    const oT = offTarget(now);
+    if (oT != null) {
+      if (headOff == null) headOff = oT;
+      else {
+        // 크게 틀어져 있으면 빨리, 거의 맞으면 천천히(떨림 방지)
+        const d = angDiff(oT, headOff);
+        headOff += d * Math.min(1, dt * (Math.abs(d) > 8 ? 2 : 0.7));
+      }
+    }
+
+    // 보이는 위치: 경로 근처(3m)면 경로 위에 붙이고, 부드럽게 따라감
     if (pose.ok) {
       let tx = pose.x,
         ty = pose.y;
       const pr = progressOn(route, cum, pose, hintS);
-      if (pr && pr.off < 2.5) {
-        const p = pointAt(route, cum, pr.s);
-        tx = tx * 0.4 + p.x * 0.6;
-        ty = ty * 0.4 + p.y * 0.6;
-      }
+      if (pr && pr.off < 3) {
+        // 진행 위치는 뒤로 크게 튀지 않게(1m 넘게 뒤로 가려면 한 번 더 확인)
+        let sNow = pr.s;
+        if (shown.s != null && sNow < shown.s - 1 && !shown.back) {
+          shown.back = true;
+          sNow = shown.s;
+        } else shown.back = false;
+        const p = pointAt(route, cum, sNow);
+        tx = p.x;
+        ty = p.y;
+        shown.s = sNow;
+      } else shown.s = null;
       if (!shown.init)
         Object.assign(shown, { x: tx, y: ty, yaw: pose.yaw, init: true });
-      const k = Math.min(1, dt * 4);
+      const k = Math.min(1, dt * 2.5);
       shown.x += (tx - shown.x) * k;
       shown.y += (ty - shown.y) * k;
-      if (demo) shown.yaw += angDiff(pose.yaw, shown.yaw) * Math.min(1, dt * 5);
+      if (demo) shown.yaw += angDiff(pose.yaw, shown.yaw) * Math.min(1, dt * 3);
     }
 
-    // 카메라 자세
+    // 카메라 자세: 자이로 회전은 그대로(화면과 어긋나지 않게), 방향 기준만 보정
     let heading = shown.yaw;
     let Rcb;
     if (!demo && ori) {
       const Rd = deviceR(ori);
-      const off = headOff ?? 0;
-      Rcb = mul(Rz(off * D2R), Rd);
+      Rcb = mul(Rz((headOff ?? 0) * D2R), Rd);
       heading = (headingOf(Rcb) * 180) / Math.PI;
     } else Rcb = levelR(shown.yaw * D2R, demoPitch);
     const z = indoor.FL(pose.f).z + EYE;
     setCamera(Rcb, shown.x, shown.y, z);
 
     // 경로·화살표·핀
+    const sShow = shown.s ?? pose.s;
     if (
       rebuildPath ||
-      (pose.ok && Math.abs((pose.s ?? 0) - (buildPath.s ?? -99)) > 1)
+      (pose.ok && Math.abs((sShow ?? 0) - (buildPath.s ?? -99)) > 1)
     ) {
-      buildPath();
-      buildPath.s = pose.s ?? 0;
+      buildPath(sShow);
+      buildPath.s = sShow ?? 0;
       rebuildPath = false;
     }
     tex.offset.y -= dt * 1.6;
+    // 확인 뒤 15초까지는 걸음으로 이어 가며 그대로 보여 줌.
+    // 신뢰도에 따라 깜빡이지 않게, 켜고 끌 때만 부드럽게 나타나고 사라짐
+    const since = (now - pose.lastFix) / 1000;
     const showOverlay =
-      pose.ok && !lift && pose.conf > 0.25 && (demo || headOffN > 0);
-    if (pathMesh) pathMesh.visible = showOverlay;
+      pose.ok && !lift && since < HOLD && (demo || !ori || headOff != null);
+    overlayA += ((showOverlay ? 1 : 0) - overlayA) * Math.min(1, dt * 4);
+    const alpha =
+      overlayA * (since > HOLD - 3 ? Math.max(0, (HOLD - since) / 3) : 1);
+    pathMat.opacity = alpha * 0.9;
+    arrowMat.opacity = arrowEdge.opacity = alpha;
+    if (pathMesh) pathMesh.visible = alpha > 0.02;
     const end = route.pts[route.pts.length - 1];
     pin.visible =
-      showOverlay &&
+      alpha > 0.02 &&
       end.f === pose.f &&
       Math.hypot(end.x - shown.x, end.y - shown.y) < 35;
     pin.position.copy(T(end.x, end.y, indoor.FL(end.f).z));
     pin.children[0].position.y = 1.9 + Math.sin(now / 300) * 0.05;
     arrow3d.visible = false;
-    if (showOverlay && pose.s != null) {
-      const nx = nextStep(steps, route, cum, pose.s);
+    if (alpha > 0.02 && sShow != null) {
+      const nx = nextStep(steps, route, cum, sShow);
+      // 회전이 15m 안이면 회전 지점 바로 뒤 바닥에 꺾인 방향 화살표
       if (
-        nx.dist < 14 &&
-        nx.step.dir !== "arrive" &&
+        nx.dist < 15 &&
+        nx.step.kind === "walk" &&
         nx.step.dir !== "straight"
       ) {
-        const a = pointAt(route, cum, pose.s + nx.dist),
-          b = pointAt(route, cum, pose.s + nx.dist + 2.5);
-        arrow3d.visible = true;
-        arrow3d.position.copy(
-          T(a.x, a.y, indoor.FL(pose.f).z + 1.1 + Math.sin(now / 350) * 0.06),
-        );
-        // 카메라를 향해 세운 화살표가 꺾인 뒤 나가는 방향(화면 기준 좌/우)을 가리킵니다.
-        const out = Math.atan2(b.y - a.y, b.x - a.x) / D2R;
-        arrow3d.lookAt(cam.position);
-        const rel = angDiff(out, heading);
-        arrow3d.children.forEach((c) => (c.rotation.z = rel * D2R));
+        const sT = sShow + nx.dist;
+        const t = pointAt(route, cum, sT),
+          a = pointAt(route, cum, sT + 0.9),
+          b = pointAt(route, cum, sT + 3);
+        if (
+          a.f === pose.f &&
+          t.f === pose.f &&
+          Math.hypot(b.x - a.x, b.y - a.y) > 0.3
+        ) {
+          arrow3d.visible = true;
+          const out = Math.atan2(b.y - a.y, b.x - a.x) / D2R;
+          arrow3d.position.copy(T(a.x, a.y, indoor.FL(pose.f).z + 0.04));
+          arrow3d.rotation.set(0, (out - 90) * D2R, 0);
+        }
       }
       // HUD 화살표: 다가오는 동작(25m 안쪽) 아이콘, 그 전에는 직진
       ui.arrow.textContent = nx.dist < 25 ? ARROW[nx.step.dir] || "↑" : "↑";
       // 경로가 화면 밖이면 어느 쪽을 보라고 알려 줌
-      const ahead = pointAt(route, cum, pose.s + 4);
+      const ahead = pointAt(route, cum, sShow + 4);
       const rel = angDiff(
         Math.atan2(ahead.y - shown.y, ahead.x - shown.x) / D2R,
         heading,
@@ -937,10 +1218,87 @@ export async function openAR(opts) {
       if (hint) ui.sub.textContent = hint;
       ui.sub.classList.toggle("hint", !!hint);
     }
+    if (dbg && now - dbgT > 300) {
+      dbgT = now;
+      dbg.textContent = [
+        `센서 ${ori ? "켜짐" : "없음"} · 걸음 ${pdr.on ? pdr.n || 0 : "없음"} · 질의 ${Math.round(lastMs)}ms`,
+        `화각 ${fovLong.toFixed(1)}° ${urlFov ? "(주소)" : fovCal ? `(보정 표본 ${fovCal.samples.length})` : ""}`,
+        `방향기준 ${headOff == null ? "-" : headOff.toFixed(1)} / 소실점 ${vpF.value == null ? "-" : vpF.value.toFixed(1)} (${vpF.n}) / 사진·걸음 ${offF.value == null ? "-" : offF.value.toFixed(1)} (${offF.n})`,
+        `위치 ${pose.ok ? "OK" : "--"} ${floorLabel(pose.f)} (${pose.x.toFixed(1)}, ${pose.y.toFixed(1)}) 신뢰 ${pose.conf.toFixed(2)}`,
+      ].join("\n");
+    }
     drawMini(heading);
     renderer.render(scene, cam);
   }
   requestAnimationFrame(frame);
+
+  // ---- 층 직접 고르기: 상태 표시를 누르면 층 버튼
+  const floorBox = $("#ar-floors");
+  floorBox.replaceChildren();
+  for (const n of indoor.floors) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = floorLabel(n);
+    b.onclick = () => {
+      floorBox.hidden = true;
+      worker.postMessage({ type: "floor", f: n });
+      pose.ok = false;
+      pose.f = n;
+      shown.init = false;
+      setStatus("searching", `${floorName(n)}에서 위치를 찾는 중`);
+      toast(`${floorName(n)}로 맞췄어요`);
+    };
+    floorBox.append(b);
+  }
+  ui.status.onclick = () => {
+    for (const b of floorBox.children)
+      b.classList.toggle("on", b.textContent === floorLabel(pose.f));
+    floorBox.hidden = !floorBox.hidden;
+  };
+
+  // ---- 위치 계산 서버(선택): ?loc=<주소>. 1.5초마다 화면 한 장을 보내 결과를 입자 필터에 반영.
+  // 사진은 서버가 위치 계산에만 쓰고 저장하지 않아야 합니다(docs/decisions.md).
+  const LOC_URL = demo ? null : new URLSearchParams(location.search).get("loc");
+  const shot = LOC_URL ? document.createElement("canvas") : null;
+  let locBusy = false,
+    locLast = 0;
+  function remoteFix(now) {
+    if (!LOC_URL || locBusy || now - locLast < 1500 || !ori) return;
+    const vw = video.videoWidth,
+      vh = video.videoHeight;
+    if (!vw) return;
+    locBusy = true;
+    locLast = now;
+    const sc = 640 / Math.max(vw, vh);
+    shot.width = Math.round(vw * sc);
+    shot.height = Math.round(vh * sc);
+    shot.getContext("2d").drawImage(video, 0, 0, shot.width, shot.height);
+    const R = deviceR(ori);
+    const yaw = (headingOf(R) * 180) / Math.PI;
+    const meta = {
+      R, // 카메라→(센서 기준)세계 회전, 중력 방향 포함
+      fovLong,
+      prior: pose.ok
+        ? { f: pose.f, x: pose.x, y: pose.y, yaw: pose.yaw }
+        : { f: pointAt(route, cum, hintS).f },
+    };
+    shot.toBlob(
+      async (blob) => {
+        try {
+          const fd = new FormData();
+          fd.append("image", blob, "q.jpg");
+          fd.append("meta", JSON.stringify(meta));
+          const res = await fetch(LOC_URL, { method: "POST", body: fd });
+          const r = await res.json();
+          if (!closed && r && r.ok)
+            worker.postMessage({ type: "fix", fix: r, yaw });
+        } catch {}
+        locBusy = false;
+      },
+      "image/jpeg",
+      0.7,
+    );
+  }
 
   // ---- 보조
   function setStatus(kind, text) {
@@ -979,6 +1337,7 @@ export async function openAR(opts) {
     document.removeEventListener("visibilitychange", onVis);
     if (voice.supported) speechSynthesis.cancel();
     removeEventListener("deviceorientation", onOri);
+    removeEventListener("devicemotion", onMotion);
     removeEventListener("resize", resize);
     stream?.getTracks().forEach((t) => t.stop());
     video.pause();
@@ -986,6 +1345,7 @@ export async function openAR(opts) {
     video.srcObject = null;
     video.load();
     renderer.dispose();
+    dbg?.remove();
     pathMesh?.geometry.dispose();
     root.hidden = true;
     onClose?.();

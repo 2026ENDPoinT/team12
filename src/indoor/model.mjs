@@ -51,6 +51,19 @@ function decodeGrid(b64) {
   return new Uint8Array(Buffer.from(b64, "base64"));
 }
 
+/** 도면 걷기 격자 → walk(층, x, y) (AR 워커처럼 경로 탐색 없이 격자만 필요할 때) */
+export function makeWalk(M) {
+  const grids = {};
+  for (const f of M.floors) grids[f.n] = decodeGrid(f.grid);
+  return (n, x, y) => {
+    const i = Math.floor((x - M.gx0) / M.cell),
+      j = Math.floor((M.gy1 - y) / M.cell);
+    if (!grids[n] || i < 0 || j < 0 || i >= M.gw || j >= M.gh) return false;
+    const k = j * M.gw + i;
+    return ((grids[n][k >> 3] >> (7 - (k & 7))) & 1) === 1;
+  };
+}
+
 export function inPoly(p, x, y) {
   let c = false;
   for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
@@ -72,16 +85,7 @@ const norm = (s) =>
 export function createIndoor(M) {
   const floors = M.floors.map((f) => f.n);
   const FL = (n) => M.floors.find((f) => f.n === n);
-  const grids = {};
-  for (const f of M.floors) grids[f.n] = decodeGrid(f.grid);
-
-  function walk(n, x, y) {
-    const i = Math.floor((x - M.gx0) / M.cell),
-      j = Math.floor((M.gy1 - y) / M.cell);
-    if (!grids[n] || i < 0 || j < 0 || i >= M.gw || j >= M.gh) return false;
-    const k = j * M.gw + i;
-    return ((grids[n][k >> 3] >> (7 - (k & 7))) & 1) === 1;
-  }
+  const walk = makeWalk(M);
   function nearest(n, x, y, R = 18) {
     if (walk(n, x, y)) return [x, y];
     for (let r = M.cell; r < R; r += M.cell)

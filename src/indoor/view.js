@@ -8,6 +8,13 @@ import {
   CSS2DObject,
 } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import {
+  texturize,
+  glassMaterial,
+  interiorEnvironment,
+  flatNormals,
+  LIGHTING,
+} from "./materials.mjs";
 
 const VIOLET = 0x7950ff,
   DEEP = 0x5330d2;
@@ -17,6 +24,9 @@ export function createView(el, indoor, { onPick } = {}) {
   const { M, FL } = indoor;
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  // 질감 재질(materials.mjs)용 톤 매핑. 경로·핀 같은 표시는 toneMapped:false 로 원래 색 그대로
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMappingExposure = LIGHTING.mapExposure;
   el.appendChild(renderer.domElement);
   const lr = new CSS2DRenderer();
   Object.assign(lr.domElement.style, {
@@ -28,8 +38,8 @@ export function createView(el, indoor, { onPick } = {}) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xeef0f6);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xe6e0d2, 1.8));
-  const sun = new THREE.DirectionalLight(0xffffff, 0.7);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xe6e0d2, LIGHTING.hemi));
+  const sun = new THREE.DirectionalLight(0xffffff, LIGHTING.sun);
   sun.position.set(30, 80, 20);
   scene.add(sun);
 
@@ -99,22 +109,37 @@ export function createView(el, indoor, { onPick } = {}) {
     const g = await new Promise((ok, fail) =>
       new GLTFLoader().parse(buf, "", ok, fail),
     );
+    // 질감(materials.mjs): 촬영 영상을 참고한 바닥 타일·벽·문·금속·나무·유리 재질 + 실내 반사광
+    try {
+      scene.environment = await interiorEnvironment(renderer);
+      scene.environmentIntensity = LIGHTING.env;
+    } catch {}
     g.scene.traverse((o) => {
       if (!o.isMesh) return;
-      o.material =
-        o.name[0] === "G"
-          ? new THREE.MeshBasicMaterial({
-              color: 0xcfe6f2,
-              transparent: true,
-              opacity: 0.28,
-              side: THREE.DoubleSide,
-              depthWrite: false,
-            })
-          : new THREE.MeshLambertMaterial({
-              vertexColors: true,
-              flatShading: true,
-              side: THREE.DoubleSide,
-            });
+      if (o.name[0] === "G") {
+        flatNormals(o);
+        o.material = glassMaterial();
+      } else if (o.name[0] === "X") {
+        flatNormals(o);
+        o.material = new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.9,
+          side: THREE.DoubleSide,
+        });
+      } else
+        texturize(
+          o,
+          renderer,
+          // D<층>: 벽·바닥과 같은 평면에 붙은 문짝·걸레받이·바닥 무늬(scripts/clean-mirae.py).
+          // 살짝 앞으로 당겨 그려 가까이 가도 벽과 번갈아 반짝이지 않게 합니다.
+          o.name[0] === "D"
+            ? {
+                polygonOffset: true,
+                polygonOffsetFactor: -1,
+                polygonOffsetUnits: -4,
+              }
+            : {},
+        );
       nodes[o.name] = o;
     });
     scene.add(g.scene);
@@ -393,12 +418,14 @@ export function createView(el, indoor, { onPick } = {}) {
     return geo;
   }
   const matMain = new THREE.MeshBasicMaterial({
+    toneMapped: false,
     color: VIOLET,
     side: THREE.DoubleSide,
     polygonOffset: true,
     polygonOffsetFactor: -2,
   });
   const matGhost = new THREE.MeshBasicMaterial({
+    toneMapped: false,
     color: VIOLET,
     transparent: true,
     opacity: 0.28,
@@ -406,6 +433,7 @@ export function createView(el, indoor, { onPick } = {}) {
     side: THREE.DoubleSide,
   });
   const matChev = new THREE.MeshBasicMaterial({
+    toneMapped: false,
     color: 0xffffff,
     side: THREE.DoubleSide,
     depthTest: false,
@@ -557,11 +585,19 @@ export function createView(el, indoor, { onPick } = {}) {
     const g = new THREE.Group();
     const ring = new THREE.Mesh(
       new THREE.CircleGeometry(0.75, 28),
-      new THREE.MeshBasicMaterial({ color: VIOLET, depthTest: false }),
+      new THREE.MeshBasicMaterial({
+        toneMapped: false,
+        color: VIOLET,
+        depthTest: false,
+      }),
     );
     const dot = new THREE.Mesh(
       new THREE.CircleGeometry(0.48, 28),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false }),
+      new THREE.MeshBasicMaterial({
+        toneMapped: false,
+        color: 0xffffff,
+        depthTest: false,
+      }),
     );
     ring.rotation.x = dot.rotation.x = -Math.PI / 2;
     dot.position.y = 0.01;
@@ -573,6 +609,7 @@ export function createView(el, indoor, { onPick } = {}) {
   function makePin() {
     const g = new THREE.Group();
     const mat = new THREE.MeshLambertMaterial({
+      toneMapped: false,
       color: DEEP,
       emissive: 0x2a1580,
     });
@@ -583,7 +620,7 @@ export function createView(el, indoor, { onPick } = {}) {
     cone.position.y = 1.5;
     const dot = new THREE.Mesh(
       new THREE.SphereGeometry(0.28, 14, 10),
-      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+      new THREE.MeshBasicMaterial({ toneMapped: false, color: 0xffffff }),
     );
     dot.position.set(0, 2.6, 0.55);
     g.add(head, cone, dot);
@@ -594,6 +631,7 @@ export function createView(el, indoor, { onPick } = {}) {
     const halo = new THREE.Mesh(
       new THREE.CircleGeometry(1.4, 30),
       new THREE.MeshBasicMaterial({
+        toneMapped: false,
         color: 0x3d8bff,
         transparent: true,
         opacity: 0.22,
@@ -602,11 +640,16 @@ export function createView(el, indoor, { onPick } = {}) {
     );
     const dot = new THREE.Mesh(
       new THREE.CircleGeometry(0.55, 24),
-      new THREE.MeshBasicMaterial({ color: 0x3d8bff, depthTest: false }),
+      new THREE.MeshBasicMaterial({
+        toneMapped: false,
+        color: 0x3d8bff,
+        depthTest: false,
+      }),
     );
     const cone = new THREE.Mesh(
       new THREE.CircleGeometry(2.6, 24, -0.45, 0.9),
       new THREE.MeshBasicMaterial({
+        toneMapped: false,
         color: 0x3d8bff,
         transparent: true,
         opacity: 0.3,
@@ -636,6 +679,8 @@ export function createView(el, indoor, { onPick } = {}) {
   function setFirstPerson(on) {
     firstPerson = on;
     ctl.enabled = !on;
+    // 위에서 내려다볼 때는 바닥이 칙칙해 보이지 않게 조금 더 밝게
+    renderer.toneMappingExposure = on ? LIGHTING.exposure : LIGHTING.mapExposure;
     applyVisibility();
     updateLabels();
   }

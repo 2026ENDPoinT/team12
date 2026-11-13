@@ -767,6 +767,37 @@ a {
   color: #fff;
   backdrop-filter: blur(6px);
 }
+button.ar-status {
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+button.ar-status::after {
+  content: " ▾";
+  opacity: 0.7;
+}
+.ar-floors {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.ar-floors[hidden] {
+  display: none;
+}
+.ar-floors button {
+  min-width: 44px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: #24203599;
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  backdrop-filter: blur(6px);
+}
+.ar-floors button.on {
+  background: var(--violet);
+}
 .ar-status.searching::before,
 .ar-status.ok::before,
 .ar-status.weak::before {
@@ -1272,4 +1303,18 @@ a {
 .walk-ctrl #walk-play {
   border: 3px solid #fff;
   box-shadow: 0 4px 16px #24203566;
+}
+.ar-debug {
+  position: absolute;
+  left: 8px;
+  top: 34%;
+  margin: 0;
+  padding: 6px 8px;
+  font: 11px/1.45 ui-monospace, monospace;
+  color: #b6ff6a;
+  background: #000a;
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 5;
+  white-space: pre;
 }

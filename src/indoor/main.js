@@ -418,6 +418,9 @@ function routeUrl() {
   q.set("from", state.start.id);
   q.set("to", state.dest.key);
   if (state.mode === "elevator") q.set("mode", "elevator");
+  // 시험용 설정(진단 표시·화각·위치 서버)은 주소에 남겨 둠
+  const cur = new URLSearchParams(location.search);
+  for (const k of ["debug", "fov", "loc"]) if (cur.has(k)) q.set(k, cur.get(k));
   return `${location.pathname}?${q}`;
 }
 $("#route-share").onclick = async () => {
