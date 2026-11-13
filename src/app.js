@@ -1,5 +1,6 @@
 import { shortestPath } from "./routing.mjs";
 import { routeBetween } from "./route-target.mjs";
+import { attachGps } from "./gps-start.mjs";
 import {
   edgeId,
   reportLocation,
@@ -185,11 +186,13 @@ setRoutePlace("#destination", activeDestination);
 let graph = { nodes: NODES, edges: EDGES, entrances: SURVEY.entrances };
 function selectedPlace(selector, g = graph) {
   const id = routePlaceId(selector);
+  // 현재 위치는 routeOn에서 길 위의 점으로 붙입니다(placeGps). entries는 붙이기 전 기본값입니다.
   if (id === "gps")
-    return gpsStartNode
+    return gpsStartNode && gpsPosition
       ? {
           id: "gps",
           name: "현재 위치",
+          gps: gpsPosition,
           entry: gpsStartNode,
           entries: [gpsStartNode],
         }
@@ -203,26 +206,49 @@ function selectedPlace(selector, g = graph) {
 // [팀 알고리즘 호출 지점]
 // 신고된 차단 edge를 제외한 그래프를 routing.mjs의 임시 알고리즘에 전달합니다.
 // 건물에 출입구가 여러 개면 route-target.mjs가 가장 가까운 문을 고릅니다.
+// 현재 위치가 출발지·도착지면 가장 가까운 길 위의 점을 그래프에 더해 그 점에서 시작합니다.
+// 반환하는 nodes는 그 점까지 포함한 노드 목록이라, 경로를 그릴 때 이것을 씁니다.
 function routeOn(g) {
-  const start = selectedPlace("#origin", g),
+  let start = selectedPlace("#origin", g),
     destination = selectedPlace("#destination", g);
-  if (!start || !destination) return { start, destination, route: null };
+  if (!start || !destination)
+    return { start, destination, route: null, nodes: g.nodes };
+  // 확정된 공사 구간을 먼저 빼서, 막힌 길 위에는 출발점이 생기지 않게 합니다.
+  let routeGraph = {
+    nodes: g.nodes,
+    edges: availableEdges(confirmedEdges, g.edges),
+  };
+  [start, routeGraph] = placeGps(start, routeGraph, g, "gps-start");
+  [destination, routeGraph] = placeGps(destination, routeGraph, g, "gps-goal");
   return {
     start,
     destination,
+    nodes: routeGraph.nodes,
     route: routeBetween(
       start.entries,
       destination.entries,
       mode,
-      g.nodes,
-      availableEdges(confirmedEdges, g.edges),
+      routeGraph.nodes,
+      routeGraph.edges,
     ),
   };
+}
+function placeGps(place, routeGraph, g, id) {
+  if (place.id !== "gps") return [place, routeGraph];
+  const at = attachGps(place.gps, routeGraph, { buildings: BUILDINGS, id });
+  if (!at) return [place, routeGraph];
+  // 건물 안이면 그 건물을 고른 것처럼 가장 가까운 출입구에서 출발합니다.
+  if (at.kind === "building")
+    return [
+      { ...place, entries: placeEntries(at.building, g.entrances) },
+      routeGraph,
+    ];
+  return [{ ...place, entries: [at.nodeId] }, at.graph];
 }
 function updateRoute({ announce = false } = {}) {
   activeStart = routePlaceId("#origin") || activeStart;
   activeDestination = routePlaceId("#destination") || activeDestination;
-  const { start, destination, route } = routeOn(graph);
+  const { start, destination, route, nodes } = routeOn(graph);
   if (!start || !destination) {
     const gpsWaiting =
       routePlaceId("#origin") === "gps" ||
@@ -261,7 +287,7 @@ function updateRoute({ announce = false } = {}) {
   );
   visible.forEach((id, i) => {
     const li = document.createElement("li");
-    const point = graph.nodes[id];
+    const point = nodes[id];
     const nearestBuilding = BUILDINGS.filter(
       (b) => b.name !== "교내 건물",
     ).reduce(
@@ -292,7 +318,7 @@ function updateRoute({ announce = false } = {}) {
     $("#route-steps").append(li);
   });
   $("#indoor-open").hidden = destination.id !== "future";
-  map?.setRoute(currentRoute, start.id, destination.id, graph.nodes);
+  map?.setRoute(currentRoute, start.id, destination.id, nodes);
   if (announce)
     toast(`${start.name}에서 ${destination.name}까지 경로를 표시했어요.`);
 }
