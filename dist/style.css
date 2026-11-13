@@ -4571,7 +4571,7 @@ body.exploring .header {
   }
   .building-card-row {
     display: grid;
-    grid-template-columns: 22px 1fr auto;
+    grid-template-columns: 22px max-content minmax(0, 1fr);
     align-items: center;
     gap: 10px;
     margin: 0;
@@ -4582,7 +4582,12 @@ body.exploring .header {
     height: 20px;
     color: var(--v2-muted);
   }
+  .building-card-row > span {
+    white-space: nowrap;
+  }
   .building-card-row b {
+    white-space: pre-line;
+    text-align: right;
     color: var(--v2-muted);
     font-size: 13px;
     font-weight: 500;

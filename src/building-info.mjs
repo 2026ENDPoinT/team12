@@ -2,7 +2,7 @@
 // 출처: https://seoultech-map.pages.dev/data/campus.js (원자료: https://www.seoultech.ac.kr/intro/map/)
 // 출처에 등재됐거나 별도 공식 자료로 확인한 층을 표시합니다.
 // 생활관의 시간은 등록 입주생의 출입문 개방 시간입니다.
-const residentHours = "05:00–24:00 (입주생)";
+const residentHours = "24시간 (입주생)";
 export const BUILDING_INFO = {
   "대학본부": { floors: "B1 · 1F–5F" },
   // 기계공학과 시설 현황에 다산관 401호가 등재돼 있습니다.
@@ -19,8 +19,15 @@ export const BUILDING_INFO = {
   "도예관": { floors: "1F" },
   "창업보육센터": { floors: "B1 · 1F–4F" },
   "프론티어관": { floors: "B1 · 1F–10F · 옥탑 1층" },
-  "중앙도서관": { floors: "1F–3F · 옥탑 1층" },
-  "중앙도서관 별관": { floors: "B1 · 1F–2F" },
+  // https://library.seoultech.ac.kr/ 이용시간 안내 (2026-11-14 확인)
+  "중앙도서관": {
+    floors: "1F–3F · 옥탑 1층",
+    hours: "학기 평일 09:00–21:00\n방학 평일 09:00–18:00\n토요일 휴관",
+  },
+  "중앙도서관 별관": {
+    floors: "B1 · 1F–2F",
+    hours: "2F 열람실 · 학기 24시간\n방학 06:00–24:00\n자료실 · 평일 09:00–18:00",
+  },
   "학생회관": { floors: "B1 · 1F–3F · 옥탑 1층" },
   "국제관": { floors: "B1 · 1F–5F" },
   "다빈치관": { floors: "B1 · 1F–7F · 옥탑 1층" },

@@ -24,7 +24,7 @@ test("층 정보에 공개 지도와 추가 공식 자료를 반영한다", () =
 test("공식 생활관 출입 시간은 입주생 기준으로 표시한다", () => {
   assert.deepEqual(buildingInfo("누리학사"), {
     floors: "B1 · 1F–10F",
-    hours: "05:00–24:00 (입주생)",
+    hours: "24시간 (입주생)",
   });
   assert.equal(buildingInfo("창명학사").floors, "1F–4F");
   assert.equal(buildingInfo("수림학사").floors, "B1 · 1F–7F");
