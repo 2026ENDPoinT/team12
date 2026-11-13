@@ -649,6 +649,17 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     camera.updateProjectionMatrix();
     controls.update();
   }
+  // 건물 검색 결과에서 고른 건물로 카메라를 옮깁니다(이름표 더블클릭과 같은 시점).
+  function focusPlace(id) {
+    const record = buildingLayer.records.find((r) => r.b.id === id);
+    if (record) focusBuilding({ ...record.b, h: record.height });
+    return Boolean(record);
+  }
+  // 건물 정보 카드로 고른 건물의 이름표를 강조합니다. null이면 강조를 지웁니다.
+  function highlightBuilding(id) {
+    for (const item of labelObjects)
+      item.label.element.classList.toggle("is-selected", item.id === id);
+  }
   function zoom(factor) {
     camera.zoom = THREE.MathUtils.clamp(camera.zoom * factor, 0.5, 12);
     camera.updateProjectionMatrix();
@@ -1115,6 +1126,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     zoom,
     reset,
     top,
+    focusPlace,
+    highlightBuilding,
     dispose() {
       cancelAnimationFrame(frame);
       profiler?.dispose();

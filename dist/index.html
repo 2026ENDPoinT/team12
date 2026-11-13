@@ -20,6 +20,49 @@
   <body>
     <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg">
       <defs>
+        <symbol id="i-map" viewBox="0 0 24 24">
+          <path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Zm6-3v15m6-12v15" />
+        </symbol>
+        <symbol id="i-building" viewBox="0 0 24 24">
+          <rect x="5" y="3" width="14" height="18" rx="1.5" />
+          <path d="M9 7h1m4 0h1M9 11h1m4 0h1M9 15h1m4 0h1M10 21v-3h4v3" />
+        </symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24">
+          <path d="M12 3 2 20h20Zm0 6v5m0 3v.5" />
+        </symbol>
+        <symbol id="i-layers" viewBox="0 0 24 24">
+          <path d="m12 3 9 5-9 5-9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5" />
+        </symbol>
+        <symbol id="i-download" viewBox="0 0 24 24">
+          <path d="M12 3v12m-5-5 5 5 5-5M4 20h16" />
+        </symbol>
+        <symbol id="i-bell" viewBox="0 0 24 24">
+          <path
+            d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4Zm4 4a2 2 0 0 0 4 0"
+          />
+        </symbol>
+        <symbol id="i-sliders" viewBox="0 0 24 24">
+          <path d="M5 4v6m0 4v6m7-16v10m0 4v2m7-16v2m0 4v10M3 12h4m3-4h4m3 8h4" />
+        </symbol>
+        <symbol id="i-locate" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="6" />
+          <circle cx="12" cy="12" r="2" />
+          <path d="M12 2v4m0 12v4M2 12h4m12 0h4" />
+        </symbol>
+        <symbol id="i-walk" viewBox="0 0 24 24">
+          <circle cx="13" cy="4" r="2" />
+          <path d="m9 21 2-6 3 3v3m-6-8 2-5 4 2 2 3m-8-1 2-4" />
+        </symbol>
+        <symbol id="i-flag" viewBox="0 0 24 24">
+          <path d="M5 21V4m0 0h11l-2 4 2 4H5" />
+        </symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24">
+          <path d="m9 6 6 6-6 6" />
+        </symbol>
         <symbol id="i-search" viewBox="0 0 24 24">
           <circle cx="10.5" cy="10.5" r="6.5" />
           <path d="m16 16 5 5" />
@@ -183,17 +226,113 @@
       </footer>
     </main>
     <section id="map-view" class="map-view" hidden>
+      <nav class="map-sidebar" aria-label="지도 메뉴">
+        <a class="map-sidebar-brand" href="#campuses" aria-label="학교 검색으로 돌아가기"
+          >사이.</a
+        >
+        <span class="map-sidebar-divider" aria-hidden="true"></span>
+        <button data-side="map" aria-label="건물 검색 바 보이기" aria-pressed="true" title="건물 검색 바">
+          <svg class="icon"><use href="#i-map" /></svg>
+        </button>
+        <button
+          data-side="route"
+          aria-label="길찾기 패널"
+          aria-pressed="false"
+          title="길찾기"
+        >
+          <svg class="icon"><use href="#i-route" /></svg>
+        </button>
+        <button data-side="building" aria-label="건물 검색" title="건물 검색">
+          <svg class="icon"><use href="#i-building" /></svg>
+        </button>
+        <button
+          data-side="report"
+          aria-label="길 막힘 제보"
+          aria-pressed="false"
+          title="길 막힘 제보"
+        >
+          <svg class="icon"><use href="#i-alert" /></svg>
+        </button>
+        <button
+          data-side="layers"
+          aria-label="지도 범례 보기"
+          aria-pressed="false"
+          title="지도 범례"
+        >
+          <svg class="icon"><use href="#i-layers" /></svg>
+        </button>
+        <a
+          data-side="download"
+          href="data/seoultech.geojson"
+          download
+          aria-label="캠퍼스 GIS 데이터 받기"
+          title="GIS 데이터 받기"
+          ><svg class="icon"><use href="#i-download" /></svg
+        ></a>
+        <span class="map-sidebar-spacer" aria-hidden="true"></span>
+        <button data-side="alerts" aria-label="관리자 검토 알림" title="관리자 검토">
+          <svg class="icon"><use href="#i-bell" /></svg
+          ><span id="side-alert-count" class="map-sidebar-badge" hidden>0</span>
+        </button>
+        <button
+          data-side="settings"
+          aria-label="지도 조작 안내 보기"
+          aria-pressed="false"
+          title="지도 조작 안내"
+        >
+          <svg class="icon"><use href="#i-sliders" /></svg>
+        </button>
+      </nav>
+      <div id="route-summary-bar" class="route-summary-bar" hidden>
+        <span class="summary-dot summary-origin" aria-hidden="true"></span
+        ><b id="summary-origin"></b
+        ><svg class="icon" aria-hidden="true"><use href="#i-chevron" /></svg
+        ><span class="summary-dot summary-dest" aria-hidden="true"></span
+        ><b id="summary-dest"></b>
+        <div class="summary-modes" role="group" aria-label="경로 방식">
+          <button data-summary-mode="shortest">최단 경로</button
+          ><button data-summary-mode="stepfree">계단 피하기</button>
+        </div>
+        <button id="summary-edit">수정</button>
+      </div>
       <div class="map-topbar">
         <button id="back-home" aria-label="학교 검색으로 돌아가기">←</button
         ><span class="map-mini-brand">사이.</span
         ><span class="map-school-name"
           >서울과학기술대학교 <small>공릉캠퍼스</small></span
-        ><button id="panel-toggle" class="panel-toggle" aria-expanded="true">
+        ><div class="building-search" role="search">
+          <svg class="icon" aria-hidden="true"><use href="#i-search" /></svg
+          ><input
+            id="building-search"
+            type="search"
+            placeholder="건물 검색"
+            aria-label="건물 검색"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-controls="building-results"
+            aria-expanded="false"
+            autocomplete="off"
+            enterkeyhint="search"
+            spellcheck="false"
+          /><kbd aria-hidden="true">/</kbd>
+          <div
+            id="building-results"
+            class="building-results"
+            role="listbox"
+            aria-label="건물 검색 결과"
+            hidden
+          ></div>
+        </div>
+        <button id="panel-toggle" class="panel-toggle" aria-expanded="true">
           길찾기 접기
         </button>
       </div>
       <div class="explorer">
         <aside class="route-panel">
+          <div class="route-panel-head">
+            <b>길찾기</b
+            ><button id="route-panel-close" aria-label="길찾기 패널 닫기">✕</button>
+          </div>
           <div class="mobile-route-heading">
             <b>캠퍼스 길찾기</b><span>건물 이름을 검색해주세요</span>
           </div>
@@ -228,13 +367,19 @@
             />
             <datalist id="route-places"></datalist>
           </div>
+          <p class="mode-heading">어떤 길로 갈까요?</p>
           <div class="mode-tabs" role="group" aria-label="경로 모드">
             <button class="active" data-mode="shortest" aria-pressed="true">
-              ↗ 최단 경로</button
+              <span class="mode-name">↗ 최단 경로</span
+              ><small class="mode-meta" data-mode-meta="shortest"></small
+              ><b class="mode-time" data-mode-time="shortest"></b></button
             ><button data-mode="stepfree" aria-pressed="false">
-              ▱ 계단 피하기
+              <span class="mode-name">▱ 계단 피하기</span
+              ><small class="mode-meta" data-mode-meta="stepfree"></small
+              ><b class="mode-time" data-mode-time="stepfree"></b>
             </button>
           </div>
+          <p class="mode-hint">고르면 바로 지도에 경로가 그려져요.</p>
           <button id="find-route" class="primary route-submit">
             경로 찾기 <svg class="icon"><use href="#i-arrow" /></svg>
           </button>
@@ -410,6 +555,86 @@
             N ↑
           </button>
           <div id="building-popover" class="building-popover" hidden></div>
+          <aside id="result-panel" class="result-panel" aria-label="경로와 건물 정보" hidden>
+            <section id="route-card" class="result-card route-card" hidden>
+              <div class="result-card-head">
+                <span class="result-card-icon route-card-icon" aria-hidden="true"
+                  ><svg class="icon"><use href="#i-route" /></svg
+                ></span>
+                <div>
+                  <h3 id="route-card-title">최단 경로</h3>
+                  <small id="route-card-sub"></small>
+                </div>
+                <button id="route-card-close" aria-label="경로 지우기">✕</button>
+              </div>
+              <p class="route-card-time">
+                <b id="route-card-minutes">—</b><span>분</span
+                ><small id="route-card-distance"></small>
+              </p>
+              <ol id="route-card-steps" class="route-card-steps"></ol>
+              <button id="route-card-start" class="result-card-primary">
+                안내 시작
+                <svg class="icon" aria-hidden="true"><use href="#i-chevron" /></svg>
+              </button>
+            </section>
+            <section
+              id="building-card"
+              class="building-card"
+              aria-labelledby="building-card-name"
+              hidden
+            >
+              <div class="building-card-head">
+                <span class="building-card-icon" aria-hidden="true"
+                  ><svg class="icon"><use href="#i-building" /></svg
+                ></span>
+                <div>
+                  <h3 id="building-card-name"></h3>
+                  <small id="building-card-sub"></small>
+                </div>
+                <button id="building-card-close" aria-label="건물 정보 닫기">
+                  ✕
+                </button>
+              </div>
+              <div class="building-card-stats">
+                <span><small>층</small><b id="building-card-floors">—</b></span
+                ><span
+                  ><small>출입구</small><b id="building-card-entrances">—</b></span
+                >
+              </div>
+              <p class="building-card-row">
+                <svg class="icon" aria-hidden="true"><use href="#i-clock" /></svg
+                ><span>개방 시간</span><b id="building-card-hours">—</b>
+              </p>
+              <div class="building-card-actions">
+                <button id="building-card-origin">출발지로</button
+                ><button id="building-card-dest" class="primary">도착지로</button>
+              </div>
+              <button id="building-card-indoor" class="building-card-indoor">
+                <svg class="icon" aria-hidden="true"><use href="#i-cube" /></svg
+                >실내 탐색
+              </button>
+            </section>
+          </aside>
+          <div class="v2-map-controls" aria-label="지도 보기 조작">
+            <div class="v2-dimension" role="group" aria-label="지도 시점">
+              <button id="v2-2d" aria-pressed="false">2D</button
+              ><button id="v2-3d" aria-pressed="true">3D</button>
+            </div>
+            <div class="v2-zoom">
+              <button id="v2-plus" aria-label="지도 확대">＋</button
+              ><button id="v2-minus" aria-label="지도 축소">−</button>
+            </div>
+            <button id="v2-locate" aria-label="내 위치" aria-pressed="false">
+              <svg class="icon"><use href="#i-locate" /></svg>
+            </button>
+            <button id="v2-reset" aria-label="지도 시점 초기화">
+              <svg class="icon"><use href="#i-cube" /></svg>
+            </button>
+          </div>
+          <small class="map-attribution"
+            >© OpenStreetMap 기여자 · 국토교통부 브이월드 · SMASH</small
+          >
+
           <div id="map-error" class="map-error" hidden>
             <h3>3D 지도를 표시할 수 없어요</h3>
             <p>
@@ -417,6 +642,28 @@
               선택하면 경로 정보는 확인할 수 있습니다.
             </p>
           </div>
+        </div>
+      </div>
+      <div
+        id="indoor-loading"
+        class="indoor-loading"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="indoor-loading-title"
+        hidden
+      >
+        <button id="indoor-loading-back" class="indoor-loading-back">
+          ← 지도로 돌아가기
+        </button>
+        <div class="indoor-loading-card">
+          <span class="indoor-spinner" aria-hidden="true"></span
+          ><span class="indoor-loading-tag" id="indoor-loading-tag"
+            >미래관 · 실내</span
+          >
+          <h2 id="indoor-loading-title">실내 지도를 불러오는 중이에요</h2>
+          <p>층별 도면과 강의실 정보를 준비하고 있어요.</p>
+          <div class="indoor-progress" aria-hidden="true"><i></i></div>
+          <small>데모 준비 중 · 실내 탐색 화면은 나중에 연결돼요.</small>
         </div>
       </div>
     </section>
