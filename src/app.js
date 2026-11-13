@@ -1007,19 +1007,21 @@ $("#v2-minus").onclick = () => map?.zoom(1 / 1.18);
 $("#v2-locate").onclick = () => $("#gps-toggle").click();
 $("#v2-reset").onclick = () => setDimension(false);
 
-// ===== 지도 화면에서는 페이지 확대를 막고 지도만 확대합니다 =====
-// 패널·이름표 위에서 오므리기/벌리기(Ctrl+휠)나 Ctrl·⌘ +/−를 누르면 브라우저가 페이지 전체를
-// 확대해 메뉴·패널이 커지고 화면 밖으로 밀려납니다. 지도 화면에서는 이 확대를 모두 지도로 보냅니다.
+// ===== 페이지 확대를 막습니다(표지·학교 검색 화면과 지도 화면 모두) =====
+// 오므리기/벌리기(Ctrl+휠)나 Ctrl·⌘ +/−를 누르면 브라우저가 페이지 전체를 확대해
+// 메뉴·패널이 커지고 화면 밖으로 밀려납니다. 페이지는 항상 같은 크기로 두고,
+// 지도 화면에서는 그 확대를 지도로 보냅니다.
 const onMapView = () => !$("#map-view").hidden;
 const mapCanvas = () => $("#campus-map canvas");
 document.addEventListener(
   "wheel",
   (e) => {
-    if (!e.ctrlKey || !onMapView()) return;
+    if (!e.ctrlKey) return;
     const canvas = mapCanvas();
     // 지도 위는 지도가 직접 처리합니다(같은 이벤트를 두 번 보내지 않음).
-    if (!canvas || e.target === canvas) return;
+    if (onMapView() && canvas && e.target === canvas) return;
     e.preventDefault();
+    if (!onMapView() || !canvas) return;
     canvas.dispatchEvent(
       new WheelEvent("wheel", {
         deltaX: e.deltaX,
@@ -1034,26 +1036,29 @@ document.addEventListener(
   },
   { passive: false },
 );
-// Safari 트랙패드 제스처: 지도 밖(패널 위)에서도 페이지 대신 지도를 확대합니다.
+// Safari 트랙패드 제스처: 페이지는 확대하지 않고, 지도 화면이면 지도를 확대합니다.
 let pageGestureScale = null;
 for (const type of ["gesturestart", "gesturechange", "gestureend"])
   document.addEventListener(type, (e) => {
-    if (!onMapView() || e.target === mapCanvas()) return;
+    if (onMapView() && e.target === mapCanvas()) return;
     e.preventDefault();
+    if (!onMapView()) return;
     if (type === "gesturestart") pageGestureScale = e.scale;
     else if (type === "gesturechange" && pageGestureScale) {
       map?.zoom(e.scale / pageGestureScale);
       pageGestureScale = e.scale;
     } else pageGestureScale = null;
   });
-// Ctrl·⌘ + / − / 0: 페이지 대신 지도를 확대·축소·처음 시점으로.
+// Ctrl·⌘ + / −: 페이지 확대를 막고, 지도 화면이면 지도를 확대·축소합니다.
+// Ctrl·⌘ 0은 표지 화면에서는 브라우저에 맡겨(이미 확대된 페이지를 되돌릴 수 있게) 두고,
+// 지도 화면에서는 지도 처음 시점으로 씁니다.
 document.addEventListener("keydown", (e) => {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey || !onMapView()) return;
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
   const zoom = { "+": 1.18, "=": 1.18, "-": 1 / 1.18, _: 1 / 1.18 }[e.key];
   if (zoom) {
     e.preventDefault();
-    map?.zoom(zoom);
-  } else if (e.key === "0") {
+    if (onMapView()) map?.zoom(zoom);
+  } else if (e.key === "0" && onMapView()) {
     e.preventDefault();
     map?.reset();
   }
