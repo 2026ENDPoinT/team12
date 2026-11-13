@@ -221,15 +221,59 @@ function addPassage(graph, feature, id, ctx) {
   });
 }
 
+const isTeamStairs = (e) =>
+  e.source_kind === "team_input" && e.type === "stairs";
+
+/**
+ * 팀이 현장에서 확인해 그린 계단이 자동 생성 평지 선과 겹치면 평지 선을 뺍니다.
+ * 그대로 두면 계단 없는 모드가 계단 바로 옆의 평지 선으로 지나가기 때문입니다.
+ * 1) 팀 계단과 같은 두 점을 잇는 자동 평지 선을 뺀다.
+ * 2) 팀 계단이 자동 생성 입구(building.entry)의 연결선(노란 선)에 닿으면 — 입구 점이든
+ *    선 중간이든 — 그 연결선 전체를 뺀다. 연결선은 실제 길이 아니라 자동으로 그은 선입니다.
+ * 팀이 그린 선(source_kind: team_input)은 건드리지 않습니다. graph를 직접 고칩니다.
+ * 연결선 조각은 mergeSurvey가 붙인 AUTO_ENTRY 표시로 알아봅니다(잘려도 표시가 따라감).
+ * docs/decisions.md 2026-11-14 참고.
+ */
+const AUTO_ENTRY = "_autoEntry";
+function replaceFlatUnderStairs(graph) {
+  const stairs = graph.edges.filter(isTeamStairs);
+  if (!stairs.length) return;
+  const pair = (e) => (e.a < e.b ? `${e.a}--${e.b}` : `${e.b}--${e.a}`),
+    stairPairs = new Set(stairs.map(pair)),
+    stairNodes = new Set(stairs.flatMap((e) => [e.a, e.b])),
+    touchedDoors = new Set(
+      graph.edges
+        .filter(
+          (e) => e[AUTO_ENTRY] && (stairNodes.has(e.a) || stairNodes.has(e.b)),
+        )
+        .map((e) => e[AUTO_ENTRY]),
+    );
+  graph.edges = graph.edges.filter(
+    (e) =>
+      e.source_kind === "team_input" ||
+      e.stairs ||
+      !(stairPairs.has(pair(e)) || touchedDoors.has(e[AUTO_ENTRY])),
+  );
+}
+
 /**
  * base: { nodes, edges } (미터 좌표), survey: GeoJSON FeatureCollection (위경도)
  * 반환: { nodes, edges, entrances, warnings }
  * 같은 입력이면 항상 같은 결과가 나오도록 항목을 종류 → id 순으로 처리합니다.
  */
 export function mergeSurvey(base, survey, { origin, buildings }) {
-  const graph = {
+  const autoDoors = new Set(
+      (buildings || []).map((b) => b.entry).filter(Boolean),
+    ),
+    graph = {
       nodes: { ...base.nodes },
-      edges: base.edges.map((edge) => ({ ...edge })),
+      // 자동 생성 입구의 연결선에 표시를 달아 둡니다(replaceFlatUnderStairs). 끝에서 지웁니다.
+      edges: base.edges.map((edge) => {
+        const door = [edge.a, edge.b].find((n) => autoDoors.has(n));
+        return door && !edge.stairs
+          ? { ...edge, [AUTO_ENTRY]: door }
+          : { ...edge };
+      }),
     },
     entrances = [],
     warnings = [],
@@ -257,7 +301,14 @@ export function mergeSurvey(base, survey, { origin, buildings }) {
     );
 
   const seen = new Set();
+  let linesDone = false;
   for (const { f, id } of features) {
+    // 길·계단을 다 넣은 뒤, 출입구를 붙이기 전에 팀 계단과 겹친 자동 평지 선을 뺍니다.
+    // 출입구가 빠질 선에 붙지 않게 하려는 순서입니다.
+    if (!linesDone && TYPE_ORDER[f.properties.feature_type] > 0) {
+      linesDone = true;
+      replaceFlatUnderStairs(graph);
+    }
     if (!id) {
       ctx.warn("(id 없음)", "조사 항목에 id가 없어 넣지 않았습니다.");
       continue;
@@ -272,6 +323,8 @@ export function mergeSurvey(base, survey, { origin, buildings }) {
     else if (type === "building_passage") addPassage(graph, f, id, ctx);
     else addLine(graph, f, id, ctx);
   }
+  if (!linesDone) replaceFlatUnderStairs(graph);
+  for (const e of graph.edges) delete e[AUTO_ENTRY];
   if (ctx.loose.length) {
     const degree = new Map();
     for (const e of graph.edges)
