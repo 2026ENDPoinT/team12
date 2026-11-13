@@ -48,3 +48,37 @@ test("guidance heading follows the route as it turns", () => {
   assert.equal(guidanceAt(route, { x: 0, z: -30 }).heading, 0);
   assert.equal(guidanceAt(route, { x: 0, z: -100 }).heading, 90);
 });
+
+test("a short sideways jog that returns to the same direction is not a turn", () => {
+  // 북쪽으로 가다 왼쪽으로 조금씩 비켜 간 뒤(−7°·−25°·−9°) 한 번에 원래 방향으로 돌아오는(+45°) 길
+  const jog = [
+    { x: 0, z: 0 },
+    { x: 0, z: -100 },
+    { x: -0.5, z: -110 },
+    { x: -3.5, z: -117 },
+    { x: -11, z: -130 },
+    { x: -11, z: -200 },
+    { x: 89, z: -200 },
+  ];
+  // S자 구간은 건너뛰고 끝의 실제 오른쪽 회전까지 거리를 안내합니다.
+  const guide = guidanceAt(jog, { x: 0, z: -20 });
+  assert.equal(guide.next.direction, "right");
+  assert.deepEqual(guide.nextPoint, { x: -11, z: -200 });
+});
+
+test("a corner taken in several small bends is one turn", () => {
+  // 20°씩 다섯 번 꺾어 동쪽(90°)으로 도는 모퉁이
+  const corner = [{ x: 0, z: 0 }, { x: 0, z: -100 }];
+  let heading = 0;
+  for (let i = 0; i < 5; i++) {
+    heading += 18;
+    const last = corner.at(-1),
+      rad = (heading * Math.PI) / 180;
+    corner.push({ x: last.x + Math.sin(rad) * 5, z: last.z - Math.cos(rad) * 5 });
+  }
+  const last = corner.at(-1);
+  corner.push({ x: last.x + 100, z: last.z });
+  const guide = guidanceAt(corner, { x: 0, z: -20 });
+  assert.equal(guide.next.direction, "right");
+  assert.ok(guide.next.distance >= 75 && guide.next.distance < 110);
+});
