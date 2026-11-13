@@ -327,7 +327,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     entranceRingGeometry = new THREE.RingGeometry(2.2, 3.1, 20);
   // 등록된 출입구(team-survey.json)를 초록 점으로 그립니다. 편집기로 바꾸면 다시 그립니다.
   let mappedEntrances = ENTRANCES,
-    entrancesVisible = true;
+    entrancesVisible = false;
   function setEntrances(list) {
     mappedEntrances = list;
     for (const child of [...entranceGroup.children])
