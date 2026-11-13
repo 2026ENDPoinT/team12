@@ -6,7 +6,13 @@ const SUPABASE_URL = "https://jydziqwmhjlwlsoiegdd.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_nlLz8LxRU7-DborGMtCnrQ_iDb8PjKR";
 const PHOTO_BUCKET = "report-photos";
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// 관리자 로그인은 현재 화면에서만 유지하고, 새로고침 뒤에는 다시 인증합니다.
+export const AUTH_OPTIONS = { auth: { persistSession: false } };
+export const supabase = createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  AUTH_OPTIONS,
+);
 
 // 권한 판정에는 사용자가 직접 바꿀 수 없는 app_metadata만 사용합니다.
 export const isAdminUser = (user) => user?.app_metadata?.role === "admin";
