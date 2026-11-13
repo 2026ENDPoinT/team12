@@ -519,69 +519,6 @@
     {
       "type": "Feature",
       "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [127.0804778, 37.6303598],
-          [127.0811056, 37.6302605]
-        ]
-      },
-      "properties": {
-        "id": "pass-10",
-        "campus_id": "SEOULTECH",
-        "feature_type": "building_passage",
-        "building_id": "way-382499351",
-        "from": "ent-way-382499351-5",
-        "to": "ent-way-382499351-4",
-        "length_m": 56,
-        "source_kind": "team_input",
-        "verification_status": "candidate"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [127.0811056, 37.6302605],
-          [127.0808883, 37.6300096]
-        ]
-      },
-      "properties": {
-        "id": "pass-11",
-        "campus_id": "SEOULTECH",
-        "feature_type": "building_passage",
-        "building_id": "way-382499351",
-        "from": "ent-way-382499351-4",
-        "to": "ent-way-382499351-3",
-        "length_m": 34,
-        "source_kind": "team_input",
-        "verification_status": "candidate"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [127.0808883, 37.6300096],
-          [127.0807864, 37.6295839]
-        ]
-      },
-      "properties": {
-        "id": "pass-12",
-        "campus_id": "SEOULTECH",
-        "feature_type": "building_passage",
-        "building_id": "way-382499351",
-        "from": "ent-way-382499351-3",
-        "to": "ent-way-382499351-1",
-        "length_m": 48,
-        "source_kind": "team_input",
-        "verification_status": "candidate"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
         "type": "Point",
         "coordinates": [127.0817251, 37.6292447]
       },
@@ -2594,6 +2531,23 @@
         "id": "path-46",
         "campus_id": "SEOULTECH",
         "feature_type": "stairs",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0814235, 37.6301929],
+          [127.0814144, 37.6301271]
+        ]
+      },
+      "properties": {
+        "id": "path-47",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
         "source_kind": "team_input",
         "verification_status": "candidate"
       }
