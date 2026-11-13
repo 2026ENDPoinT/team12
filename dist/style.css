@@ -7965,20 +7965,6 @@ body {
     font-weight: 700;
     white-space: nowrap;
   }
-  #navigation-compass {
-    position: fixed;
-    z-index: 35;
-    display: grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    border: 1px solid var(--v2-stroke);
-    border-radius: 50%;
-    background: var(--v2-tile);
-    backdrop-filter: var(--v2-glass-filter);
-    color: var(--v2-ink);
-  }
-  #navigation-compass { right: 16px; bottom: calc(140px + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* Night palette for campus controls and map overlays. */
@@ -8069,7 +8055,38 @@ body {
   border-color: var(--v2-stroke);
 }
 
-#navigation-compass[aria-pressed="true"] {
-  color: #15212b;
-  background: var(--lime);
+
+/* 모바일: 경로를 볼 때도 위쪽 검색 바를 항상 띄우고, 경로 요약은 그 아래에 작게 둡니다. */
+@media (max-width: 760px) {
+  .map-view.panel-closed.route-shown .map-topbar {
+    display: flex;
+    /* 검색 결과 시트가 이 바 안에 있어 경로 시트(25)보다 위에 둡니다. */
+    z-index: 26;
+  }
+  .map-view.panel-closed.route-shown .route-summary-bar {
+    top: calc(76px + env(safe-area-inset-top, 0px));
+    padding: 4px 4px 4px 14px;
+    font-size: 13px;
+  }
+  .map-view.panel-closed.route-shown .summary-modes {
+    display: none;
+  }
+  /* 위치 상태 말풍선은 경로 요약 아래로 내립니다. */
+  .map-view.panel-closed.route-shown .gps-status {
+    top: calc(126px + env(safe-area-inset-top, 0px));
+  }
+  .map-view.panel-closed.route-shown .route-summary-bar #summary-edit {
+    height: 30px;
+  }
+  #summary-close {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0.75px solid var(--v2-stroke);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.45);
+    color: var(--v2-muted);
+    font-size: 12px;
+  }
 }

@@ -301,6 +301,7 @@
           ><button data-summary-mode="stepfree">계단 피하기</button>
         </div>
         <button id="summary-edit">수정</button>
+        <button id="summary-close" aria-label="경로 지우기">✕</button>
       </div>
       <aside
         id="reports-panel"
@@ -362,11 +363,6 @@
             <div class="navigation-instruction"><button id="navigation-back" aria-label="경로 미리보기로 돌아가기">←</button><div class="navigation-turn"><span id="navigation-arrow" aria-hidden="true">↑</span><b id="navigation-turn-distance">—</b></div><div><h2 id="navigation-direction">위치 확인 중</h2><p id="navigation-detail" role="status">현재 위치를 확인하고 있어요.</p></div></div>
           </div>
           <button id="navigation-recenter" hidden><svg class="icon" aria-hidden="true"><use href="#i-locate" /></svg>내 위치로</button>
-          <button id="navigation-compass" aria-label="진행 방향 따라가기" aria-pressed="false">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="m12 3 7 17-7-4-7 4 7-17Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-            </svg>
-          </button>
           <div class="navigation-bottom">
             <div class="navigation-summary">
               <div class="navigation-arrival">

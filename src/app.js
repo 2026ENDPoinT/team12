@@ -999,10 +999,6 @@ function syncNavigationCameraButtons() {
       : "";
   if (status.textContent !== message) status.textContent = message;
   $("#navigation-recenter").hidden = !guidanceActive || guidanceFollowing;
-  $("#navigation-compass").setAttribute(
-    "aria-pressed",
-    String(guidanceActive && guidanceFollowing),
-  );
 }
 function endGuidance({ silent = false } = {}) {
   const wasRunning = guidanceActive || guidancePending;
@@ -1093,16 +1089,6 @@ function startGuidance() {
   if (guidancePending) toast("현재 위치가 확인되면 길안내를 시작할게요.");
 }
 $("#route-card-start").onclick = startGuidance;
-$("#navigation-compass").onclick = () => {
-  if (!guidanceActive) return;
-  if (!guidanceFollowing) {
-    $("#navigation-recenter").click();
-    return;
-  }
-  guidanceFollowing = false;
-  map?.clearGuidanceHeading();
-  syncNavigationCameraButtons();
-};
 $("#navigation-back").onclick = () => {
   endGuidance();
   setPanelClosed(false);
@@ -1120,6 +1106,11 @@ $$("[data-summary-mode]").forEach(
       $(`.mode-tabs [data-mode="${b.dataset.summaryMode}"]`).click()),
 );
 $("#summary-edit").onclick = () => setPanelClosed(false);
+// 경로 요약의 ✕는 경로를 지우고 기본 지도(검색 바)로 돌아갑니다.
+$("#summary-close").onclick = () => {
+  endRouteSearch();
+  setPanelClosed(true);
+};
 // 모바일 경로 시트의 ✕는 길찾기를 끝내고(경로 지움) 지도로 돌아갑니다. 데스크톱은 패널만 닫습니다.
 $("#route-panel-close").onclick = () => {
   if (!isDesktop.matches) endRouteSearch();
