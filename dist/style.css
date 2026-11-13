@@ -801,6 +801,18 @@ body.exploring {
   color: var(--ink);
   padding: 3px 0;
   outline-offset: 3px;
+  appearance: none;
+  cursor: text;
+}
+#origin::placeholder,
+#destination::placeholder {
+  color: #b5a9bf;
+  font-weight: 500;
+}
+#origin[aria-invalid="true"],
+#destination[aria-invalid="true"] {
+  color: #b54343;
+  outline: 2px solid #efb6b6;
 }
 .journey-connector {
   height: 27px;
