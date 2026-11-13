@@ -216,10 +216,11 @@ function startEditor(api) {
       dots = [];
     // 편집 전 경로(회색 점선): 조사 데이터가 파일과 다를 때만
     if (JSON.stringify(withPending()) !== baselineText) {
-      const before = api.routeOn(baselineGraph).route;
+      const { route: before, nodes } = api.routeOn(baselineGraph);
       if (before)
         lines.push({
-          points: before.path.map((id) => baselineGraph.nodes[id]),
+          // nodes: 현재 위치에서 출발하면 길 위에 더한 점까지 들어 있는 노드 목록
+          points: before.path.map((id) => (nodes || baselineGraph.nodes)[id]),
           color: C.ghost,
           width: 1.6,
           dashed: true,
