@@ -1004,10 +1004,6 @@ function syncNavigationCameraButtons() {
       : "";
   if (status.textContent !== message) status.textContent = message;
   $("#navigation-recenter").hidden = !guidanceActive || guidanceFollowing;
-  $("#navigation-compass").setAttribute(
-    "aria-pressed",
-    String(guidanceActive && guidanceFollowing),
-  );
 }
 function endGuidance({ silent = false } = {}) {
   const wasRunning = guidanceActive || guidancePending;
@@ -1099,7 +1095,6 @@ function startGuidance() {
 }
 $("#route-card-start").onclick = startGuidance;
 $("#navigation-stop").onclick = () => endGuidance();
-$("#navigation-layers").onclick = () => side("layers").click();
 // 데스크톱에서 지도를 확대·축소하면 자동 추적을 멈추고 "내 위치로"를 표시합니다.
 function zoomNavigation(factor) {
   guidanceFollowing = false;
@@ -1109,21 +1104,10 @@ function zoomNavigation(factor) {
 }
 $("#navigation-zoom-in").onclick = () => zoomNavigation(1.18);
 $("#navigation-zoom-out").onclick = () => zoomNavigation(1 / 1.18);
-$("#navigation-compass").onclick = () => {
-  if (!guidanceActive) return;
-  if (!guidanceFollowing) {
-    $("#navigation-recenter").click();
-    return;
-  }
-  guidanceFollowing = false;
-  map?.clearGuidanceHeading();
-  syncNavigationCameraButtons();
-};
 $("#navigation-back").onclick = () => {
   endGuidance();
   setPanelClosed(false);
 };
-$("#navigation-route").onclick = () => $("#navigation-back").click();
 $("#navigation-back-mobile").onclick = () => $("#navigation-back").click();
 $("#navigation-recenter").onclick = () => {
   if (!gpsPosition || !guidanceActive) return;
