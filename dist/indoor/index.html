@@ -14,7 +14,7 @@
     <title>미래관 실내 · 사이</title>
     <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="indoor.css" />
-    <link rel="stylesheet" href="indoor-ui.css?v=lift-walk-3" />
+    <link rel="stylesheet" href="indoor-ui.css?v=route-selection-5" />
   </head>
   <body>
     <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg">
@@ -53,7 +53,7 @@
           <path d="M12 2v3m0 14v3M2 12h3m14 0h3" />
         </symbol>
         <symbol id="i-reset-view" viewBox="0 0 24 24">
-          <path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6" />
+          <path d="m12 2 9 5v10l-9 5-9-5V7Zm0 10L3 7m9 5 9-5m-9 5v10" />
         </symbol>
         <symbol id="i-play" viewBox="0 0 24 24">
           <path d="M8 5v14l11-7Z" />
@@ -112,8 +112,16 @@
       </header>
 
       <div id="floor-controls" class="floor-controls">
-        <button id="floor-overview" class="floor-overview" type="button" aria-pressed="false" hidden>
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></svg>
+        <button
+          id="floor-overview"
+          class="floor-overview"
+          type="button"
+          aria-pressed="false"
+          hidden
+        >
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5" />
+          </svg>
           <span>전체 층</span>
         </button>
         <nav id="floors" class="floors" aria-label="층 선택"></nav>
@@ -178,40 +186,108 @@
             </button>
           </div>
           <div class="actions">
-            <button id="place-route" class="primary-btn" type="button">
-              길찾기
-              <span class="icon-slot action-icon"
-                ><img src="ui/route.svg" alt=""
-              /></span>
-            </button>
             <button id="place-from" class="ghost-btn" type="button">
-              여기서 출발
+              출발지로
+            </button>
+            <button id="place-route" class="primary-btn" type="button">
+              도착지로
             </button>
           </div>
         </div>
 
         <!-- 경로 -->
         <div id="sheet-route" class="sheet-body" hidden>
+          <div class="route-heading">
+            <b>길찾기</b>
+            <button
+              id="route-close"
+              class="round-btn small flat"
+              type="button"
+              aria-label="경로 닫기"
+            >
+              <span class="icon-slot"><img src="ui/close.svg" alt="" /></span>
+            </button>
+          </div>
           <div class="route-ends">
-            <div class="route-points">
-              <label class="end">
-                <span class="dot start"></span>
-                <select id="route-from" aria-label="출발지"></select>
-              </label>
-              <div class="end">
-                <span class="dot goal"></span>
-                <button id="route-to" class="end-btn" type="button"></button>
+            <div class="route-fields">
+              <div class="route-field-group">
+                <div class="route-field">
+                  <label for="route-from">출발지</label>
+                  <input
+                    id="route-from"
+                    type="search"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded="false"
+                    aria-controls="route-from-suggestions"
+                    aria-label="출발지 검색"
+                    placeholder="호실·이름·출입구 검색"
+                    autocomplete="off"
+                    enterkeyhint="search"
+                    spellcheck="false"
+                  />
+                  <button
+                    id="route-from-clear"
+                    class="route-field-clear"
+                    type="button"
+                    aria-label="출발지 지우기"
+                    hidden
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div
+                  id="route-from-panel"
+                  class="route-suggestion-panel"
+                  hidden
+                >
+                  <p id="route-from-hint" role="status"></p>
+                  <ul
+                    id="route-from-suggestions"
+                    class="route-suggestions"
+                    role="listbox"
+                    aria-label="출발지 검색 결과"
+                  ></ul>
+                </div>
+              </div>
+              <div class="route-field-group">
+                <div class="route-field destination">
+                  <label for="route-to">도착지</label>
+                  <input
+                    id="route-to"
+                    type="search"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded="false"
+                    aria-controls="route-to-suggestions"
+                    aria-label="도착지 검색"
+                    placeholder="호실·이름·출입구 검색"
+                    autocomplete="off"
+                    enterkeyhint="search"
+                    spellcheck="false"
+                  />
+                  <button
+                    id="route-to-clear"
+                    class="route-field-clear"
+                    type="button"
+                    aria-label="도착지 지우기"
+                    hidden
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div id="route-to-panel" class="route-suggestion-panel" hidden>
+                  <p id="route-to-hint" role="status"></p>
+                  <ul
+                    id="route-to-suggestions"
+                    class="route-suggestions"
+                    role="listbox"
+                    aria-label="도착지 검색 결과"
+                  ></ul>
+                </div>
               </div>
             </div>
             <div class="route-side">
-              <button
-                id="route-close"
-                class="round-btn small flat"
-                type="button"
-                aria-label="경로 닫기"
-              >
-                <span class="icon-slot"><img src="ui/close.svg" alt="" /></span>
-              </button>
               <button
                 id="route-swap"
                 class="round-btn small flat"
@@ -471,6 +547,6 @@
     </div>
 
     <div id="toast" class="toast" role="status" hidden></div>
-    <script src="indoor.js?v=glass-camera-2" defer></script>
+    <script src="indoor.js?v=route-selection-5" defer></script>
   </body>
 </html>
