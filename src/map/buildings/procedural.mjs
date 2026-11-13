@@ -1,3 +1,4 @@
+import { windowLights } from "../night-lighting.mjs";
 import { applyBuildingFinish } from "./finishes.mjs";
 import * as THREE from "three";
 import { insideBuilding } from "../../geo.mjs";
@@ -111,6 +112,7 @@ export function facadeMaterial(appearance, wall, entrance = null) {
   if (!appearance.facade) return applyBuildingFinish(material, "stone");
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, {
+      windowLights,
       facadeGlass: { value: new THREE.Color(appearance.glass) },
       facadeFrame: { value: new THREE.Color(appearance.frame) },
       facadeLayout: {
@@ -141,6 +143,13 @@ export function facadeMaterial(appearance, wall, entrance = null) {
       #include <begin_vertex>
       facadeUV = uv; facadePlan = position.xy; wallSpan = facadeSpan;
     `,
+    );
+    shader.fragmentShader = "uniform float windowLights;\n" + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <emissivemap_fragment>",
+      `#include <emissivemap_fragment>
+      totalEmissiveRadiance += vec3(1.0, 0.59, 0.24) *
+        windowLights * architecturalGlass * step(0.28, paneTone);`,
     );
     shader.fragmentShader = facadeDeclarations + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace(

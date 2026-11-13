@@ -1201,6 +1201,14 @@ $("#v2-3d").onclick = () => setDimension(false);
 $("#v2-plus").onclick = () => map?.zoom(1.18);
 $("#v2-minus").onclick = () => map?.zoom(1 / 1.18);
 $("#v2-locate").onclick = () => $("#gps-toggle").click();
+const nightToggle = $("#v2-night");
+nightToggle.disabled = !map;
+nightToggle.onclick = () => {
+  const enabled = nightToggle.getAttribute("aria-pressed") !== "true";
+  map?.setNightMode(enabled);
+  $("#map-view").classList.toggle("map-night", enabled);
+  nightToggle.setAttribute("aria-pressed", String(enabled));
+};
 $("#v2-reset").onclick = () => setDimension(false);
 
 // ===== 트랙패드 확대 제스처로 페이지가 커지지 않게 합니다(표지·지도 화면 모두) =====
