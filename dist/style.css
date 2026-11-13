@@ -6638,3 +6638,13 @@ body {
     display: none;
   }
 }
+@media (min-width: 761px) {
+  /* 데스크톱도 출발지·도착지를 둘 다 고른 뒤에야 경로 방식 카드와 경로 결과를 보여 줍니다(사용자 요청). */
+  .map-view:not(.places-ready) .route-panel .mode-heading,
+  .map-view:not(.places-ready) .route-panel .mode-tabs,
+  .map-view:not(.places-ready) .route-panel .mode-hint,
+  .map-view:not(.places-ready) .route-panel .route-card,
+  .map-view:not(.places-ready) .route-panel #no-route-message {
+    display: none;
+  }
+}
