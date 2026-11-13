@@ -97,24 +97,72 @@ test("lobby entrance matches the campus futureDoor node through the plan alignme
   assert.ok(Math.hypot(back.x - lobby.p[0], back.y - lobby.p[1]) < 1e-9);
 });
 
-test("multi-floor route from the lobby reaches 313 with stairs", () => {
-  const d = I.findDest("3:313");
+test("adjacent-floor route from the lobby reaches 223 with stairs", () => {
+  const d = I.findDest("2:223");
   const r = I.routeTo(start, d, { mode: "stairs" });
   assert.ok(r);
-  assert.equal(r.pts.at(-1).f, 3);
+  assert.equal(r.pts.at(-1).f, 2);
   assert.ok(r.vertical.every((l) => l.kind === "stair"));
   assert.ok(r.len > 20 && r.len < 120, `len ${r.len}`);
-  // 경로 끝은 313호 문 앞
+  // 경로 끝은 223호 문 앞
   const door = d.doors[0];
   assert.ok(
     Math.hypot(r.pts.at(-1).x - door[0], r.pts.at(-1).y - door[1]) < 1.5,
   );
-  // 같은 계단을 층참만 지나 오르면 한 단계로 안내
+  // 한 층 올라가는 계단은 한 단계로 안내
   const steps = buildSteps(r, d);
   const vertical = steps.filter((s) => s.dir.startsWith("stair"));
   assert.equal(vertical.length, 1);
-  assert.equal(vertical[0].to, 3);
-  assert.match(steps.at(-1).text, /313호 도착/);
+  assert.equal(vertical[0].to, 2);
+  assert.match(steps.at(-1).text, /223호 도착/);
+});
+
+test("fast routes prefer elevators in both directions between the first and third floors", () => {
+  const low = I.findDest("1:108");
+  const high = I.findDest("3:313");
+  for (const [origin, dest] of [
+    [low, high],
+    [high, low],
+  ]) {
+    const [x, y] = origin.doors[0];
+    const route = I.routeTo({ f: origin.f, x, y }, dest);
+    assert.ok(route, `${origin.key} → ${dest.key}`);
+    assert.equal(route.mode, "stairs");
+    assert.equal(route.preferElev, true);
+    assert.equal(route.stairFloors, 0);
+    assert.ok(route.vertical.length > 0);
+    assert.ok(route.vertical.every((leg) => leg.kind === "elev"));
+    assert.equal(route.pts.at(-1).f, dest.f);
+  }
+  const fromLobby = I.routeTo(start, high);
+  assert.equal(fromLobby.preferElev, true);
+  assert.equal(fromLobby.stairFloors, 0);
+});
+
+test("fast routes use stairs only for the basement when travelling to or from the third floor", () => {
+  const basement = I.findDest("0:B104");
+  const high = I.findDest("3:313");
+  for (const [origin, dest] of [
+    [basement, high],
+    [high, basement],
+  ]) {
+    const [x, y] = origin.doors[0];
+    const route = I.routeTo({ f: origin.f, x, y }, dest);
+    assert.ok(route, `${origin.key} → ${dest.key}`);
+    assert.equal(route.preferElev, true);
+    assert.equal(route.stairFloors, 1);
+    assert.ok(route.vertical.some((leg) => leg.kind === "elev"));
+    assert.ok(
+      route.vertical
+        .filter((leg) => leg.kind === "stair")
+        .every(
+          (leg) =>
+            Math.min(leg.from, leg.to) === 0 &&
+            Math.max(leg.from, leg.to) === 1,
+        ),
+    );
+    assert.equal(route.pts.at(-1).f, dest.f);
+  }
 });
 
 test("step-free mode uses only elevators where they reach", () => {
@@ -135,7 +183,7 @@ test("step-free mode falls back to the fewest stairs (313 → B104)", () => {
   assert.equal(r.stairFloors, 1);
   const kinds = r.vertical.map((l) => `${l.kind}${l.from}>${l.to}`);
   assert.deepEqual(kinds, ["elev3>1", "stair1>0"]);
-  // 빠른 길도 계단 3개 층 이상이면 엘리베이터 우선 → 같은 경로
+  // 빠른 길도 계단 두 층 이상이면 엘리베이터 우선 → 같은 경로
   const fast = I.routeTo(from, I.findDest("0:B104"), { mode: "stairs" });
   assert.ok(fast.preferElev);
   assert.equal(fast.stairFloors, 1);
@@ -311,7 +359,7 @@ test("route stops in front of the destination door, outside the room", () => {
   }
 });
 
-test("fast route keeps stairs for 1–2 floors, prefers elevator for 3+", () => {
+test("fast routes keep adjacent-floor stairs and prefer elevators for two or more floors", () => {
   for (const d of I.destinations) {
     for (const f of [0, 1, 2, 3]) {
       const src = I.destinations.find((x) => x.f === f && x.numbered);
@@ -320,7 +368,7 @@ test("fast route keeps stairs for 1–2 floors, prefers elevator for 3+", () => 
       const r = I.routeTo(from, d, { mode: "stairs" });
       assert.ok(r, `${src.key}→${d.key}`);
       assert.ok(
-        r.stairFloors < 3,
+        r.stairFloors < 2,
         `${src.key}→${d.key} stairs ${r.stairFloors}`,
       );
     }

@@ -780,6 +780,9 @@ button:disabled {
   padding: 18px 20px max(34px, var(--safe-b));
   border-radius: 28px 28px 0 0;
 }
+#search-handle {
+  display: none;
+}
 .search-hint {
   margin: 0 0 2px;
   line-height: 18px;
@@ -1479,5 +1482,123 @@ button.ar-status::after {
           max(16px, var(--safe-b)) - 12px
       )
     );
+  }
+}
+
+/* Mobile map gestures move the map; the panels stay attached to the viewport. */
+@media (max-width: 819px) {
+  .stage {
+    height: 100dvh;
+  }
+  .view canvas {
+    touch-action: none;
+  }
+  input,
+  .search-bar input,
+  .route-field input {
+    font-size: 16px;
+  }
+  button {
+    touch-action: manipulation;
+  }
+  #sheet,
+  #sheet.place-mode {
+    display: flex;
+    flex-direction: column;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    padding: 0 16px max(16px, var(--safe-b));
+    border-radius: 28px 28px 0 0;
+    overflow: hidden;
+    transform: none;
+    transition: none;
+  }
+  #sheet .sheet-handle,
+  #search-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 32px;
+    width: 100%;
+    height: 32px;
+    padding: 0;
+    margin: 0;
+    touch-action: none;
+    user-select: none;
+    cursor: ns-resize;
+  }
+  .sheet-handle i {
+    margin: 0;
+    background: rgba(90, 104, 114, 0.35);
+  }
+  #sheet > .sheet-body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+  }
+  #sheet.route-mode {
+    max-height: min(56dvh, calc(100dvh - var(--ui-top) - 80px));
+  }
+  #sheet-route,
+  #sheet-place {
+    padding-bottom: 70px;
+  }
+  #sheet-route > .actions,
+  #sheet-place > .actions {
+    position: absolute;
+    z-index: 3;
+    left: 16px;
+    right: 16px;
+    bottom: max(16px, var(--safe-b));
+    padding-top: 10px;
+    background: var(--glass-strong);
+    backdrop-filter: var(--glass-filter);
+    -webkit-backdrop-filter: var(--glass-filter);
+    border-radius: 16px;
+  }
+  #sheet.route-mode.collapsed,
+  #sheet.place-mode.collapsed {
+    height: calc(104px + var(--safe-b));
+  }
+  #sheet.route-mode.collapsed #sheet-route > :not(.actions) {
+    display: none;
+  }
+  #sheet.place-mode.collapsed .place-head {
+    display: none;
+  }
+  #sheet.place-mode .actions {
+    flex-shrink: 0;
+  }
+  #sheet.panel-sizing,
+  .search-panel.panel-sizing {
+    will-change: height;
+  }
+  .search-panel,
+  body.searching .search-panel {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    padding: 0 16px max(16px, var(--safe-b));
+    overflow: hidden;
+  }
+  .search-content {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+  }
+  .search-panel.collapsed {
+    height: calc(76px + var(--safe-b));
+  }
+  .search-panel.collapsed .results {
+    display: none;
+  }
+  body.searching:has(#sheet.place-mode:not([hidden])) .search-panel {
+    padding: 0 14px 14px;
+    margin-right: 16px;
+    margin-bottom: calc(var(--place-card-height, 220px) + 12px);
   }
 }

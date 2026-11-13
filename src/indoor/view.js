@@ -580,14 +580,28 @@ export function createView(el, indoor, { onPick } = {}) {
 
   // ---- 탭으로 방 고르기
   let down = null;
-  renderer.domElement.addEventListener(
-    "pointerdown",
-    (e) => (down = [e.clientX, e.clientY, performance.now()]),
-  );
+  const mapPointers = new Set();
+  renderer.domElement.addEventListener("pointerdown", (e) => {
+    mapPointers.add(e.pointerId);
+    down = mapPointers.size === 1 && e.button === 0
+      ? { id: e.pointerId, x: e.clientX, y: e.clientY, time: performance.now() }
+      : null;
+  });
+  renderer.domElement.addEventListener("pointermove", (e) => {
+    if (down?.id === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8)
+      down = null;
+  });
+  renderer.domElement.addEventListener("pointercancel", (e) => {
+    mapPointers.delete(e.pointerId);
+    down = null;
+  });
   renderer.domElement.addEventListener("pointerup", (e) => {
-    if (!down || firstPerson || floorOverview) return;
-    const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]);
-    if (moved > 8 || performance.now() - down[2] > 450) return;
+    mapPointers.delete(e.pointerId);
+    const tap = down;
+    down = null;
+    if (!tap || tap.id !== e.pointerId || mapPointers.size || firstPerson || floorOverview) return;
+    const moved = Math.hypot(e.clientX - tap.x, e.clientY - tap.y);
+    if (moved > 8 || performance.now() - tap.time > 450) return;
     const r = renderer.domElement.getBoundingClientRect();
     const ray = new THREE.Raycaster();
     ray.setFromCamera(
