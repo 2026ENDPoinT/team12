@@ -14,7 +14,7 @@
     <title>미래관 실내 · 사이</title>
     <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="indoor.css" />
-    <link rel="stylesheet" href="indoor-ui.css?v=glass-camera-2" />
+    <link rel="stylesheet" href="indoor-ui.css?v=lift-walk-3" />
   </head>
   <body>
     <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg">
@@ -253,16 +253,16 @@
             </button>
           </div>
           <div class="actions">
-            <button id="ar-open" class="primary-btn" type="button">
-              AR 길안내
-              <span class="icon-slot action-icon"
-                ><img src="ui/ar.svg" alt=""
-              /></span>
-            </button>
-            <button id="walk-open" class="ghost-btn" type="button">
+            <button id="walk-open" class="primary-btn" type="button">
               미리 걷기
               <span class="icon-slot action-icon"
                 ><img src="ui/walk.svg" alt=""
+              /></span>
+            </button>
+            <button id="ar-open" class="ghost-btn" type="button">
+              AR 길안내
+              <span class="icon-slot action-icon"
+                ><img src="ui/ar.svg" alt=""
               /></span>
             </button>
           </div>
@@ -455,6 +455,7 @@
     <!-- 엘리베이터 탑승 화면 -->
     <div id="lift" class="lift" hidden role="status" aria-live="polite">
       <div class="lift-box">
+        <p class="lift-label">엘리베이터 이동</p>
         <div class="lift-panel">
           <span class="lift-arrow">▲</span><b class="lift-floor">1F</b>
         </div>
@@ -463,7 +464,7 @@
         </div>
         <p class="lift-msg"></p>
         <small class="lift-sub"></small>
-        <button class="lift-skip ghost-btn" type="button" hidden>
+        <button class="lift-skip primary-btn" type="button" hidden>
           내렸어요
         </button>
       </div>
