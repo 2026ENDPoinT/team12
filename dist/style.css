@@ -7371,6 +7371,10 @@ body {
 .admin-dot.works {
   background: var(--violet);
 }
+.admin-dot.shortcut {
+  background: #7950ff;
+  box-shadow: 0 0 0 3px rgba(121, 80, 255, 0.16);
+}
 #admin-dialog .admin-section > p {
   margin: 0;
   color: var(--v2-muted);
@@ -7660,6 +7664,35 @@ body {
 #admin-dialog .admin-tab-panel {
   display: contents;
 }
+#admin-dialog .admin-shortcuts .report-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+#admin-dialog .shortcut-review {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 0.75px solid rgba(121, 80, 255, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+}
+#admin-dialog .shortcut-review > b {
+  color: var(--violet);
+  font-size: 13px;
+}
+#admin-dialog .shortcut-review > p {
+  margin: 0;
+  color: var(--v2-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+#admin-dialog .shortcut-review > small {
+  color: var(--v2-muted);
+  font-size: 12px;
+}
 #admin-dialog .admin-panel-content > small,
 #admin-dialog .admin-tab-panel > small {
   color: var(--v2-muted);
@@ -7740,7 +7773,7 @@ body {
     z-index: 4;
     top: 0;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
     padding: 5px;
     border: 0.75px solid rgba(255, 255, 255, 0.85);
@@ -7765,6 +7798,19 @@ body {
   #admin-dialog .admin-tabs button.is-active {
     background: var(--v2-ink);
     color: #fff;
+  }
+  #admin-dialog .admin-tabs button span {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    margin-left: 5px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--lime);
+    color: var(--v2-ink);
+    font-size: 11px;
+    line-height: 1;
   }
   #admin-dialog .admin-tab-panel {
     display: none;
@@ -8379,4 +8425,106 @@ body {
 #navigation-compass[aria-pressed="true"] {
   color: #15212b;
   background: var(--lime);
+}
+
+.shortcut-picking canvas { cursor: crosshair; }
+.shortcut-picking :is(.building-label, .entrance-dot) { pointer-events: none !important; }
+#shortcut-start { margin-top: 8px; }
+#shortcut-picker { z-index: 20; }
+dialog.shortcut-dialog {
+  --shortcut-field: #ffffff42;
+  --shortcut-border: #ffffffa6;
+  --shortcut-muted: #53636f;
+  width: min(460px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  border: 1px solid var(--shortcut-border);
+  border-radius: 26px;
+  background: linear-gradient(145deg, #f7f1ffed, #f2eafbdf);
+  color: #15212b;
+  box-shadow: 0 18px 55px #2420382b;
+  backdrop-filter: blur(20px);
+}
+.shortcut-dialog::backdrop {
+  background: #30234c40;
+  backdrop-filter: blur(5px);
+}
+.shortcut-dialog .dialog-body {
+  display: grid;
+  gap: 10px;
+  padding: clamp(18px, 5vw, 24px);
+}
+.shortcut-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 4px;
+  padding-right: 40px;
+}
+.shortcut-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 14px;
+  background: var(--lime);
+  color: #15212b;
+}
+.shortcut-dialog .shortcut-heading h2 {
+  margin: 0;
+  color: inherit;
+  font-size: 22px;
+  font-weight: 800;
+}
+.shortcut-dialog .dialog-close {
+  top: 24px;
+  right: 24px;
+  background: transparent;
+  border-color: transparent;
+  color: inherit;
+}
+.shortcut-dialog p { margin: 0; }
+.shortcut-dialog label { font-weight: 700; }
+.shortcut-dialog :is(textarea, select, .shortcut-summary) {
+  min-width: 0;
+  padding: 11px 13px;
+  border: 1px solid var(--shortcut-border);
+  border-radius: 16px;
+  background: var(--shortcut-field);
+  color: inherit;
+  font: inherit;
+}
+.shortcut-dialog textarea { resize: vertical; }
+.shortcut-dialog :is(small, textarea::placeholder) { color: var(--shortcut-muted); }
+.shortcut-dialog .report-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: 8px;
+  margin-top: 4px;
+}
+.shortcut-dialog .report-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  border: 1px solid var(--shortcut-border);
+  border-radius: 999px;
+  background: var(--shortcut-field);
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+}
+.shortcut-dialog .report-actions button:last-child {
+  border-color: transparent;
+  background: var(--violet);
+  color: var(--lime);
+}
+body:has(#map-view.map-night) .shortcut-dialog {
+  --shortcut-field: #ffffff12;
+  --shortcut-border: #555d73;
+  --shortcut-muted: #b6c0d2;
+  background: #1b2130ed;
+  color: #f2efff;
+  color-scheme: dark;
 }

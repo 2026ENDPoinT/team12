@@ -15,7 +15,7 @@
     />
     <title>사이 · 길을 아는 건, 우리니까.</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=shortcut-card" />
   </head>
   <body>
     <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg">
@@ -310,13 +310,14 @@
       >
         <div class="route-panel-head">
           <b id="reports-panel-title">길 막힘 제보</b
-          ><button id="reports-panel-close" aria-label="길 막힘 제보 닫기">✕</button>
+          ><button id="reports-panel-close" aria-label="지도 제보 닫기">✕</button>
         </div>
         <div id="reports-panel-body"></div>
         <button id="reports-panel-start" class="result-card-primary">
           <svg class="icon" aria-hidden="true"><use href="#i-alert" /></svg>
           지금 위치에서 제보하기
         </button>
+        <button id="shortcut-start" class="result-card-primary" type="button">＋ 지름길 제보하기</button>
       </aside>
       <div id="mobile-route-top" class="mobile-route-top">
         <button id="mobile-route-back" aria-label="길찾기 닫기">
@@ -663,6 +664,10 @@
               선택합니다.</small
             ><button id="report-cancel">선택 취소</button>
           </div>
+          <div id="shortcut-picker" class="report-picker" hidden>
+            <b id="shortcut-picker-status" role="status"></b>
+            <button id="shortcut-picker-close" type="button">취소</button>
+          </div>
           <div class="map-controls">
             <button id="map-plus" aria-label="지도 확대">＋</button
             ><button id="map-minus" aria-label="지도 축소">−</button
@@ -780,6 +785,35 @@
         </div>
       </div>
     </section>
+    <dialog id="shortcut-dialog" class="report-dialog shortcut-dialog" aria-labelledby="shortcut-title">
+      <button class="dialog-close" type="button" aria-label="닫기">✕</button>
+      <form id="shortcut-form" class="dialog-body">
+        <header class="shortcut-heading">
+          <span class="shortcut-icon" aria-hidden="true">
+            <svg class="icon"><use href="#i-route" /></svg>
+          </span>
+          <h2 id="shortcut-title">지름길 제보</h2>
+        </header>
+        <p id="shortcut-summary" class="shortcut-summary"></p>
+        <label for="shortcut-note">어떤 길인가요?</label>
+        <textarea id="shortcut-note" rows="3" maxlength="300" required placeholder="예: 두 보행로 사이에 통과할 수 있는 길이 있어요."></textarea>
+        <label for="shortcut-stairs">계단이 있나요?</label>
+        <select id="shortcut-stairs" required>
+          <option value="">선택해주세요</option>
+          <option value="yes">있어요</option>
+          <option value="no">없어요</option>
+        </select>
+        <small>관리자가 확인한 뒤 길찾기에 반영돼요.</small>
+        <p id="shortcut-error" role="alert" hidden></p>
+        <div class="report-actions">
+          <button id="shortcut-repick" type="button">다시 선택</button>
+          <button id="shortcut-submit" type="submit">
+            <svg class="icon" aria-hidden="true"><use href="#i-route" /></svg>
+            보내기
+          </button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="report-dialog" class="report-dialog">
       <button class="dialog-close" aria-label="닫기">✕</button>
       <div class="dialog-body">
@@ -927,6 +961,7 @@
         <div class="admin-panel-content" tabindex="0" aria-label="관리자 센터 내역">
           <nav class="admin-tabs" role="tablist" aria-label="관리자 기능">
             <button id="admin-tab-reports" type="button" role="tab" aria-selected="true" aria-controls="admin-panel-reports" data-admin-tab="reports">신고 검토</button>
+            <button id="admin-tab-shortcuts" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-shortcuts" data-admin-tab="shortcuts">지름길 제보 <span id="admin-shortcut-count" hidden>0</span></button>
             <button id="admin-tab-works" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-works" data-admin-tab="works">건물 공사</button>
             <button id="admin-tab-photos" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-photos" data-admin-tab="photos">사진 정리</button>
           </nav>
@@ -947,6 +982,13 @@
               <ul id="admin-list-minor" class="report-list"></ul>
             </section>
             <small>신고는 1건부터 모두 보이며, 관리자가 확정한 구간만 경로에서 제외됩니다.</small>
+          </div>
+          <div id="admin-panel-shortcuts" class="admin-tab-panel" role="tabpanel" aria-labelledby="admin-tab-shortcuts" data-admin-panel="shortcuts">
+            <section class="admin-section admin-shortcuts">
+              <h3><i class="admin-dot shortcut" aria-hidden="true"></i>지름길 제보 검토</h3>
+              <p id="shortcut-admin-status" role="status"></p>
+              <ul id="shortcut-admin-list" class="report-list"></ul>
+            </section>
           </div>
           <div id="admin-panel-works" class="admin-tab-panel" role="tabpanel" aria-labelledby="admin-tab-works" data-admin-panel="works">
             <section class="admin-section admin-works">
@@ -1000,6 +1042,6 @@
       </div>
     </dialog>
     <div id="toast" class="toast" role="status" hidden></div>
-    <script src="app.js" defer></script>
+    <script src="app.js?v=shortcut-reports" defer></script>
   </body>
 </html>
