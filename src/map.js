@@ -18,7 +18,14 @@ import {
   ENTRANCES,
   MAIN_GATE,
 } from "./data.mjs";
-import { locateReportPoint, edgeId, reportLocation } from "./reports.mjs";
+import {
+  locateReportPoint,
+  edgeId,
+  reportLocation,
+  clusterReports,
+} from "./reports.mjs";
+import { buildingLabel, worksPeriod } from "./buildings.mjs";
+import { createGraphOverlay } from "./graph-overlay.js";
 const VIOLET = 0x7950ff;
 
 // Three.js 기반 독립 구현. 외곽선/도로 데이터만 별도 ODbL 데이터에서 가져옵니다.
@@ -278,7 +285,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     if (b.name !== "교내 건물") {
       const element = document.createElement("button");
       element.className = "building-label";
-      element.textContent = b.name;
+      element.textContent = buildingLabel(b);
       element.setAttribute("aria-label", `${b.name} 출발지 또는 도착지 선택`);
       element.onclick = (e) => {
         e.stopPropagation();
@@ -305,7 +312,14 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     entranceStemGeometry = new THREE.CylinderGeometry(0.45, 0.45, 4.2, 8),
     entranceDotGeometry = new THREE.SphereGeometry(1.75, 12, 8),
     entranceRingGeometry = new THREE.RingGeometry(2.2, 3.1, 20);
-  for (const entrance of ENTRANCES) {
+  // 등록된 출입구(team-survey.json)를 초록 점으로 그립니다. 편집기로 바꾸면 다시 그립니다.
+  function setEntrances(list) {
+    for (const child of [...entranceGroup.children])
+      entranceGroup.remove(child);
+    for (const entrance of list) addEntranceMarker(entrance);
+    if (editHandler) setEditHandler(editHandler);
+  }
+  function addEntranceMarker(entrance) {
     const stem = new THREE.Mesh(entranceStemGeometry, entranceMaterial),
       dot = new THREE.Mesh(entranceDotGeometry, entranceMaterial),
       ring = new THREE.Mesh(entranceRingGeometry, entranceMaterial),
@@ -323,6 +337,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     stem.renderOrder = dot.renderOrder = ring.renderOrder = 4;
     entranceGroup.add(stem, dot, ring, marker);
   }
+  for (const entrance of ENTRANCES) addEntranceMarker(entrance);
   entranceGroup.visible = false;
   scene.add(entranceGroup);
   const gateLabel = document.createElement("span");
@@ -352,7 +367,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       else child.material?.dispose();
     }
   }
-  function setRoute(route, startId, destinationId) {
+  // nodes: 경로의 노드 위치를 찾을 그래프. 편집 모드에서는 조사 데이터를 합친 그래프가 들어옵니다.
+  function setRoute(route, startId, destinationId, nodes = NODES) {
     clearGroup(routeGroup);
     movingDot = null;
     for (const [id, { body, profile, label }] of buildingGroups) {
@@ -368,7 +384,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     }
     if (!route) return;
     const points = route.path.map(
-      (id) => new THREE.Vector3(NODES[id].x, 1.8, NODES[id].z),
+      (id) => new THREE.Vector3(nodes[id].x, 1.8, nodes[id].z),
     );
     routeCurve = new THREE.CurvePath();
     for (let i = 1; i < points.length; i++) {
@@ -412,6 +428,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     }
     routeLength = route.meters;
   }
+  // 30m 안 신고를 한 구역으로 묶어 구역마다 표시 하나만 띄웁니다.
+  // 서로 다른 기기 3건 이상이면 주의(노란색), 관리자가 확정하면 빨간색으로 막습니다.
   function setReports(reports) {
     clearReportSelection();
     clearGroup(warningGroup);
@@ -420,24 +438,75 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       label.element.remove();
     }
     warningLabels.length = 0;
-    for (const report of reports) {
-      const edge = EDGES.find((e) => edgeId(e) === report.edgeId);
-      if (edge)
-        segment(NODES[edge.a], NODES[edge.b], 3.5, 0xe3a443, 1, warningGroup);
+    for (const cluster of clusterReports(reports)) {
+      if (cluster.status === "pending") continue; // 아직 기준 미만: 지도에 표시하지 않음
+      const confirmed = cluster.status === "confirmed";
+      for (const id of cluster.edgeIds) {
+        const edge = EDGES.find((e) => edgeId(e) === id);
+        if (edge)
+          segment(
+            NODES[edge.a],
+            NODES[edge.b],
+            3.5,
+            confirmed ? 0xd43f3f : 0xf2c200,
+            1,
+            warningGroup,
+          );
+      }
+      // 표시는 대표 신고 위치에 하나만 찍습니다(확정 전에는 가장 최근 사진 신고).
+      const cover = cluster.cover;
       const el = document.createElement("button");
-      el.className = "road-warning";
-      el.setAttribute("aria-label", `신고 위치: ${reportLocation(report)}`);
-      el.innerHTML =
-        '<span class="warning-triangle" aria-hidden="true">!</span><small>통행 주의</small>';
+      el.className = confirmed
+        ? "road-warning road-warning-confirmed"
+        : "road-warning";
+      el.setAttribute("aria-label", `신고 위치: ${reportLocation(cover)}`);
+      el.innerHTML = confirmed
+        ? '<span class="warning-triangle" aria-hidden="true">⛔</span><small>통행 막힘(확정)</small>'
+        : `<span class="warning-triangle" aria-hidden="true">!</span><small>통행 주의 · 신고 ${cluster.count}건</small>`;
       el.onclick = (e) => {
         e.stopPropagation();
-        onRoadSelect({ reportId: report.id });
+        onRoadSelect({ reportId: cover.id });
       };
       const label = new CSS2DObject(el);
-      label.position.set(report.point.x, 12, report.point.z);
+      label.position.set(cover.point.x, 12, cover.point.z);
       label.visible = !homeMode;
       scene.add(label);
       warningLabels.push(label);
+    }
+  }
+  // 관리자가 등록한 건물 공사: 건물 위에 🚧 표시. 누르면 공사 기간이 몇 초 보였다가 사라집니다.
+  const workLabels = [];
+  function setWorks(works) {
+    for (const label of workLabels) {
+      scene.remove(label);
+      label.element.remove();
+    }
+    workLabels.length = 0;
+    for (const work of works) {
+      const b = buildingGroups.get(work.buildingId)?.b;
+      if (!b) continue;
+      const el = document.createElement("button"),
+        bubble = document.createElement("span");
+      el.className = "building-work";
+      el.setAttribute("aria-label", `${b.name} 공사 중 · 기간 보기`);
+      el.innerHTML = '<span aria-hidden="true">🚧</span>';
+      bubble.className = "building-work-bubble";
+      bubble.setAttribute("role", "status");
+      bubble.hidden = true;
+      bubble.textContent = `${b.name} 공사 ${worksPeriod(work)}${work.note ? ` · ${work.note}` : ""}`;
+      el.append(bubble);
+      let timer;
+      el.onclick = (e) => {
+        e.stopPropagation();
+        bubble.hidden = false;
+        clearTimeout(timer);
+        timer = setTimeout(() => (bubble.hidden = true), 3000);
+      };
+      const label = new CSS2DObject(el);
+      label.position.set(b.x, b.h + 26, b.z);
+      label.visible = !homeMode;
+      scene.add(label);
+      workLabels.push(label);
     }
   }
   function setReporting(value) {
@@ -515,8 +584,10 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       controls.update();
     }
   }
+  const graphOverlay = createGraphOverlay({ THREE, scene, CSS2DObject });
   function setHomeMode(value) {
     homeMode = value;
+    graphOverlay.setHidden(value);
     controls.enablePan = !value;
     // 첫 화면 미리보기는 이동 대신 한 손가락으로 둘러보기를 유지합니다.
     controls.touches.ONE = value ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN;
@@ -532,7 +603,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       if (label.element.tagName === "BUTTON")
         label.element.tabIndex = value || reporting ? -1 : 0;
     }
-    for (const label of warningLabels) label.visible = !value;
+    for (const label of [...warningLabels, ...workLabels])
+      label.visible = !value;
     warningGroup.visible = !value;
     resize();
   }
@@ -580,6 +652,18 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   function top() {
     camera.position.set(0, 1400, 5);
     controls.target.set(0, 0, 0);
+    controls.update();
+  }
+  // 편집 모드: 한 지점을 화면 가운데에 두고 위에서 내려다봅니다.
+  function focusTop(point, zoomLevel = 5) {
+    controls.target.set(point.x, 0, point.z);
+    camera.position.set(point.x, 1400, point.z + 5);
+    camera.zoom = THREE.MathUtils.clamp(
+      zoomLevel,
+      controls.minZoom,
+      controls.maxZoom,
+    );
+    camera.updateProjectionMatrix();
     controls.update();
   }
   const raycaster = new THREE.Raycaster(),
@@ -822,6 +906,32 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   renderer.domElement.addEventListener("pointerdown", (e) => {
     down = { x: e.clientX, y: e.clientY };
   });
+  // 편집 모드: 클릭·마우스 이동을 땅 위 좌표(x, z)로 편집기에 넘깁니다.
+  let editHandler = null,
+    pendingMove = null;
+  renderer.domElement.addEventListener("pointermove", (e) => {
+    if (!editHandler || e.pointerType === "touch") return;
+    const first = !pendingMove;
+    pendingMove = { x: e.clientX, y: e.clientY };
+    if (first)
+      requestAnimationFrame(() => {
+        const hit = pendingMove && groundAt(pendingMove.x, pendingMove.y);
+        pendingMove = null;
+        if (hit && editHandler) editHandler.move?.({ x: hit.x, z: hit.z });
+      });
+  });
+  function setEditHandler(handler) {
+    editHandler = handler;
+    renderer.domElement.style.cursor = handler ? "crosshair" : "";
+    // 편집 중에는 지도 위 HTML 표시(건물 이름표, 출입구 후보 점)가 클릭을 가로채지 않게 합니다.
+    const block = handler || homeMode || reporting;
+    for (const { label } of labelObjects)
+      label.element.style.pointerEvents = block ? "none" : "auto";
+    entranceGroup.traverse((object) => {
+      if (object.element)
+        object.element.style.pointerEvents = handler ? "none" : "";
+    });
+  }
   renderer.domElement.addEventListener("pointerup", (e) => {
     if (
       homeMode ||
@@ -835,6 +945,11 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     const r = renderer.domElement.getBoundingClientRect(),
       x = ((e.clientX - r.left) / r.width) * 2 - 1,
       y = (-(e.clientY - r.top) / r.height) * 2 + 1;
+    if (editHandler) {
+      const hit = groundAt(e.clientX, e.clientY);
+      if (hit) editHandler.click?.({ x: hit.x, z: hit.z });
+      return;
+    }
     if (reporting) {
       pickPoint(x, y);
       return;
@@ -979,9 +1094,18 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   });
   return {
     moveTo,
+    // 편집 모드 전용: 보행 그래프 디버그 오버레이. graph가 null이면 끕니다.
+    setGraphOverlay: (graph) => graphOverlay.set(graph),
+    // 편집 모드 전용: 미리보기 도형(점·선)과 클릭·이동 처리기. null이면 지웁니다.
+    setEditPreview: (spec) => graphOverlay.setPreview(spec),
+    setEditHandler,
+    setEntrances,
+    focusTop,
     setRoute,
     setReports,
+    setWorks,
     setReporting,
+    previewReportSelection,
     clearReportSelection,
     setUserLocation,
     zoom,

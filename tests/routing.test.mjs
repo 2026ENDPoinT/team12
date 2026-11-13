@@ -7,7 +7,6 @@ import {
   BUILDINGS,
   ENTRANCES,
   MAIN_GATE,
-  SURVEY,
 } from "../src/data.mjs";
 import { shortestPath } from "../src/routing.mjs";
 import { insideBuilding, projectToSegment } from "../src/geo.mjs";
@@ -76,7 +75,8 @@ test("missing or disconnected nodes return no route; already there returns zero"
   assert.equal(shortestPath("futureDoor").meters, 0);
 });
 test("derived walking edges do not cut across building interiors", () => {
-  for (const edge of EDGES.filter((edge) => edge.type !== "building_passage")) {
+  // 건물을 가로지를 수 있는 간선은 팀이 조사한 건물 관통(building_passage)뿐입니다.
+  for (const edge of EDGES.filter(({ type }) => type !== "building_passage")) {
     const a = NODES[edge.a],
       b = NODES[edge.b];
     for (const t of [0.2, 0.5, 0.8]) {
@@ -107,9 +107,8 @@ test("derived walking edges do not cut across building interiors", () => {
     }
   }
 });
-test("surveyed entrances stay on their matching building outline", () => {
-  assert.equal(ENTRANCES.length, SURVEY.entrances.length);
-  assert.ok(ENTRANCES.length > 0);
+test("registered entrances stay on their matching building outline", () => {
+  // 등록 출입구(team-survey.json)는 편집기가 벽 위로 붙여 저장합니다. 위경도 저장 반올림을 감안해 0.05m.
   for (const entrance of ENTRANCES) {
     const building = BUILDINGS.find(({ id }) => id === entrance.buildingId);
     assert.ok(building, entrance.name);

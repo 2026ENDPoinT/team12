@@ -172,8 +172,8 @@
           <span class="feature-no">03 / INSIDE</span
           ><svg class="icon"><use href="#i-eye" /></svg>
           <h3>건물 안까지, 자연스럽게.</h3>
-          <p>미래관 입구에서 실내로.<br />가우시안 · AR 실내 탐색을 준비 중.</p>
-          <span class="feature-status">COMING NEXT ✦</span>
+          <p>미래관 입구에서 실내로.<br />호실 검색 · AR 실내 길안내.</p>
+          <span class="feature-status">미래관 실내 체험 ↗</span>
         </article>
       </section>
       <footer>
@@ -195,19 +195,38 @@
       <div class="explorer">
         <aside class="route-panel">
           <div class="mobile-route-heading">
-            <b>캠퍼스 길찾기</b><span>출발지와 도착지를 선택해주세요</span>
+            <b>캠퍼스 길찾기</b><span>건물 이름을 검색해주세요</span>
           </div>
           <div class="panel-eyebrow">LET’S FIND YOUR WAY <span>↗</span></div>
           <h2>학교 안에서,<br /><span>원하는 곳까지.</span></h2>
-          <p class="panel-description">출발지와 도착지를 선택해주세요.</p>
+          <p class="panel-description">출발지와 도착지를 검색해주세요.</p>
           <div class="journey-form">
             <label for="origin"><span class="origin-dot"></span>출발지</label
-            ><select id="origin" aria-label="출발지 선택"></select>
+            ><input
+              id="origin"
+              type="search"
+              list="route-places"
+              placeholder="건물 이름 검색"
+              aria-label="출발지 검색"
+              autocomplete="off"
+              enterkeyhint="search"
+              spellcheck="false"
+            />
             <div class="journey-connector"></div>
             <label class="destination-label" for="destination">
               <svg class="icon"><use href="#i-pin" /></svg><span>도착지</span>
             </label>
-            <select id="destination" aria-label="도착지 선택"></select>
+            <input
+              id="destination"
+              type="search"
+              list="route-places"
+              placeholder="건물 이름 검색"
+              aria-label="도착지 검색"
+              autocomplete="off"
+              enterkeyhint="search"
+              spellcheck="false"
+            />
+            <datalist id="route-places"></datalist>
           </div>
           <div class="mode-tabs" role="group" aria-label="경로 모드">
             <button class="active" data-mode="shortest" aria-pressed="true">
@@ -217,7 +236,7 @@
             </button>
           </div>
           <button id="find-route" class="primary route-submit">
-            선택한 경로 찾기 <svg class="icon"><use href="#i-arrow" /></svg>
+            경로 찾기 <svg class="icon"><use href="#i-arrow" /></svg>
           </button>
           <div
             id="no-route-message"
@@ -250,7 +269,7 @@
             <span class="indoor-icon">✦</span
             ><span
               ><small>그다음은, 건물 안으로</small><b>미래관 실내 둘러보기</b
-              ><em>가우시안 · AR 연동 준비 중</em></span
+              ><em>호실 검색 · AR 길안내</em></span
             ><span>↗</span>
           </button>
           <section class="road-reports">
@@ -259,7 +278,7 @@
               <span>이 브라우저 시연</span>
             </div>
             <p id="report-empty">아직 등록한 신고가 없어요.</p>
-            <ul id="report-list"></ul>
+            <ul id="report-list" class="report-list"></ul>
             <small
               >신고는 학생 확인 전 정보입니다. 지금은 내 브라우저에만 저장되며
               다른 사람과 공유되지 않아요.</small
@@ -343,13 +362,24 @@
             <button id="report-start" class="report-start" aria-pressed="false">
               ⚠ 공사 구간 신고
             </button>
+            <button
+              id="admin-toggle"
+              class="report-start admin-toggle"
+              aria-pressed="false"
+            >
+              🛠 관리자 검토
+              <span id="admin-alert-count" class="admin-alert-count" hidden
+                >0</span
+              >
+            </button>
           </div>
           <div id="gps-status" class="gps-status" role="status" hidden></div>
           <div id="report-picker" class="report-picker" hidden>
-            <b>공사 중인 도로를 직접 눌러주세요.</b>
+            <b>현재 위치(파란 점)에서 신고해요.</b>
             <p>
-              누른 곳과 연결된 도로 구간 전체가 주황색으로 표시됩니다. 맞는
-              구간인지 확인한 뒤 신고하면 돼요.
+              다른 길이면 파란 점 30m 안의 길을 눌러 다시 고르세요. 같은 구역에
+              신고가 쌓이면 주의(노란색), 관리자가 확정하면 통행
+              막힘(빨간색)으로 바뀝니다.
             </p>
             <small
               >키보드: 지도에 초점을 두고 Enter를 누르면 화면 가운데 길을
@@ -408,22 +438,105 @@
             />
             공사 중이에요</label
           ><label
-            ><input type="radio" name="road-reason" value="blocked" /> 통행이
-            막혔어요</label
+            ><input type="radio" name="road-reason" value="blocked" /> 장애물이
+            있거나 통제 중이에요</label
+          ><label
+            ><input type="radio" name="road-reason" value="other" /> 기타 (직접
+            입력)</label
           >
+          <input
+            type="text"
+            id="report-reason-note"
+            class="report-reason-note"
+            maxlength="100"
+            placeholder="어떤 상황인지 적어주세요"
+            aria-label="기타 사유"
+            hidden
+          />
         </fieldset>
-        <p class="report-scope">
-          선택한 도로 구간 전체를 경로에서 제외하고 우회 경로를 다시 계산합니다.
-          현재 브라우저에만 저장됩니다.
-        </p>
+        <p class="report-scope"></p>
+        <div id="report-photo-field" class="report-photo-field">
+          <span>현장 사진 (필수) · 지금 이 자리에서 찍어 주세요</span>
+          <video
+            id="report-camera"
+            class="report-camera"
+            playsinline
+            muted
+            hidden
+          ></video>
+          <img id="report-photo-preview" alt="찍은 사진 미리보기" hidden />
+          <p
+            id="report-camera-error"
+            class="report-camera-error"
+            role="alert"
+            hidden
+          ></p>
+          <div class="camera-actions">
+            <button type="button" id="report-shoot" hidden>📷 촬영</button
+            ><button type="button" id="report-retake" hidden>다시 찍기</button>
+          </div>
+        </div>
+        <img
+          id="report-existing-photo"
+          class="report-existing-photo"
+          alt="신고에 첨부된 사진"
+          hidden
+        />
         <div id="new-report-actions" class="report-actions">
           <button id="report-no">아니요</button
           ><button id="report-yes">네, 신고할게요</button>
         </div>
         <div id="existing-report-actions" class="report-actions" hidden>
           <button id="report-keep">닫기</button
-          ><button id="report-remove">내 시연 신고 삭제</button>
+          ><button id="report-remove">내 신고 삭제</button>
         </div>
+      </div>
+    </dialog>
+    <dialog id="admin-dialog" class="report-dialog admin-dialog">
+      <button class="dialog-close" aria-label="닫기">✕</button>
+      <div class="dialog-body">
+        <span class="report-dialog-symbol" aria-hidden="true">🛠</span
+        ><span class="eyebrow">관리자 검토 · 시연</span>
+        <h2>신고된 구간</h2>
+        <section class="admin-section admin-section-urgent">
+          <h3>🔴 검토 필요 · 3건 이상</h3>
+          <p id="admin-empty-urgent">지금은 검토가 급한 구간이 없어요.</p>
+          <ul id="admin-list-urgent" class="report-list"></ul>
+        </section>
+        <section class="admin-section">
+          <h3>⛔ 확정된 구간 · 우회 안내 중</h3>
+          <p id="admin-empty-confirmed">확정된 구간이 없어요.</p>
+          <ul id="admin-list-confirmed" class="report-list"></ul>
+        </section>
+        <section class="admin-section">
+          <h3>참고용 · 3건 미만</h3>
+          <p id="admin-empty-minor">3건 미만으로 쌓인 신고가 없어요.</p>
+          <ul id="admin-list-minor" class="report-list"></ul>
+        </section>
+        <small
+          >신고는 1건부터 여기 모두 보입니다. 지도에는 3건 이상부터
+          주의(노란색)로 표시됩니다. 확정하면 빨간색 통행 막힘으로 바뀌고
+          경로에서 제외됩니다. 반려하면 누적된 신고를 지우고 처음부터 다시
+          집계합니다.</small
+        >
+        <section class="admin-section admin-works">
+          <h3>🚧 건물 공사</h3>
+          <form id="work-form" class="work-form">
+            <label>건물<select id="work-building" required></select></label
+            ><label>시작일<input type="date" id="work-start" required /></label
+            ><label>종료일<input type="date" id="work-end" required /></label
+            ><label class="work-note"
+              >메모 (선택)<input
+                type="text"
+                id="work-note"
+                maxlength="100"
+                placeholder="예: 리모델링, 출입 제한"
+            /></label>
+            <button type="submit">공사 등록</button>
+          </form>
+          <p id="work-empty">등록된 공사가 없어요.</p>
+          <ul id="work-list" class="report-list"></ul>
+        </section>
       </div>
     </dialog>
     <dialog id="indoor-dialog" class="indoor-dialog">
@@ -437,27 +550,24 @@
         <span class="purple eyebrow">NEXT CHAPTER</span>
         <h2>문을 지나, 안으로.</h2>
         <p>
-          외부 경로는 미래관 입구까지 이어져요.<br />이후 실내 공간은 팀에서
-          제작하는 뷰어와 연결될 예정입니다.
+          외부 경로는 미래관 1층 로비 출입구까지 이어져요.<br />이제 건물
+          안에서도 호실 문 앞까지 안내해요.
         </p>
         <div class="indoor-options">
           <div>
-            <b>3D Gaussian Splatting</b><span>촬영한 공간을 3D로 둘러보기</span
-            ><small>공간 촬영 · 뷰어 준비 중</small
-            ><a id="gaussian-link" hidden target="_blank" rel="noopener"
-              >실내 뷰어 열기 ↗</a
-            >
+            <b>실내 지도 · 호실 검색</b
+            ><span>층별 3D 도면에서 호실을 찾고 경로 보기</span
+            ><small>지하 1층 ~ 3층 · 계단 없는 길 안내</small
+            ><a id="indoor-link" hidden>실내 지도 열기 →</a>
           </div>
           <div>
-            <b>AR 실내 안내</b><span>현실 공간 위에 안내를 겹치기</span
-            ><small>위치 인식 · AR 연동 준비 중</small
-            ><a id="ar-link" hidden target="_blank" rel="noopener"
-              >AR 안내 열기 ↗</a
-            >
+            <b>AR 실내 안내</b><span>카메라 화면 위에 경로를 겹치기</span
+            ><small>촬영한 미래관 사진으로 위치 인식</small
+            ><a id="ar-link" hidden>AR 데모 보기 →</a>
           </div>
         </div>
         <p class="dialog-note">
-          현재 화면에는 실제 실내 촬영 데이터가 연결되어 있지 않습니다.
+          AR 길안내는 실내 지도에서 도착 호실을 고른 뒤 시작할 수 있어요.
         </p>
       </div>
     </dialog>

@@ -24,7 +24,12 @@ export const CAMPUS = {
   location: "서울 노원구 · 공릉캠퍼스",
   verified: false,
   source: "https://github.com/Hong-Iron/SMASH-SEOULTECH",
-  interior: { building: "future", gaussianUrl: null, arUrl: null },
+  // 미래관 실내 지도·AR 길안내 (dist/indoor). from=futureDoor: 캠퍼스 경로의 미래관 도착 노드
+  interior: {
+    building: "future",
+    indoorUrl: "indoor/?from=futureDoor",
+    arUrl: "indoor/?from=futureDoor&demo=1",
+  },
 };
 export const BUILDINGS = geometry.buildings;
 // 공개 도로를 분할한 자동 생성 그래프(seoultech.json) 위에 팀 조사 데이터(team-survey.json)를
@@ -44,7 +49,7 @@ export const SURVEY = {
 
 // 지도에 초록 점으로 표시하고 GIS로 내보내는 출입구입니다. 팀이 조사해 등록한 출입구
 // (team-survey.json)만 씁니다. 예전에 코드에 적혀 있던 1차 후보 19곳은 위치가 최대 13m
-// 어긋나 있어 제거했습니다. 새 위치는 조사 데이터에 등록합니다. 초록 점은 곧
+// 어긋나 있어 지웠고, 편집기(?edit=1)로 다시 등록합니다. 그래서 초록 점은 곧
 // 경로 계산에 실제로 쓰이는 출입구입니다.
 export function toEntranceMarkers(entrances) {
   return entrances.map((e) => ({
@@ -73,8 +78,7 @@ function nearestNodeId(point) {
   }, null).id;
 }
 
-// 건물의 출입 노드 목록입니다. 호출부에서 entries로 여러 문을 선택할 수 있고,
-// 기존 entry 사용부는 첫 번째 조사 출입구를 사용합니다.
+// 건물의 출입 노드 목록입니다. 경로 계산은 이 중 가장 가까운 문을 고릅니다(route-target.mjs).
 // 1) 팀이 조사한 출입구가 있으면 그것만 씁니다. 자동 생성 *Door는 실제 문과 무관해서 뺍니다.
 // 2) 없으면 자동 생성 입구(building.entry), 그것도 없으면 건물 중심에서 가장 가까운
 //    보행 노드에 임시로 연결합니다. 현장 조사 후 실제 출입구로 바뀌어야 합니다.

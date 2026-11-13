@@ -1,6 +1,7 @@
 import { toLngLat } from "./geo.mjs";
 
-// 조사 입력·지도·GIS 출력은 같은 좌표 변환식을 사용합니다.
+// 브라우저용 로컬 미터 좌표를 서버·PostGIS가 교환하기 쉬운 WGS84로 되돌립니다.
+// 변환식은 geo.mjs의 toLngLat 하나만 씁니다.
 export const campusToGps = toLngLat;
 
 function closeRing(ring, origin) {
@@ -108,7 +109,8 @@ export function createCampusGeoJson(geometry, entrances = []) {
           building_id: entrance.buildingId,
           name: entrance.name,
           source_kind: "team_input",
-          verification_status: "candidate",
+          // 팀이 편집기에서 "현장 확인함"으로 표시한 출입구는 verified로 내보냅니다.
+          verification_status: entrance.verification_status || "candidate",
           access_status: "unverified",
         },
       ),

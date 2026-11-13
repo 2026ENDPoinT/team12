@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1"
+    />
+    <meta name="theme-color" content="#7950ff" />
+    <meta
+      name="description"
+      content="사이 · 서울과기대 미래관 실내 지도. 호실·강의실을 검색하고 층을 넘나드는 경로와 AR 길안내를 확인하세요."
+    />
+    <title>미래관 실내 · 사이</title>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="indoor.css" />
+  </head>
+  <body>
+    <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <symbol id="i-search" viewBox="0 0 24 24">
+          <circle cx="10.5" cy="10.5" r="6.5" />
+          <path d="m16 16 5 5" />
+        </symbol>
+        <symbol id="i-back" viewBox="0 0 24 24">
+          <path d="M15 5 8 12l7 7" />
+        </symbol>
+        <symbol id="i-close" viewBox="0 0 24 24">
+          <path d="M6 6l12 12M18 6 6 18" />
+        </symbol>
+        <symbol id="i-ar" viewBox="0 0 24 24">
+          <path
+            d="M4 8V5a1 1 0 0 1 1-1h3m8 0h3a1 1 0 0 1 1 1v3m0 8v3a1 1 0 0 1-1 1h-3m-8 0H5a1 1 0 0 1-1-1v-3"
+          />
+          <path d="m12 7 4 2.3v4.6L12 16l-4-2.1V9.3Z" />
+        </symbol>
+        <symbol id="i-walk" viewBox="0 0 24 24">
+          <circle cx="13" cy="4.5" r="1.8" />
+          <path d="m9 21 2.5-6.5L14 17v4m-3.5-6.5L11 9l-3 2v3m3-5 3 3 3 1" />
+        </symbol>
+        <symbol id="i-route" viewBox="0 0 24 24">
+          <circle cx="6" cy="5" r="3" />
+          <circle cx="18" cy="19" r="3" />
+          <path d="M6 8v6a5 5 0 0 0 5 5h4M9 5h5a4 4 0 0 1 0 8h-3" />
+        </symbol>
+        <symbol id="i-swap" viewBox="0 0 24 24">
+          <path d="M7 4v16m0 0-3-3m3 3 3-3M17 20V4m0 0-3 3m3-3 3 3" />
+        </symbol>
+        <symbol id="i-target" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="7" />
+          <circle cx="12" cy="12" r="2.5" />
+          <path d="M12 2v3m0 14v3M2 12h3m14 0h3" />
+        </symbol>
+        <symbol id="i-play" viewBox="0 0 24 24">
+          <path d="M8 5v14l11-7Z" />
+        </symbol>
+      </defs>
+    </svg>
+
+    <main id="stage" class="stage">
+      <div id="view" class="view" aria-label="미래관 3D 실내 지도"></div>
+      <div id="loading" class="loading">
+        <div class="loading-mark">✦</div>
+        <b>미래관 도면을 불러오는 중</b>
+        <div class="bar"><i id="load-bar"></i></div>
+      </div>
+
+      <header class="topbar">
+        <a
+          id="back"
+          class="round-btn"
+          href="../#campus/seoultech"
+          aria-label="캠퍼스 지도로"
+        >
+          <svg class="icon"><use href="#i-back" /></svg>
+        </a>
+        <button id="search-open" class="search-pill" type="button">
+          <svg class="icon"><use href="#i-search" /></svg>
+          <span>미래관에서 호실·강의실 검색</span>
+        </button>
+      </header>
+
+      <nav id="floors" class="floors" aria-label="층 선택"></nav>
+      <div id="floor-badge" class="floor-badge" aria-hidden="true"></div>
+      <div class="map-tools">
+        <button
+          id="recenter"
+          class="round-btn small"
+          type="button"
+          aria-label="지도 다시 맞추기"
+        >
+          <svg class="icon"><use href="#i-target" /></svg>
+        </button>
+      </div>
+
+      <section id="sheet" class="sheet" aria-live="polite">
+        <button
+          id="sheet-handle"
+          class="sheet-handle"
+          type="button"
+          aria-label="패널 접기·펴기"
+        >
+          <i></i>
+        </button>
+
+        <!-- 처음 화면 -->
+        <div id="sheet-home" class="sheet-body">
+          <span class="eyebrow">SEOULTECH · 미래관</span>
+          <h1>미래관, 그 안의 사이.</h1>
+          <p id="home-from" class="muted">
+            지하 1층부터 3층까지 호실을 찾아 길을 안내해요.
+          </p>
+          <div class="chips" id="quick-chips">
+            <button data-q="화장실">화장실</button>
+            <button data-q="엘리베이터">엘리베이터</button>
+            <button data-q="컴퓨터공학과 사무실">학과 사무실</button>
+            <button data-q="실습실">실습실</button>
+            <button data-q="교수">교수연구실</button>
+          </div>
+          <button id="demo-open" class="ghost-btn" type="button">
+            <svg class="icon"><use href="#i-play" /></svg>AR 길안내 데모 보기
+            <small>로비 → 108호 촬영 영상</small>
+          </button>
+        </div>
+
+        <!-- 장소 선택 -->
+        <div id="sheet-place" class="sheet-body" hidden>
+          <div class="place-head">
+            <span id="place-floor" class="floor-tag"></span>
+            <div>
+              <h2 id="place-title"></h2>
+              <p id="place-sub" class="muted"></p>
+            </div>
+            <button
+              id="place-close"
+              class="round-btn small flat"
+              type="button"
+              aria-label="닫기"
+            >
+              <svg class="icon"><use href="#i-close" /></svg>
+            </button>
+          </div>
+          <div class="actions">
+            <button id="place-route" class="primary-btn" type="button">
+              <svg class="icon"><use href="#i-route" /></svg>길찾기
+            </button>
+            <button id="place-from" class="ghost-btn" type="button">
+              여기서 출발
+            </button>
+          </div>
+        </div>
+
+        <!-- 경로 -->
+        <div id="sheet-route" class="sheet-body" hidden>
+          <div class="route-ends">
+            <label class="end">
+              <span class="dot start"></span>
+              <select id="route-from" aria-label="출발지"></select>
+            </label>
+            <div class="end">
+              <span class="dot goal"></span>
+              <button id="route-to" class="end-btn" type="button"></button>
+            </div>
+            <div class="route-side">
+              <button
+                id="route-close"
+                class="round-btn small flat"
+                type="button"
+                aria-label="경로 닫기"
+              >
+                <svg class="icon"><use href="#i-close" /></svg>
+              </button>
+              <button
+                id="route-swap"
+                class="round-btn small flat"
+                type="button"
+                aria-label="출발·도착 바꾸기"
+              >
+                <svg class="icon"><use href="#i-swap" /></svg>
+              </button>
+            </div>
+          </div>
+          <div class="seg" role="radiogroup" aria-label="이동 방식">
+            <button
+              data-mode="stairs"
+              class="on"
+              type="button"
+              role="radio"
+              aria-checked="true"
+            >
+              빠른 길
+            </button>
+            <button
+              data-mode="elevator"
+              type="button"
+              role="radio"
+              aria-checked="false"
+            >
+              계단 없이
+            </button>
+          </div>
+          <div class="route-summary-row">
+            <div id="route-summary" class="route-summary"></div>
+            <button id="route-share" class="link-btn" type="button">
+              공유
+            </button>
+          </div>
+          <div class="actions">
+            <button id="ar-open" class="primary-btn" type="button">
+              <svg class="icon"><use href="#i-ar" /></svg>AR 길안내
+            </button>
+            <button id="walk-open" class="ghost-btn" type="button">
+              <svg class="icon"><use href="#i-walk" /></svg>미리 걷기
+            </button>
+          </div>
+          <ol id="route-steps" class="steps"></ol>
+        </div>
+      </section>
+    </main>
+
+    <!-- 검색 -->
+    <section id="search" class="search" hidden>
+      <div class="search-bar">
+        <button
+          id="search-close"
+          class="round-btn flat"
+          type="button"
+          aria-label="검색 닫기"
+        >
+          <svg class="icon"><use href="#i-back" /></svg>
+        </button>
+        <input
+          id="search-input"
+          type="search"
+          inputmode="search"
+          autocomplete="off"
+          placeholder="313, 네트워크, 화장실, 교수 이름"
+        />
+      </div>
+      <p id="search-hint" class="search-hint"></p>
+      <ul id="search-results" class="results"></ul>
+    </section>
+
+    <!-- 미리 걷기 -->
+    <section id="walk" class="walk" hidden>
+      <div class="walk-top">
+        <div id="walk-step" class="hud-card"></div>
+      </div>
+      <figure id="walk-photo" class="walk-photo" hidden>
+        <img alt="이 위치에서 찍은 실제 사진" />
+        <figcaption>실제 사진</figcaption>
+      </figure>
+      <div class="walk-bottom">
+        <div class="walk-progress"><i id="walk-bar"></i></div>
+        <div class="walk-ctrl">
+          <button
+            id="walk-prev"
+            class="round-btn small"
+            type="button"
+            aria-label="이전 단계"
+          >
+            ⏮
+          </button>
+          <button
+            id="walk-play"
+            class="round-btn"
+            type="button"
+            aria-label="일시정지"
+          >
+            ❚❚
+          </button>
+          <button
+            id="walk-next"
+            class="round-btn small"
+            type="button"
+            aria-label="다음 단계"
+          >
+            ⏭
+          </button>
+          <button
+            id="walk-speed"
+            class="round-btn small"
+            type="button"
+            aria-label="속도"
+          >
+            1×
+          </button>
+          <button
+            class="round-btn small voice-btn"
+            type="button"
+            aria-label="음성 안내"
+          >
+            🔈
+          </button>
+        </div>
+        <button id="walk-close" class="primary-btn dark" type="button">
+          미리 걷기 끝내기
+        </button>
+      </div>
+    </section>
+
+    <!-- AR -->
+    <section id="ar" class="ar" hidden>
+      <video id="ar-video" playsinline muted autoplay></video>
+      <canvas id="ar-gl"></canvas>
+      <div class="ar-top">
+        <div id="ar-step" class="hud-card">
+          <div class="hud-arrow" id="ar-arrow">↑</div>
+          <div>
+            <b id="ar-step-text">위치를 찾는 중</b
+            ><small id="ar-step-sub"></small>
+          </div>
+        </div>
+        <button
+          id="ar-status"
+          class="ar-status searching"
+          type="button"
+          aria-label="위치 상태 · 눌러서 층 직접 고르기"
+        >
+          주변을 천천히 비춰 주세요
+        </button>
+        <div id="ar-floors" class="ar-floors" hidden></div>
+      </div>
+      <div id="ar-coach" class="ar-coach">
+        <div class="coach-phone"></div>
+        <b>휴대폰을 세워 복도를 비춰 주세요</b>
+        <small>촬영해 둔 미래관 사진과 화면을 비교해 위치를 찾아요</small>
+      </div>
+      <div class="ar-bottom">
+        <canvas
+          id="ar-mini"
+          width="240"
+          height="240"
+          aria-label="현재 위치 미니맵"
+        ></canvas>
+        <div class="ar-info">
+          <b id="ar-dest"></b>
+          <span id="ar-remain"></span>
+          <div class="ar-btns">
+            <button id="ar-close" class="primary-btn dark" type="button">
+              AR 끝내기
+            </button>
+            <button
+              class="round-btn small voice-btn"
+              type="button"
+              aria-label="음성 안내"
+            >
+              🔈
+            </button>
+          </div>
+        </div>
+      </div>
+      <div id="ar-error" class="ar-error" hidden>
+        <b></b>
+        <p></p>
+        <div class="actions">
+          <button id="ar-demo" class="primary-btn" type="button">
+            <svg class="icon"><use href="#i-play" /></svg>데모 영상으로 보기
+          </button>
+          <button id="ar-error-close" class="ghost-btn" type="button">
+            닫기
+          </button>
+        </div>
+      </div>
+      <div id="ar-arrive" class="ar-arrive" hidden>
+        <span>✦</span>
+        <b></b>
+        <button id="ar-arrive-close" class="primary-btn" type="button">
+          확인
+        </button>
+        <button id="ar-again" class="ghost-btn" type="button" hidden>
+          데모 다시 보기
+        </button>
+      </div>
+    </section>
+
+    <!-- 엘리베이터 탑승 화면 -->
+    <div id="lift" class="lift" hidden role="status" aria-live="polite">
+      <div class="lift-box">
+        <div class="lift-panel">
+          <span class="lift-arrow">▲</span><b class="lift-floor">1F</b>
+        </div>
+        <div class="lift-cab">
+          <div class="lift-doors"><i></i><i></i></div>
+        </div>
+        <p class="lift-msg"></p>
+        <small class="lift-sub"></small>
+        <button class="lift-skip ghost-btn" type="button" hidden>
+          내렸어요
+        </button>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+    <script src="indoor.js" defer></script>
+  </body>
+</html>

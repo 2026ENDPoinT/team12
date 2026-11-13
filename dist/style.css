@@ -801,6 +801,18 @@ body.exploring {
   color: var(--ink);
   padding: 3px 0;
   outline-offset: 3px;
+  appearance: none;
+  cursor: text;
+}
+#origin::placeholder,
+#destination::placeholder {
+  color: #b5a9bf;
+  font-weight: 500;
+}
+#origin[aria-invalid="true"],
+#destination[aria-invalid="true"] {
+  color: #b54343;
+  outline: 2px solid #efb6b6;
 }
 .journey-connector {
   height: 27px;
@@ -2198,15 +2210,15 @@ body {
   display: block;
   margin-top: 12px;
 }
-#report-list {
+.report-list {
   list-style: none;
   margin: 12px 0 0;
   padding: 0;
 }
-#report-list li + li {
+.report-list li + li {
   margin-top: 7px;
 }
-#report-list button {
+.report-list button {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -2217,25 +2229,118 @@ body {
   border-radius: 8px;
   padding: 10px;
 }
-#report-list button > span:first-child {
+.report-list button > span:first-child {
   color: #bd8b2d;
   font-size: 19px;
 }
-#report-list b {
+.report-list b {
   display: block;
   font-size: 9px;
   color: #967244;
   line-height: 1.6;
 }
-#report-list small {
+.report-list small {
   display: block;
   font-size: 8px;
   color: #ba9a6d;
   margin-top: 4px;
 }
-#report-list button > span:last-child {
+.report-list button > span:last-child {
   margin-left: auto;
   color: #b58a45;
+}
+/* 관리자 검토 목록: report-list 틀을 그대로 쓰고 항목 안쪽만 다릅니다. */
+.admin-item {
+  border: 1px solid #eee0c5;
+  background: #fffaf0;
+  border-radius: 8px;
+  padding: 10px;
+}
+.admin-section {
+  margin-top: 16px;
+}
+.admin-section h3 {
+  font-size: 11px;
+  margin: 0 0 8px;
+}
+.admin-section-urgent {
+  padding: 10px;
+  background: #fdeceb;
+  border: 1px solid #f1b3ae;
+  border-radius: 10px;
+}
+.admin-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.admin-actions button {
+  flex: 1;
+  font-size: 9px;
+  padding: 7px;
+  border-radius: 6px;
+  border: 1px solid #eee0c5;
+  background: #fff;
+  cursor: pointer;
+}
+.admin-actions button[data-act="confirm"] {
+  background: #fdeceb;
+  border-color: #f1b3ae;
+  color: #b3362c;
+}
+.road-warning-confirmed .warning-triangle {
+  background: #e2453c;
+  color: #fff;
+}
+.road-warning-confirmed:hover .warning-triangle {
+  background: #c93328;
+}
+.road-warning-confirmed small {
+  color: #8a2420;
+  background: #ffecea;
+  border-color: #f1b3ae;
+}
+/* 관리자 버튼 위 "검토 필요" 건수 배지 */
+.admin-toggle {
+  position: relative;
+}
+.admin-alert-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #e2453c;
+  color: #fff;
+  font-size: 9px;
+  line-height: 16px;
+  text-align: center;
+}
+/* 신고 사진 첨부 */
+.report-photo-field {
+  display: block;
+  margin: 14px 0;
+  font-size: 10px;
+  color: #967244;
+}
+.report-photo-field span {
+  display: block;
+  margin-bottom: 6px;
+}
+.report-photo-field input {
+  font-size: 10px;
+}
+#report-photo-preview,
+.report-existing-photo {
+  display: block;
+  margin-top: 8px;
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: 8px;
+  border: 1px solid #eee0c5;
+  object-fit: cover;
 }
 .no-route-message {
   padding: 17px 14px;
@@ -3135,4 +3240,276 @@ body.exploring .header {
     padding: 13px 14px;
     border-radius: 14px;
   }
+}
+/* 신고 사유 3가지 + 기타 직접 입력 */
+#report-reasons {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+.report-reason-note {
+  flex-basis: 100%;
+  font-size: 11px;
+  padding: 9px 10px;
+  border: 1px solid #eee0c5;
+  border-radius: 8px;
+  color: #6f5631;
+}
+.report-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+/* 건물 공사 표시: 건물 위 🚧, 누르면 3초간 공사 기간 말풍선 */
+.building-work {
+  position: relative;
+  background: #fff4d6;
+  border: 1px solid #e3be74;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+  pointer-events: auto;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 3px #6c4a1b40);
+}
+.building-work-bubble {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 10px;
+  color: #72531d;
+  background: #fff9e5;
+  border: 1px solid #e3be74;
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+/* 관리자: 건물 공사 등록 */
+.work-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 10px;
+  color: #967244;
+}
+.work-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.work-form label:first-child,
+.work-form .work-note,
+.work-form button {
+  grid-column: 1 / -1;
+}
+.work-form select,
+.work-form input {
+  font-size: 11px;
+  padding: 7px;
+  border: 1px solid #eee0c5;
+  border-radius: 6px;
+  min-width: 0;
+}
+.work-form button {
+  padding: 9px;
+  border-radius: 6px;
+  border: 1px solid #b48025;
+  background: #b48025;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+#work-empty {
+  font-size: 10px;
+  color: #ae9c84;
+}
+/* 모바일: 지도가 메인. 길찾기 입력은 위쪽에 얇게 압축합니다(네이버 지도처럼). */
+@media (max-width: 760px) {
+  .route-panel,
+  .map-view.panel-closed .route-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+  .route-panel > * {
+    flex: 0 0 100%;
+    margin: 0;
+  }
+  .mobile-route-heading,
+  .journey-connector,
+  .map-overlay-heading,
+  .map-view.panel-closed .map-overlay-heading {
+    display: none;
+  }
+  .journey-form {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 2px;
+    padding: 4px 10px;
+  }
+  .journey-form > label,
+  .destination-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    margin: 0;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  #origin,
+  #destination {
+    width: 100%;
+    margin: 0;
+    padding: 5px 0;
+    font-size: 13px;
+  }
+  #origin {
+    border-bottom: 1px solid #eee8f3;
+  }
+  .route-panel > .mode-tabs {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    margin: 0;
+  }
+  .route-panel > .route-submit {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 32px;
+    padding: 6px 12px;
+    gap: 6px;
+  }
+  .mode-tabs button {
+    padding: 7px 4px;
+  }
+  .route-result {
+    margin: 0;
+    padding: 0 2px;
+  }
+  .result-icon,
+  .result-heading > div > small {
+    display: none;
+  }
+  .result-heading h3 {
+    font-size: 16px;
+  }
+}
+/* 관리자 버튼: 사용자에게는 숨김(?admin=1 또는 관리자 기기에서만 보임), 모바일 아이콘은 🛠로 구분 */
+.admin-toggle[hidden] {
+  display: none !important;
+}
+@media (max-width: 760px) {
+  .map-quick-actions .admin-toggle::before {
+    content: "🛠";
+  }
+  .map-quick-actions .admin-toggle {
+    background: #f1ecff;
+    border-color: #c9b8ff;
+  }
+}
+/* 관리자: 구역별 신고 사진. 라디오로 대표 사진을 고릅니다. */
+.admin-photos {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+.admin-photo {
+  font-size: 9px;
+  color: #967244;
+}
+.admin-photo label {
+  position: relative;
+  display: block;
+  cursor: pointer;
+}
+.admin-photo input[type="radio"] {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  margin: 0;
+  accent-color: #d43f3f;
+}
+.admin-photo img,
+.admin-photo-empty {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 2px solid #eee0c5;
+  background: #fffaf0;
+}
+.admin-photo label:has(input:checked) img {
+  border-color: #d43f3f;
+}
+.admin-photo small {
+  display: block;
+  margin-top: 3px;
+  line-height: 1.4;
+}
+.admin-photo-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+.admin-photo-actions a,
+.admin-photo-actions button {
+  font-size: 9px;
+  color: #a27a3c;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* 현장 신고: 앱 안 카메라 */
+.report-camera,
+#report-photo-preview {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  margin-top: 6px;
+  border-radius: 8px;
+  background: #1d1a22;
+  object-fit: cover;
+}
+.report-camera[hidden],
+#report-photo-preview[hidden] {
+  display: none;
+}
+.camera-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.camera-actions button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #b48025;
+  background: #fff;
+  color: #8a611f;
+  font-size: 12px;
+  font-weight: 600;
+}
+.camera-actions #report-shoot {
+  background: #b48025;
+  color: #fff;
+}
+.report-camera-error {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #b3362c;
 }

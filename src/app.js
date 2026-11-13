@@ -1,11 +1,37 @@
 import { shortestPath } from "./routing.mjs";
+import { routeBetween } from "./route-target.mjs";
 import {
   edgeId,
   reportLocation,
-  readReports,
-  writeReports,
   availableEdges,
+  clusterReports,
+  clusterOf,
+  gpsDistance,
+  locateReportPoint,
+  sanitizeReports,
+  rowToReport,
+  confirmedEdgesFromRows,
+  reasonLabel,
+  REPORT_THRESHOLD,
 } from "./reports.mjs";
+import {
+  fetchReportRows,
+  insertReportRow,
+  getDeviceId,
+  confirmReportRows,
+  deleteReportRows,
+  uploadReportPhoto,
+  photoUrlFor,
+  fetchWorkRows,
+  insertWorkRow,
+  deleteWorkRow,
+} from "./backend.mjs";
+import {
+  activeWorks,
+  buildingLabel,
+  worksPeriod,
+  today,
+} from "./buildings.mjs";
 import catalog from "./schools.json";
 import {
   CAMPUS,
@@ -15,8 +41,11 @@ import {
   EDGES,
   PLACES,
   ENTRANCES,
+  SURVEY,
+  placeEntries,
 } from "./data.mjs";
 import { createCampusMap } from "./map.js";
+import { setupEditMode } from "./edit-mode.js";
 import { gpsToCampus } from "./geo.mjs";
 import { gisSummary } from "./gis.mjs";
 const $ = (s) => document.querySelector(s),
@@ -31,21 +60,29 @@ let region = "전체",
   gpsWatchId = null,
   gpsPosition = null,
   gpsStartNode = null;
-// TODO(백엔드 연동): 안전하게 접근 가능한 브라우저 저장소만 사용합니다.
-let reportStorage = null;
-try {
-  reportStorage = window.localStorage;
-} catch {}
-let reports = readReports(reportStorage),
+// Supabase에서 비동기로 채워집니다 (아래 loadReports 참고). 처음엔 빈 상태로 시작합니다.
+let reports = [],
+  confirmedEdges = [],
   reporting = false,
-  selectedReport = null;
+  selectedReport = null,
+  adminUnlocked = false,
+  // 신고를 올릴 때 Storage에 업로드할 File. 미리보기용 blob URL은 따로 관리합니다.
+  selectedPhotoFile = null,
+  photoPreviewUrl = null,
+  // 관리자가 등록한 건물 공사 (Supabase building_works, 종료일 안 지난 것만)
+  works = [],
+  // 30m 안 신고를 묶은 구역 (loadReports에서 다시 계산)
+  clusters = [];
+// TODO(백엔드): 지금은 코드만 맞으면 누구나 여는 시연용 잠금입니다.
+// 실제 배포 전 서버에서 관리자 로그인/권한을 검증하도록 교체하세요.
+const ADMIN_DEMO_CODE = "team12admin";
 const GIS_SUMMARY = gisSummary(CAMPUS_GEOMETRY, ENTRANCES);
 for (const [key, value] of Object.entries(GIS_SUMMARY)) {
   const element = document.querySelector(`[data-gis-count="${key}"]`);
   if (element) element.textContent = value.toLocaleString("ko-KR");
 }
 $(".map-data-status").textContent =
-  `건물 ${GIS_SUMMARY.buildings} · 출입구 후보 ${GIS_SUMMARY.entrances}`;
+  `건물 ${GIS_SUMMARY.buildings} · 등록 출입구 ${GIS_SUMMARY.entrances}`;
 const normalize = (s) => s.toLowerCase().replace(/\s/g, "");
 const schoolData = [
   catalog.find((s) => s[0] === CAMPUS.name),
@@ -120,47 +157,84 @@ $("#show-all").onclick = () => {
   showAll = !showAll;
   renderSchools();
 };
-const gpsOptions = [];
-for (const select of [$("#origin"), $("#destination")]) {
-  const gpsOption = document.createElement("option");
-  gpsOption.value = "gps";
-  gpsOption.textContent = "내 현재 위치 · GPS 필요";
-  gpsOption.disabled = true;
-  select.append(gpsOption);
-  gpsOptions.push(gpsOption);
-  for (const place of PLACES) {
-    const option = document.createElement("option");
-    option.value = place.id;
-    option.textContent = place.name;
-    select.append(option);
-  }
+const placesById = new Map(PLACES.map((place) => [place.id, place])),
+  placesByName = new Map(PLACES.map((place) => [place.name, place])),
+  gpsOption = document.createElement("option"),
+  gpsOptions = [gpsOption];
+gpsOption.value = "내 현재 위치";
+gpsOption.disabled = true;
+$("#route-places").append(gpsOption);
+for (const place of PLACES) {
+  const option = document.createElement("option");
+  option.value = place.name;
+  $("#route-places").append(option);
 }
-$("#origin").value = activeStart;
-$("#destination").value = activeDestination;
-function selectedPlace(selector) {
-  const id = $(selector).value;
-  return id === "gps" && gpsStartNode
-    ? { id: "gps", name: "현재 위치", entry: gpsStartNode }
-    : PLACES.find((place) => place.id === id);
+function routePlaceId(selector) {
+  const value = $(selector).value.trim();
+  return value === "내 현재 위치" ? "gps" : placesByName.get(value)?.id;
+}
+function setRoutePlace(selector, id) {
+  $(selector).value =
+    id === "gps" ? "내 현재 위치" : placesById.get(id)?.name || "";
+  $(selector).removeAttribute("aria-invalid");
+}
+setRoutePlace("#origin", activeStart);
+setRoutePlace("#destination", activeDestination);
+// 경로 계산에 쓰는 보행 그래프입니다. 평소에는 data.mjs의 합친 그래프이고,
+// 편집 모드에서는 편집 중인 조사 데이터를 합친 그래프로 바뀝니다.
+let graph = { nodes: NODES, edges: EDGES, entrances: SURVEY.entrances };
+function selectedPlace(selector, g = graph) {
+  const id = routePlaceId(selector);
+  if (id === "gps")
+    return gpsStartNode
+      ? {
+          id: "gps",
+          name: "현재 위치",
+          entry: gpsStartNode,
+          entries: [gpsStartNode],
+        }
+      : undefined;
+  const place = PLACES.find((item) => item.id === id),
+    building = BUILDINGS.find((b) => b.id === id);
+  return place && building
+    ? { ...place, entries: placeEntries(building, g.entrances) }
+    : place;
+}
+// [팀 알고리즘 호출 지점]
+// 신고된 차단 edge를 제외한 그래프를 routing.mjs의 임시 알고리즘에 전달합니다.
+// 건물에 출입구가 여러 개면 route-target.mjs가 가장 가까운 문을 고릅니다.
+function routeOn(g) {
+  const start = selectedPlace("#origin", g),
+    destination = selectedPlace("#destination", g);
+  if (!start || !destination) return { start, destination, route: null };
+  return {
+    start,
+    destination,
+    route: routeBetween(
+      start.entries,
+      destination.entries,
+      mode,
+      g.nodes,
+      availableEdges(confirmedEdges, g.edges),
+    ),
+  };
 }
 function updateRoute({ announce = false } = {}) {
-  activeStart = $("#origin").value;
-  activeDestination = $("#destination").value;
-  const start = selectedPlace("#origin"),
-    destination = selectedPlace("#destination");
+  activeStart = routePlaceId("#origin") || activeStart;
+  activeDestination = routePlaceId("#destination") || activeDestination;
+  const { start, destination, route } = routeOn(graph);
   if (!start || !destination) {
-    toast("현재 위치를 먼저 확인해주세요.");
+    const gpsWaiting =
+      routePlaceId("#origin") === "gps" ||
+      routePlaceId("#destination") === "gps";
+    toast(
+      gpsWaiting
+        ? "현재 위치를 먼저 확인해주세요."
+        : "검색 결과에서 출발지와 도착지를 선택해주세요.",
+    );
     return;
   }
-  // [팀 알고리즘 호출 지점]
-  // 신고된 차단 edge를 제외한 그래프를 routing.mjs의 임시 알고리즘에 전달합니다.
-  currentRoute = shortestPath(
-    start.entry,
-    destination.entry,
-    mode,
-    NODES,
-    availableEdges(reports),
-  );
+  currentRoute = route;
   if (!currentRoute) {
     $("#route-result").hidden = true;
     $("#no-route-message").hidden = false;
@@ -187,7 +261,7 @@ function updateRoute({ announce = false } = {}) {
   );
   visible.forEach((id, i) => {
     const li = document.createElement("li");
-    const point = NODES[id];
+    const point = graph.nodes[id];
     const nearestBuilding = BUILDINGS.filter(
       (b) => b.name !== "교내 건물",
     ).reduce(
@@ -218,7 +292,7 @@ function updateRoute({ announce = false } = {}) {
     $("#route-steps").append(li);
   });
   $("#indoor-open").hidden = destination.id !== "future";
-  map?.setRoute(currentRoute, start.id, destination.id);
+  map?.setRoute(currentRoute, start.id, destination.id, graph.nodes);
   if (announce)
     toast(`${start.name}에서 ${destination.name}까지 경로를 표시했어요.`);
 }
@@ -252,7 +326,7 @@ function showPopover(title, description, place = null, indoor = false) {
       const button = document.createElement("button");
       button.textContent = text;
       button.onclick = () => {
-        $(selector).value = place.id;
+        setRoutePlace(selector, place.id);
         updateRoute();
         closeBuildingPopover();
       };
@@ -261,7 +335,7 @@ function showPopover(title, description, place = null, indoor = false) {
   }
   if (indoor) {
     const button = document.createElement("button");
-    button.textContent = "미래관 실내 연동 보기 ↗";
+    button.textContent = "미래관 실내 지도 ↗";
     button.onclick = () => $("#indoor-dialog").showModal();
     el.append(button);
   }
@@ -286,20 +360,39 @@ if (!map) {
       PLACES.find((place) => place.id === "future").entry,
       "shortest",
       NODES,
-      availableEdges(reports),
+      availableEdges(confirmedEdges),
     ),
     "gate",
     "future",
   );
+  setupEditMode({
+    map,
+    survey: SURVEY,
+    geometry: CAMPUS_GEOMETRY,
+    buildings: BUILDINGS,
+    getGraph: () => graph,
+    // 편집기가 조사 데이터를 바꿀 때마다 합친 그래프를 넘겨받아 경로를 다시 그립니다.
+    applyGraph(next) {
+      graph = next;
+      updateRoute();
+    },
+    // 주어진 그래프에서 지금 고른 출발지·도착지 경로를 계산만 합니다(화면은 그대로).
+    routeOn,
+  });
 }
-$("#origin").onchange = () => {
-  updateRoute();
-  closeBuildingPopover();
-};
-$("#destination").onchange = () => {
-  updateRoute();
-  closeBuildingPopover();
-};
+for (const selector of ["#origin", "#destination"]) {
+  const input = $(selector);
+  input.oninput = () => input.removeAttribute("aria-invalid");
+  input.onchange = () => {
+    if (!routePlaceId(selector)) {
+      input.setAttribute("aria-invalid", "true");
+      toast("검색 결과에 있는 장소를 선택해주세요.");
+      return;
+    }
+    updateRoute();
+    closeBuildingPopover();
+  };
+}
 $("#find-route").onclick = () => {
   updateRoute({ announce: true });
   closeBuildingPopover();
@@ -332,7 +425,7 @@ $("#panel-toggle").onclick = () =>
 // 공개 데이터의 중심 위·경도를 로컬 미터 좌표로 변환합니다.
 // 실서비스 전에는 학교에서 기준점을 실측해 좌표 오차를 보정해야 합니다.
 function nearestGraphNode(point) {
-  return Object.entries(NODES).reduce((best, [id, node]) => {
+  return Object.entries(graph.nodes).reduce((best, [id, node]) => {
     const distance = Math.hypot(point.x - node.x, point.z - node.z);
     return !best || distance < best.distance ? { id, distance } : best;
   }, null);
@@ -351,12 +444,12 @@ function stopGps({ keepStatus = false } = {}) {
     option.textContent = "내 현재 위치 · GPS 필요";
   }
   let changed = false;
-  if ($("#origin").value === "gps") {
-    $("#origin").value = "gate";
+  if (routePlaceId("#origin") === "gps") {
+    setRoutePlace("#origin", "gate");
     changed = true;
   }
-  if ($("#destination").value === "gps") {
-    $("#destination").value = "future";
+  if (routePlaceId("#destination") === "gps") {
+    setRoutePlace("#destination", "future");
     changed = true;
   }
   if (changed) updateRoute();
@@ -408,12 +501,12 @@ $("#gps-toggle").onclick = () => {
         `현재 위치 추적 중 · 정확도 약 ${Math.round(coords.accuracy)}m`,
       );
       if (firstFix) {
-        $("#origin").value = "gps";
+        setRoutePlace("#origin", "gps");
         updateRoute();
         toast("현재 위치를 출발지로 설정했어요.");
       } else if (
-        $("#origin").value === "gps" ||
-        $("#destination").value === "gps"
+        routePlaceId("#origin") === "gps" ||
+        routePlaceId("#destination") === "gps"
       )
         updateRoute();
       firstFix = false;
@@ -464,7 +557,7 @@ function routeView() {
         PLACES.find((place) => place.id === "future").entry,
         "shortest",
         NODES,
-        availableEdges(reports),
+        availableEdges(confirmedEdges),
       ),
       "gate",
       "future",
@@ -507,7 +600,7 @@ $$("dialog").forEach((d) =>
   }),
 );
 for (const [key, selector] of [
-  ["gaussianUrl", "#gaussian-link"],
+  ["indoorUrl", "#indoor-link"],
   ["arUrl", "#ar-link"],
 ]) {
   const url = CAMPUS.interior[key];
@@ -540,10 +633,17 @@ document.addEventListener("keydown", (e) => {
 });
 renderSchools();
 renderReportList();
+renderAdminAlert();
 routeView();
+loadReports(); // Supabase에서 신고 목록을 비동기로 불러와 위 렌더를 다시 채웁니다.
 
-// ===== 지도 위치를 직접 누르는 공사 신고 시연 =====
-// TODO(백엔드): 사용자 입력은 point{x,z}. 경로 연결 edge는 지도 내부에서 자동 계산합니다.
+// ===== 현장 공사 신고 (GPS 위치 + 앱 안 카메라) =====
+// 스윙·지쿠터처럼 지금 그 자리에서만 신고합니다. 위치는 GPS로 잡고(정확도 50m 이내, 캠퍼스 안),
+// 다른 길이면 GPS 위치 30m 안에서만 다시 고를 수 있습니다. 사진은 앱 안 카메라로만 찍습니다(앨범 X).
+// ponytail: GPS 위치를 조작하는 앱까지는 막지 못합니다. 더 막으려면 서버(Edge Function)에서 검증하세요.
+const REPORT_MAX_ACCURACY = 50,
+  REPORT_ADJUST_RADIUS = 30;
+let reportOrigin = null; // 신고를 시작할 때 잡은 GPS 위치 {x, z, accuracy}
 function setReporting(value) {
   reporting = value;
   $("#report-start").classList.toggle("active", value);
@@ -553,13 +653,69 @@ function setReporting(value) {
     : "⚠ 공사 구간 신고";
   $("#report-picker").hidden = !value;
   map?.setReporting(value);
-  if (!value) map?.clearReportSelection();
+  if (!value) {
+    map?.clearReportSelection();
+    reportOrigin = null;
+    if (gpsWatchId === null) map?.setUserLocation(null);
+  }
   if (value) {
     closeBuildingPopover();
     $("#campus-map canvas")?.focus({ preventScroll: true });
   }
 }
-$("#report-start").onclick = () => setReporting(!reporting);
+function startFieldReport() {
+  if (!window.isSecureContext || !navigator.geolocation) {
+    toast("현장 신고는 https 주소에서 위치 권한을 허용해야 할 수 있어요.");
+    return;
+  }
+  toast("현재 위치를 확인하고 있어요…");
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      if (coords.accuracy > REPORT_MAX_ACCURACY) {
+        toast(
+          `GPS 정확도가 낮아요(약 ${Math.round(coords.accuracy)}m). 하늘이 트인 곳에서 다시 시도해주세요.`,
+        );
+        return;
+      }
+      const point = gpsToCampus(
+        coords.latitude,
+        coords.longitude,
+        CAMPUS_GEOMETRY.meta,
+      );
+      const nearest = point && nearestGraphNode(point);
+      if (!nearest || nearest.distance > 350) {
+        toast("캠퍼스 안에서만 신고할 수 있어요.");
+        return;
+      }
+      const selection = locateReportPoint(
+        point,
+        EDGES,
+        NODES,
+        REPORT_ADJUST_RADIUS,
+      );
+      if (!selection) {
+        toast(
+          `현재 위치 ${REPORT_ADJUST_RADIUS}m 안에 길이 없어요. 길 가까이에서 다시 시도해주세요.`,
+        );
+        return;
+      }
+      reportOrigin = { ...point, accuracy: coords.accuracy };
+      setReporting(true);
+      map?.setUserLocation(reportOrigin, { follow: true });
+      map?.previewReportSelection(selection);
+      openRoadReport(selection);
+    },
+    (error) =>
+      toast(
+        error.code === 1
+          ? "위치 권한이 꺼져 있어요. 브라우저 설정에서 위치 권한을 허용해주세요."
+          : "현재 위치를 확인하지 못했어요. 잠시 후 다시 시도해주세요.",
+      ),
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
+  );
+}
+$("#report-start").onclick = () =>
+  reporting ? setReporting(false) : startFieldReport();
 $("#report-cancel").onclick = () => setReporting(false);
 function openRoadReport(selection) {
   if (selection?.error) {
@@ -570,52 +726,256 @@ function openRoadReport(selection) {
     ? reports.find((r) => r.id === selection.reportId)
     : null;
   if (!existing && (!selection?.point || !selection?.edgeId)) return;
+  if (!existing) {
+    if (!reportOrigin) {
+      toast("⚠ 공사 신고 버튼을 눌러 현재 위치에서 신고해주세요.");
+      return;
+    }
+    const away = Math.hypot(
+      selection.point.x - reportOrigin.x,
+      selection.point.z - reportOrigin.z,
+    );
+    if (away > REPORT_ADJUST_RADIUS) {
+      map?.clearReportSelection();
+      toast(
+        `현재 위치(파란 점)에서 ${REPORT_ADJUST_RADIUS}m 안의 길만 고를 수 있어요.`,
+      );
+      return;
+    }
+  }
   selectedReport = existing || selection;
   $("#report-location").textContent = reportLocation(selectedReport);
-  $("#report-title").textContent = existing
-    ? "이 도로 구간에 내 신고가 있어요."
-    : "선택한 도로 구간이 공사 중인가요?";
+  const cluster = existing && clusterOf(existing.id, clusters),
+    mine = existing && isMyReport(existing),
+    locked = cluster?.status === "confirmed";
+  $("#report-title").textContent = !existing
+    ? "선택한 도로 구간이 공사 중인가요?"
+    : mine
+      ? "이 구간에 내 신고가 있어요."
+      : "이 구간의 신고";
   $("#report-reasons").hidden = !!existing;
   $("#new-report-actions").hidden = !!existing;
   $("#existing-report-actions").hidden = !existing;
+  // 내 신고이고 아직 관리자가 확정하지 않았을 때만 삭제할 수 있습니다.
+  $("#report-remove").hidden = !(mine && !locked);
+  $("#report-photo-field").hidden = !!existing;
+  resetCamera();
+  $('input[name="road-reason"][value="construction"]').checked = true;
+  $("#report-reason-note").value = "";
+  $("#report-reason-note").hidden = true;
+  updateReportSubmit();
+  // 사진은 내 신고이거나, 확정된 구역의 대표 사진일 때만 사용자에게 보여 줍니다.
+  // 노란색(검토 전) 단계의 다른 사람 사진은 관리자만 봅니다.
+  const showPhoto = mine || (locked && cluster.cover.id === existing.id);
+  const existingPhotoUrl = showPhoto && photoUrlFor(existing.photoPath);
+  $("#report-existing-photo").hidden = !existingPhotoUrl;
+  if (existingPhotoUrl) $("#report-existing-photo").src = existingPhotoUrl;
   $("#report-dialog .report-scope").textContent = existing
-    ? `${existing.reason === "construction" ? "공사 중" : "통행 막힘"} · 학생 확인 전 · 선택한 도로 구간에 저장된 시연 신고입니다. 삭제하면 이 구간을 경로에 다시 포함합니다.`
-    : "지도에서 주황색으로 강조된 도로 구간 전체를 제외해 우회 경로를 다시 계산합니다. 내 브라우저에만 저장됩니다.";
+    ? `${reasonLabel(existing)} · ${reportStatusLabel(existing)} · ` +
+      (locked
+        ? "관리자가 확정한 신고라 삭제할 수 없어요. 공사가 끝나면 관리자가 해제합니다."
+        : mine
+          ? "내가 올린 신고예요. 삭제하면 집계에서 빠집니다."
+          : "다른 사람이 올린 신고예요.")
+    : `같은 구간에 신고가 ${REPORT_THRESHOLD}건 이상 모이면 지도에 주의(노란색)로 표시되고 관리자에게 검토 알림이 갑니다. 관리자가 확인해 확정하면 통행 막힘(빨간색)으로 바뀌며 우회 경로를 안내합니다.`;
   $("#report-dialog").showModal();
+  if (!existing) startCamera();
 }
+// 사진이 있고, 기타 사유면 글까지 써야 신고 버튼이 켜집니다.
+function updateReportSubmit() {
+  const other = $('input[name="road-reason"]:checked').value === "other";
+  $("#report-yes").disabled =
+    !selectedPhotoFile || (other && !$("#report-reason-note").value.trim());
+}
+for (const radio of $$('input[name="road-reason"]'))
+  radio.onchange = () => {
+    const other = radio.value === "other" && radio.checked;
+    $("#report-reason-note").hidden = !other;
+    if (other) $("#report-reason-note").focus();
+    updateReportSubmit();
+  };
+$("#report-reason-note").oninput = updateReportSubmit;
+// 앱 안 카메라: 촬영과 다시 찍기만 있고 앨범 사진은 고를 수 없습니다.
+let cameraStream = null,
+  photoTakenAt = null;
+function stopCamera() {
+  cameraStream?.getTracks().forEach((track) => track.stop());
+  cameraStream = null;
+  $("#report-camera").srcObject = null;
+}
+function resetCamera() {
+  stopCamera();
+  if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+  photoPreviewUrl = null;
+  selectedPhotoFile = null;
+  photoTakenAt = null;
+  for (const id of [
+    "#report-photo-preview",
+    "#report-camera",
+    "#report-shoot",
+    "#report-retake",
+    "#report-camera-error",
+  ])
+    $(id).hidden = true;
+  updateReportSubmit();
+}
+function cameraError(message) {
+  $("#report-camera-error").textContent = message;
+  $("#report-camera-error").hidden = false;
+}
+async function startCamera() {
+  resetCamera();
+  if (!navigator.mediaDevices?.getUserMedia) {
+    cameraError(
+      "이 브라우저에서는 카메라를 쓸 수 없어요. https 주소에서 열어주세요.",
+    );
+    return;
+  }
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false,
+    });
+  } catch {
+    cameraError(
+      "카메라 권한이 필요해요. 브라우저 설정에서 카메라를 허용해주세요.",
+    );
+    return;
+  }
+  // 권한을 묻는 사이 신고 창을 닫았으면 카메라를 바로 끕니다.
+  if (!$("#report-dialog").open) return stopCamera();
+  const video = $("#report-camera");
+  video.srcObject = cameraStream;
+  video.hidden = false;
+  $("#report-shoot").hidden = false;
+  await video.play().catch(() => {});
+}
+$("#report-shoot").onclick = () => {
+  const video = $("#report-camera");
+  if (!video.videoWidth) return;
+  const scale = Math.min(1, 1600 / video.videoWidth),
+    canvas = document.createElement("canvas");
+  canvas.width = Math.round(video.videoWidth * scale);
+  canvas.height = Math.round(video.videoHeight * scale);
+  canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+  canvas.toBlob(
+    (blob) => {
+      if (!blob) return;
+      stopCamera();
+      selectedPhotoFile = new File([blob], "photo.jpg", { type: "image/jpeg" });
+      photoTakenAt = new Date().toISOString();
+      photoPreviewUrl = URL.createObjectURL(blob);
+      $("#report-photo-preview").src = photoPreviewUrl;
+      $("#report-photo-preview").hidden = false;
+      video.hidden = true;
+      $("#report-shoot").hidden = true;
+      $("#report-retake").hidden = false;
+      updateReportSubmit();
+    },
+    "image/jpeg",
+    0.85,
+  );
+};
+$("#report-retake").onclick = () => startCamera();
 $("#report-no").onclick = () => {
   map?.clearReportSelection();
   $("#report-dialog").close();
 };
 $("#report-keep").onclick = () => $("#report-dialog").close();
-function persistReports() {
-  const saved = writeReports(reportStorage, reports);
+// 서버에서 다시 읽어와 화면을 전부 새로고침합니다 (신고 추가/삭제/확정/반려 뒤 공통으로 호출).
+async function loadReports() {
+  let rows;
+  try {
+    rows = await fetchReportRows();
+  } catch {
+    toast("신고 데이터를 불러오지 못했어요. 네트워크를 확인해주세요.");
+    return;
+  }
+  reports = sanitizeReports(rows.map(rowToReport));
+  confirmedEdges = confirmedEdgesFromRows(rows);
+  clusters = clusterReports(reports);
   map?.setReports(reports);
   renderReportList();
-  setReporting(false);
+  renderAdminAlert();
+  renderAdminPanel();
   updateRoute();
-  $("#report-dialog").close();
-  if (!saved)
-    toast("저장소를 사용할 수 없어 이번 화면에서만 신고가 유지됩니다.");
 }
-$("#report-yes").onclick = () => {
+$("#report-yes").onclick = async () => {
   if (!selectedReport?.point) return;
-  reports.push({
-    id: crypto.randomUUID(),
-    edgeId: selectedReport.edgeId,
-    point: selectedReport.point,
-    reason: $('input[name="road-reason"]:checked').value,
-    createdAt: new Date().toISOString(),
-  });
-  persistReports();
+  const reason = $('input[name="road-reason"]:checked').value,
+    reasonNote = $("#report-reason-note").value.trim();
+  if (!selectedPhotoFile) {
+    toast("현장 사진을 찍어 올려야 신고할 수 있어요.");
+    return;
+  }
+  if (!reportOrigin) {
+    toast("⚠ 공사 신고 버튼을 눌러 현재 위치에서 다시 신고해주세요.");
+    return;
+  }
+  if (reason === "other" && !reasonNote) {
+    toast("기타 사유를 적어주세요.");
+    return;
+  }
+  $("#report-yes").disabled = true; // 업로드 중 중복 신고 방지
+  try {
+    let photoPath;
+    try {
+      photoPath = await uploadReportPhoto(selectedPhotoFile);
+    } catch {
+      toast("사진 업로드에 실패했어요. 다시 시도해주세요.");
+      return;
+    }
+    try {
+      await insertReportRow({
+        edgeId: selectedReport.edgeId,
+        point: selectedReport.point,
+        reason,
+        reasonNote,
+        photoPath,
+        gps: reportOrigin,
+        takenAt: photoTakenAt,
+      });
+    } catch {
+      toast("신고 저장에 실패했어요. 다시 시도해주세요.");
+      return;
+    }
+  } finally {
+    updateReportSubmit();
+  }
+  setReporting(false);
+  $("#report-dialog").close();
+  await loadReports();
 };
-$("#report-remove").onclick = () => {
-  reports = reports.filter((r) => r.id !== selectedReport.id);
-  persistReports();
+// 이 기기에서 올린 신고인지(기기 ID 비교). 기기 ID가 없는 예전 신고는 내 신고로 보지 않습니다.
+function isMyReport(report) {
+  return !!report.deviceId && report.deviceId === getDeviceId();
+}
+$("#report-remove").onclick = async () => {
+  if (
+    !isMyReport(selectedReport) ||
+    clusterOf(selectedReport.id, clusters)?.status === "confirmed"
+  )
+    return;
+  try {
+    await deleteReportRows([selectedReport.id]);
+  } catch {
+    toast("삭제에 실패했어요. 다시 시도해주세요.");
+    return;
+  }
+  $("#report-dialog").close();
+  await loadReports();
 };
 $("#report-dialog").addEventListener("close", () => {
+  stopCamera();
   if (!selectedReport?.id) map?.clearReportSelection();
 });
+// 신고 상태를 사람이 읽을 문구로 바꿉니다: 접수 → 주의(노란색) → 관리자 확정(빨간색).
+function reportStatusLabel(report) {
+  const status = clusterOf(report.id, clusters)?.status;
+  if (status === "confirmed") return "관리자 확정 · 통행 막힘";
+  if (status === "caution") return "주의 표시 중 · 관리자 검토 대기";
+  return `접수됨 · ${REPORT_THRESHOLD}건 이상 모이면 지도에 주의 표시`;
+}
 function renderReportList() {
   $("#report-count").textContent = reports.length;
   $("#report-empty").hidden = reports.length > 0;
@@ -627,10 +987,295 @@ function renderReportList() {
       '<span aria-hidden="true">⚠</span><span><b></b><small></small></span><span>↗</span>';
     button.querySelector("b").textContent = reportLocation(report);
     button.querySelector("small").textContent =
-      (report.reason === "construction" ? "공사 중" : "통행 막힘") +
-      " · 학생 확인 전";
+      reasonLabel(report) + " · " + reportStatusLabel(report);
     button.onclick = () => openRoadReport({ reportId: report.id });
     li.append(button);
     $("#report-list").append(li);
   }
 }
+
+// ===== 관리자 검토 (시연용 — 실제 배포 전 서버 인증으로 교체) =====
+// 30m 안 신고를 구역으로 묶어 보여 줍니다. 구역마다 신고 사진을 모두 보고, 엉뚱한 신고는 하나씩 빼고,
+// 대표 사진을 골라 확정합니다(대표 사진은 사용자에게 빨간색 표시와 함께 보입니다).
+// 사용자 입력(기타 사유 글)이 들어가므로 innerHTML 대신 textContent만 씁니다.
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+function adminButton(label, act, onClick) {
+  const button = el("button", "", label);
+  button.type = "button";
+  button.dataset.act = act;
+  button.onclick = onClick;
+  return button;
+}
+async function adminAction(work, failMessage) {
+  try {
+    await work();
+  } catch {
+    toast(failMessage);
+    return;
+  }
+  await loadReports();
+}
+function clusterHeading(li, cluster, summary) {
+  li.append(
+    el("b", "", reportLocation(cluster.cover)),
+    el("small", "", summary),
+  );
+}
+// 사진 한 장: 고르기(라디오) + 사유·시각 + 크게 보기 + 이 신고만 빼기
+function photoCard(cluster, report, { selectable }) {
+  const card = el("li", "admin-photo");
+  const label = el("label");
+  if (selectable) {
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = `cover-${cluster.id}`;
+    radio.value = report.id;
+    radio.checked = report.id === cluster.cover.id;
+    radio.setAttribute("aria-label", "대표 사진으로 고르기");
+    label.append(radio);
+  }
+  const url = photoUrlFor(report.photoPath);
+  if (url) {
+    const img = el("img");
+    img.src = url;
+    img.alt = `${reasonLabel(report)} 신고 사진`;
+    img.loading = "lazy";
+    label.append(img);
+  } else label.append(el("span", "admin-photo-empty", "사진 없음"));
+  // 촬영 시각과, 촬영한 GPS 위치에서 신고 지점까지 거리·GPS 정확도(현장 신고 판단 근거)
+  const away = gpsDistance(report),
+    gpsInfo =
+      away === null
+        ? "GPS 정보 없음"
+        : `촬영 위치에서 ${Math.round(away)}m · GPS ±${Math.round(report.gps.accuracy ?? 0)}m`;
+  card.append(
+    label,
+    el(
+      "small",
+      "",
+      `${reasonLabel(report)} · ${new Date(report.takenAt || report.createdAt).toLocaleString("ko-KR")}`,
+    ),
+    el("small", "admin-photo-gps", gpsInfo),
+  );
+  const actions = el("div", "admin-photo-actions");
+  if (url) {
+    const open = el("a", "", "크게 보기");
+    open.href = url;
+    open.target = "_blank";
+    open.rel = "noopener";
+    actions.append(open);
+  }
+  if (selectable && cluster.reports.length > 1)
+    actions.append(
+      adminButton("이 신고 빼기", "remove-one", () =>
+        adminAction(
+          () => deleteReportRows([report.id]),
+          "신고를 빼지 못했어요. 다시 시도해주세요.",
+        ),
+      ),
+    );
+  card.append(actions);
+  return card;
+}
+function renderAdminSection(listId, emptyId, list) {
+  $(emptyId).hidden = list.length > 0;
+  $(listId).replaceChildren();
+  for (const cluster of list) {
+    const li = el("li", "admin-item");
+    clusterHeading(
+      li,
+      cluster,
+      `신고 ${cluster.count}건 · 최근 ${new Date(cluster.latestAt).toLocaleString("ko-KR")}`,
+    );
+    const photos = el("ul", "admin-photos");
+    for (const report of cluster.reports)
+      photos.append(photoCard(cluster, report, { selectable: true }));
+    const ids = cluster.reports.map((r) => r.id);
+    const actions = el("div", "admin-actions");
+    actions.append(
+      adminButton("고른 사진으로 확정 · 통행 막힘", "confirm", () => {
+        const coverId =
+          li.querySelector(`input[name="cover-${cluster.id}"]:checked`)
+            ?.value || cluster.cover.id;
+        adminAction(
+          () => confirmReportRows(ids, coverId),
+          "확정 처리에 실패했어요. 다시 시도해주세요.",
+        );
+      }),
+      adminButton("반려 · 신고 취소", "dismiss", () =>
+        adminAction(
+          () => deleteReportRows(ids),
+          "반려 처리에 실패했어요. 다시 시도해주세요.",
+        ),
+      ),
+    );
+    li.append(photos, actions);
+    $(listId).append(li);
+  }
+}
+// 확정된(빨간색) 구역: 사용자에게 보이는 대표 사진과 함께 보여 주고, 공사가 끝나면 해제합니다.
+function renderConfirmedSection() {
+  const list = clusters.filter((c) => c.status === "confirmed");
+  $("#admin-empty-confirmed").hidden = list.length > 0;
+  $("#admin-list-confirmed").replaceChildren();
+  for (const cluster of list) {
+    const li = el("li", "admin-item");
+    clusterHeading(
+      li,
+      cluster,
+      `통행 막힘(확정) · 신고 ${cluster.count}건 · 사용자에게 보이는 대표 사진`,
+    );
+    const photos = el("ul", "admin-photos");
+    photos.append(photoCard(cluster, cluster.cover, { selectable: false }));
+    const actions = el("div", "admin-actions");
+    actions.append(
+      adminButton("해제 · 공사 끝남", "release", async () => {
+        await adminAction(
+          () => deleteReportRows(cluster.reports.map((r) => r.id)),
+          "확정 해제에 실패했어요. 다시 시도해주세요.",
+        );
+        toast("확정을 해제했어요. 이 구간은 다시 경로에 포함돼요.");
+      }),
+    );
+    li.append(photos, actions);
+    $("#admin-list-confirmed").append(li);
+  }
+}
+function renderAdminPanel() {
+  renderConfirmedSection();
+  const open = clusters.filter((c) => c.status !== "confirmed");
+  renderAdminSection(
+    "#admin-list-urgent",
+    "#admin-empty-urgent",
+    open.filter((c) => c.needsReview),
+  );
+  renderAdminSection(
+    "#admin-list-minor",
+    "#admin-empty-minor",
+    open.filter((c) => !c.needsReview),
+  );
+}
+// threshold 이상 쌓여 검토가 필요한 구역 수를 관리자 버튼 배지로 보여줍니다.
+function renderAdminAlert() {
+  const count = clusters.filter((c) => c.needsReview).length;
+  $("#admin-alert-count").textContent = count;
+  $("#admin-alert-count").hidden = count === 0;
+}
+// 관리자 버튼은 사용자에게 숨깁니다. 주소에 ?admin=1을 붙여 열거나, 이 기기에서 한 번
+// 관리자 코드를 맞게 넣었으면 보입니다. 화면에서 감추는 것일 뿐 보안 장치는 아닙니다
+// (진짜 보호는 관리자 로그인 + Supabase RLS로 해야 합니다).
+const ADMIN_DEVICE_KEY = "sai:seoultech:admin-device:v1";
+function isAdminDevice() {
+  try {
+    return localStorage.getItem(ADMIN_DEVICE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+$("#admin-toggle").hidden = !(
+  new URLSearchParams(location.search).has("admin") || isAdminDevice()
+);
+$("#admin-toggle").onclick = () => {
+  if (!adminUnlocked) {
+    const input = prompt("관리자 코드를 입력하세요 (해커톤 시연용 임시 잠금)");
+    if (input === null) return;
+    if (input !== ADMIN_DEMO_CODE) {
+      toast("관리자 코드가 올바르지 않아요.");
+      return;
+    }
+    adminUnlocked = true;
+    try {
+      localStorage.setItem(ADMIN_DEVICE_KEY, "1");
+    } catch {}
+  }
+  renderAdminPanel();
+  renderWorkList();
+  $("#admin-dialog").showModal();
+};
+
+// ===== 건물 공사 (관리자가 건물을 골라 기간과 함께 등록 → 지도에 🚧 표시만, 경로는 그대로) =====
+async function loadWorks() {
+  let rows;
+  try {
+    rows = await fetchWorkRows();
+  } catch {
+    return; // 공사 표시는 부가 기능이라 실패해도 조용히 넘어갑니다.
+  }
+  works = activeWorks(rows);
+  map?.setWorks(works);
+  renderWorkList();
+}
+function renderWorkList() {
+  $("#work-empty").hidden = works.length > 0;
+  $("#work-list").replaceChildren();
+  for (const work of works) {
+    const b = BUILDINGS.find((x) => x.id === work.buildingId),
+      li = document.createElement("li");
+    li.className = "admin-item";
+    li.innerHTML =
+      '<b></b><small></small><div class="admin-actions"><button type="button">공사 해제</button></div>';
+    li.querySelector("b").textContent = `🚧 ${buildingLabel(b)}`;
+    li.querySelector("small").textContent =
+      worksPeriod(work) + (work.note ? ` · ${work.note}` : "");
+    li.querySelector("button").onclick = async () => {
+      try {
+        await deleteWorkRow(work.id);
+      } catch {
+        toast("공사 해제에 실패했어요. 다시 시도해주세요.");
+        return;
+      }
+      await loadWorks();
+    };
+    $("#work-list").append(li);
+  }
+}
+for (const b of BUILDINGS.filter(
+  (b) => b.name !== "교내 건물" && b.name !== "조형물",
+).sort((a, b) => a.name.localeCompare(b.name, "ko"))) {
+  const option = document.createElement("option");
+  option.value = b.id;
+  option.textContent = buildingLabel(b);
+  $("#work-building").append(option);
+}
+$("#work-start").value = today();
+$("#work-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const start = $("#work-start").value,
+    end = $("#work-end").value;
+  if (start > end) {
+    toast("종료일이 시작일보다 빠를 수 없어요.");
+    return;
+  }
+  try {
+    await insertWorkRow({
+      buildingId: $("#work-building").value,
+      start,
+      end,
+      note: $("#work-note").value.trim(),
+    });
+  } catch {
+    toast("공사 등록에 실패했어요. 다시 시도해주세요.");
+    return;
+  }
+  $("#work-note").value = "";
+  $("#work-end").value = "";
+  await loadWorks();
+};
+loadWorks();
+
+// 다른 사람(사용자↔관리자)이 바꾼 내용을 가져옵니다. 10초마다, 그리고 탭으로 돌아올 때 다시 읽습니다.
+// 신고 창이 열려 있거나 위치를 고르는 중에는 선택이 지워지지 않게 건너뜁니다.
+// 관리자 창은 열어 둔 채 기다리는 화면이라 열려 있어도 갱신합니다.
+// ponytail: 10초 폴링. 즉시 반영이 필요하면 Supabase Realtime 구독으로 바꾸세요.
+function refreshShared() {
+  if (document.hidden || reporting || $("#report-dialog").open) return;
+  loadReports();
+  loadWorks();
+}
+setInterval(refreshShared, 10000);
+document.addEventListener("visibilitychange", refreshShared);
