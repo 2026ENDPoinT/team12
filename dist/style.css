@@ -7760,6 +7760,33 @@ body {
   .route-panel.sheet-collapsed .route-card {
     margin-top: 0;
   }
+  .route-panel.sheet-sizing {
+    overflow: hidden;
+    will-change: height;
+  }
+  .route-panel.sheet-sizing::after {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(66px + var(--v2-safe-bottom));
+    background: var(--v2-sheet);
+    pointer-events: none;
+  }
+  .route-panel.sheet-sizing .route-card {
+    position: static;
+  }
+  .route-panel.sheet-sizing #route-card-start {
+    position: absolute;
+    z-index: 2;
+    left: 16px;
+    right: 16px;
+    bottom: calc(14px + var(--v2-safe-bottom));
+    width: calc(100% - 32px);
+    margin: 0;
+  }
   .map-view.guidance-on .route-panel,
   .map-view.guidance-on .mobile-route-top,
   .map-view.guidance-on .route-summary-bar,

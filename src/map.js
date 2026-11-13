@@ -1,5 +1,6 @@
 import { createStreetLights, windowLights } from "./map/night-lighting.mjs";
 import { touchGestureMode, touchTurn } from "./map/touch-gesture.mjs";
+import { cameraOffsetForHeading, smoothHeading, headingDelta } from "./heading.mjs";
 import { createNavigationBounds } from "./map/navigation-bounds.mjs";
 import { createKeyboardPan } from "./map/keyboard-pan.mjs";
 import { createMapProfiler } from "./map/performance.mjs";
@@ -415,6 +416,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   userBase.position.y = 2.2;
   userLocationGroup.add(userAccuracy, userBase);
   let navigationMode = false;
+  let navigationFollowing = false, navigationHeading = null, displayedHeading = null;
   const navigationMarker = document.createElement("div");
   navigationMarker.className = "navigation-position";
   navigationMarker.setAttribute("aria-label", "현재 위치");
@@ -622,15 +624,10 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   function clearReportSelection() {
     clearGroup(reportPreviewGroup);
   }
-  let guidanceHeading = null;
   function clearGuidanceHeading() {
-    guidanceHeading = null;
+    navigationFollowing = false;
   }
-  function setUserLocation(
-    position,
-    { follow = false, heading = null } = {},
-  ) {
-    guidanceHeading = follow && position ? heading : null;
+  function setUserLocation(position, { follow = false } = {}) {
     if (!position) {
       userLocationGroup.visible = false;
       return;
@@ -648,6 +645,10 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     userLocationGroup.position.set(position.x, 0, position.z);
     userAccuracy.scale.set(accuracy, accuracy, 1);
     if (follow) {
+      if (navigationMode) {
+        navigationFollowing = true;
+        return;
+      }
       const offset = camera.position.clone().sub(controls.target);
       controls.target.set(position.x, 0, position.z);
       camera.position.copy(controls.target).add(offset);
@@ -1274,19 +1275,29 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     }
     const profileStart = profiler?.begin(t);
     keyboardPan.update(deltaSeconds);
-    if (guidanceHeading !== null && !homeMode) {
-      const offset = camera.position.clone().sub(controls.target);
-      const current = Math.atan2(offset.x, offset.z);
-      const turn = touchTurn(current, -THREE.MathUtils.degToRad(guidanceHeading));
-      if (Math.abs(turn) > 0.001) {
-        const step = reduceMotion ? 1 : 1 - Math.exp(-8 * deltaSeconds);
-        camera.position
-          .copy(controls.target)
-          .add(offset.applyAxisAngle(upAxis, turn * step));
-      }
-    }
     controls.update();
     if (!homeMode) constrainNavigation(camera, controls);
+    if (navigationMode && userLocationGroup.visible && navigationHeading !== null) {
+      const weight = reduceMotion ? 1 : 1 - Math.exp(-10 * Math.min(.1, deltaSeconds));
+      displayedHeading = smoothHeading(displayedHeading, navigationHeading, weight);
+      if (navigationFollowing) {
+        const offset = camera.position.clone().sub(controls.target);
+        const bearing = Math.atan2(-offset.x, offset.z) * 180 / Math.PI;
+        const nextHeading = smoothHeading(bearing, navigationHeading, weight);
+        const phi = new THREE.Spherical().setFromVector3(offset).phi;
+        const desired = cameraOffsetForHeading(nextHeading, offset.length(), phi + (.45 - phi) * weight);
+        const ahead = navigationHeading * Math.PI / 180;
+        const target = userLocationGroup.position.clone().add(new THREE.Vector3(Math.sin(ahead) * 35, 0, -Math.cos(ahead) * 35));
+        controls.target.lerp(target, weight);
+        camera.position.copy(controls.target).add(new THREE.Vector3(desired.x, desired.y, desired.z));
+        camera.zoom += (Math.max(4.2, camera.zoom) - camera.zoom) * weight;
+        camera.updateProjectionMatrix();
+        controls.update();
+      }
+      const view = camera.position.clone().sub(controls.target);
+      const cameraHeading = Math.atan2(-view.x, view.z) * 180 / Math.PI;
+      navigationMarker.firstElementChild.style.transform = `rotate(${headingDelta(cameraHeading, displayedHeading)}deg)`;
+    }
     campusTrees.updateDetail(
       (renderer.domElement.clientHeight * camera.zoom) /
         (camera.top - camera.bottom),
@@ -1331,11 +1342,21 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     setUserLocation,
     clearGuidanceHeading,
     setNavigationMode(enabled) {
+      if (!enabled) {
+        navigationFollowing = false;
+        navigationHeading = displayedHeading = null;
+      }
       navigationMode = enabled;
       navigationLabel.visible = enabled;
       userBase.visible = !enabled;
       if (userTechnyong) userTechnyong.object.visible = !enabled;
     },
+    setNavigationHeading(heading, following) {
+      if (!Number.isFinite(heading)) return;
+      navigationHeading = heading;
+      navigationFollowing = following;
+    },
+    setNavigationFollowing(following) { navigationFollowing = following; },
     setRouteMascotVisible(visible) {
       routeMascotVisible = visible;
       if (movingDot) movingDot.visible = visible;
