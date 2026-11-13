@@ -1585,7 +1585,6 @@ $("#find-school").onclick = (e) => {
   if (!document.body.classList.contains("exploring"))
     $("#campuses").scrollIntoView();
 };
-$("#intro-button").onclick = () => $("#info-dialog").showModal();
 $$(".dialog-close").forEach(
   (b) => (b.onclick = () => b.closest("dialog").close()),
 );
