@@ -6,8 +6,41 @@ const SUPABASE_URL = "https://jydziqwmhjlwlsoiegdd.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_nlLz8LxRU7-DborGMtCnrQ_iDb8PjKR";
 const PHOTO_BUCKET = "report-photos";
 
-// 관리자 로그인은 현재 화면에서만 유지하고, 새로고침 뒤에는 다시 인증합니다.
-export const AUTH_OPTIONS = { auth: { persistSession: false } };
+// 관리자 로그인 유지 범위:
+// - 편집기 열기·닫기(?edit로 페이지를 다시 엶), 실내 지도에 갔다 돌아오기 → 로그인 유지
+// - 새로고침 → 로그인 해제(다시 인증), 탭을 닫으면 → 로그인 해제(sessionStorage는 탭과 함께 사라짐)
+// 그래서 세션을 이 탭의 sessionStorage에 두고, 이번 페이지 열기가 "새로고침"일 때만 지웁니다.
+export const AUTH_STORAGE_KEY = "sai:seoultech:admin-auth";
+const navigationType = () => {
+  try {
+    return performance.getEntriesByType("navigation")[0]?.type;
+  } catch {
+    return undefined;
+  }
+};
+export function authStorage({
+  storage = globalThis.sessionStorage,
+  type = navigationType(),
+} = {}) {
+  if (!storage) return undefined;
+  if (type === "reload")
+    try {
+      storage.removeItem(AUTH_STORAGE_KEY);
+    } catch {
+      // 저장소를 못 쓰는 환경(사생활 보호 모드 등)에서는 지울 것도 없습니다.
+    }
+  return storage;
+}
+const sessionStore = authStorage();
+export const AUTH_OPTIONS = {
+  auth: sessionStore
+    ? {
+        persistSession: true,
+        storage: sessionStore,
+        storageKey: AUTH_STORAGE_KEY,
+      }
+    : { persistSession: false },
+};
 export const supabase = createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
