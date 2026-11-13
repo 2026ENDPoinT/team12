@@ -271,7 +271,7 @@
         <button
           data-side="entrances"
           aria-label="출입구 표시"
-          aria-pressed="true"
+          aria-pressed="false"
           title="출입구 표시"
         >
           <svg class="icon"><use href="#i-pin" /></svg>
@@ -514,15 +514,10 @@
           </button>
           <section class="road-reports">
             <div class="reports-heading">
-              <h3>길 막힘 제보 <span id="report-count">0</span></h3>
-              <span>이 브라우저 시연</span>
+              <h3>길 막힘 제보 <span id="report-count">주의 (0)</span></h3>
             </div>
-            <p id="report-empty">아직 등록한 신고가 없어요.</p>
+            <p id="report-empty">3건 이상 모인 제보가 없어요.</p>
             <ul id="report-list" class="report-list"></ul>
-            <small
-              >신고는 학생 확인 전 정보입니다. 지금은 내 브라우저에만 저장되며
-              다른 사람과 공유되지 않아요.</small
-            >
           </section>
           <details class="gis-status">
             <summary>
@@ -608,7 +603,7 @@
               id="entrance-toggle"
               class="gps-toggle entrance-toggle"
               aria-label="출입구 표시"
-              aria-pressed="true"
+              aria-pressed="false"
             >
               <span class="gps-icon" aria-hidden="true">◉</span>
               <span>출입구</span>
