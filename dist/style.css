@@ -6703,3 +6703,40 @@ body {
     background: var(--v2-tile);
   }
 }
+@media (max-width: 760px) {
+  /* 아래 시트는 내용 높이에 꼭 맞게: 안에서 위아래로 끌어 보는 스크롤 없이 한 번에 보이게 합니다(사용자 요청).
+     화면보다 길어지는 경우에만 위쪽 카드 아래까지로 막고 그때만 스크롤합니다. */
+  .building-results,
+  .result-panel,
+  .route-panel,
+  .map-view.panel-closed .route-panel,
+  .reports-panel {
+    max-height: calc((100dvh - 150px - env(safe-area-inset-top, 0px)) / 0.9);
+    overflow-y: auto;
+  }
+  /* 경로 시트 내용을 촘촘하게: 안내 문구를 빼고 간격을 줄여 한 화면에 들어오게 */
+  .route-panel .mode-hint {
+    display: none;
+  }
+  .route-panel .mode-heading {
+    margin-bottom: 6px;
+  }
+  .route-panel .route-card {
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .route-card-time b {
+    font-size: 36px;
+  }
+  .route-card-steps {
+    gap: 7px;
+    font-size: 14px;
+  }
+  .route-card .result-card-primary {
+    height: 46px;
+  }
+  .route-panel,
+  .map-view.panel-closed .route-panel {
+    padding-bottom: calc(14px + var(--v2-safe-bottom));
+  }
+}
