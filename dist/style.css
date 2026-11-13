@@ -7025,3 +7025,11 @@ body {
     white-space: nowrap;
   }
 }
+@media (min-width: 761px) {
+  /* 건물 검색 결과 목록은 아래 패널(길 막힘 제보 등)이 비쳐 겹쳐 보이지 않게 거의 불투명하게 (사용자 요청) */
+  .building-results {
+    background: rgba(255, 255, 255, 0.97);
+    border: 0.75px solid rgba(21, 33, 43, 0.08);
+    box-shadow: 0 18px 48px rgba(21, 33, 43, 0.2);
+  }
+}
