@@ -920,59 +920,62 @@
       <div class="dialog-body">
         <header class="admin-panel-header">
         <span class="report-dialog-symbol" aria-hidden="true">🛠</span
-        ><span class="eyebrow">관리자 검토 · 시연</span>
-        <h2>신고된 구간</h2>
+        ><span class="eyebrow">서울과기대 · 관리자 모드</span>
+        <h2>관리자 센터</h2>
         <button id="admin-logout" class="admin-logout" type="button">로그아웃</button>
         </header>
-        <div class="admin-panel-content" tabindex="0" aria-label="관리자 검토 내역">
-        <section class="admin-section admin-section-urgent">
-          <h3><i class="admin-dot urgent" aria-hidden="true"></i>검토 필요 · 3건 이상</h3>
-          <p id="admin-empty-urgent">지금은 검토가 급한 구간이 없어요.</p>
-          <ul id="admin-list-urgent" class="report-list"></ul>
-        </section>
-        <section class="admin-section admin-section-confirmed">
-          <h3><i class="admin-dot confirmed" aria-hidden="true"></i>확정된 구간 · 우회 안내 중</h3>
-          <p id="admin-empty-confirmed">확정된 구간이 없어요.</p>
-          <ul id="admin-list-confirmed" class="report-list"></ul>
-        </section>
-        <section class="admin-section">
-          <h3><i class="admin-dot minor" aria-hidden="true"></i>참고용 · 3건 미만</h3>
-          <p id="admin-empty-minor">3건 미만으로 쌓인 신고가 없어요.</p>
-          <ul id="admin-list-minor" class="report-list"></ul>
-        </section>
-        <small
-          >신고는 1건부터 여기 모두 보입니다. 지도에는 3건 이상부터
-          주의(노란색)로 표시됩니다. 확정하면 빨간색 통행 막힘으로 바뀌고
-          경로에서 제외됩니다. 반려하면 누적된 신고를 지우고 처음부터 다시
-          집계합니다.</small
-        >
-        <section class="admin-section admin-photo-cleanup">
-          <h3><i class="admin-dot minor" aria-hidden="true"></i>사진 정리</h3>
-          <p>
-            반려·해제한 신고의 사진은 함께 지워져요. 신고와 연결되지 않은 채
-            하루 넘게 남은 사진은 여기서 정리해요.
-          </p>
-          <button id="photo-cleanup" type="button">남은 사진 정리</button>
-          <p id="photo-cleanup-status" role="status" hidden></p>
-        </section>
-        <section class="admin-section admin-works">
-          <h3><i class="admin-dot works" aria-hidden="true"></i>건물 공사</h3>
-          <form id="work-form" class="work-form">
-            <label>건물<select id="work-building" required></select></label
-            ><label>시작일<input type="date" id="work-start" required /></label
-            ><label>종료일<input type="date" id="work-end" required /></label
-            ><label class="work-note"
-              >메모 (선택)<input
-                type="text"
-                id="work-note"
-                maxlength="100"
-                placeholder="예: 리모델링, 출입 제한"
-            /></label>
-            <button type="submit">공사 등록</button>
-          </form>
-          <p id="work-empty">등록된 공사가 없어요.</p>
-          <ul id="work-list" class="report-list"></ul>
-        </section>
+        <div class="admin-panel-content" tabindex="0" aria-label="관리자 센터 내역">
+          <nav class="admin-tabs" role="tablist" aria-label="관리자 기능">
+            <button id="admin-tab-reports" type="button" role="tab" aria-selected="true" aria-controls="admin-panel-reports" data-admin-tab="reports">신고 검토</button>
+            <button id="admin-tab-works" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-works" data-admin-tab="works">건물 공사</button>
+            <button id="admin-tab-photos" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-photos" data-admin-tab="photos">사진 정리</button>
+          </nav>
+          <div id="admin-panel-reports" class="admin-tab-panel is-active" role="tabpanel" aria-labelledby="admin-tab-reports" data-admin-panel="reports">
+            <section class="admin-section admin-section-urgent">
+              <h3><i class="admin-dot urgent" aria-hidden="true"></i>검토 필요 · 3건 이상</h3>
+              <p id="admin-empty-urgent">지금은 검토가 급한 구간이 없어요.</p>
+              <ul id="admin-list-urgent" class="report-list"></ul>
+            </section>
+            <section class="admin-section admin-section-confirmed">
+              <h3><i class="admin-dot confirmed" aria-hidden="true"></i>확정된 구간 · 우회 안내 중</h3>
+              <p id="admin-empty-confirmed">확정된 구간이 없어요.</p>
+              <ul id="admin-list-confirmed" class="report-list"></ul>
+            </section>
+            <section class="admin-section">
+              <h3><i class="admin-dot minor" aria-hidden="true"></i>참고용 · 3건 미만</h3>
+              <p id="admin-empty-minor">3건 미만으로 쌓인 신고가 없어요.</p>
+              <ul id="admin-list-minor" class="report-list"></ul>
+            </section>
+            <small>신고는 1건부터 모두 보이며, 관리자가 확정한 구간만 경로에서 제외됩니다.</small>
+          </div>
+          <div id="admin-panel-works" class="admin-tab-panel" role="tabpanel" aria-labelledby="admin-tab-works" data-admin-panel="works">
+            <section class="admin-section admin-works">
+              <h3><i class="admin-dot works" aria-hidden="true"></i>건물 공사</h3>
+              <form id="work-form" class="work-form">
+                <label>건물<select id="work-building" required></select></label
+                ><label>시작일<input type="date" id="work-start" required /></label
+                ><label>종료일<input type="date" id="work-end" required /></label
+                ><label class="work-note"
+                  >메모 (선택)<input
+                    type="text"
+                    id="work-note"
+                    maxlength="100"
+                    placeholder="예: 리모델링, 출입 제한"
+                /></label>
+                <button type="submit">공사 등록</button>
+              </form>
+              <p id="work-empty">등록된 공사가 없어요.</p>
+              <ul id="work-list" class="report-list"></ul>
+            </section>
+          </div>
+          <div id="admin-panel-photos" class="admin-tab-panel" role="tabpanel" aria-labelledby="admin-tab-photos" data-admin-panel="photos">
+            <section class="admin-section admin-photo-cleanup">
+              <h3><i class="admin-dot minor" aria-hidden="true"></i>사진 정리</h3>
+              <p>신고와 연결되지 않은 채 하루 넘게 남은 사진을 Storage에서 정리합니다.</p>
+              <button id="photo-cleanup" type="button">남은 사진 정리</button>
+              <p id="photo-cleanup-status" role="status" hidden></p>
+            </section>
+          </div>
         </div>
       </div>
     </dialog>

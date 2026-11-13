@@ -7654,7 +7654,14 @@ body {
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
-#admin-dialog .admin-panel-content > small {
+#admin-dialog .admin-tabs {
+  display: none;
+}
+#admin-dialog .admin-tab-panel {
+  display: contents;
+}
+#admin-dialog .admin-panel-content > small,
+#admin-dialog .admin-tab-panel > small {
   color: var(--v2-muted);
   font-size: 12px;
   line-height: 1.6;
@@ -7723,6 +7730,54 @@ body {
   background-repeat: no-repeat;
   background-position: right 13px center;
   background-size: 20px;
+}
+@media (min-width: 761px) {
+  #admin-dialog {
+    width: min(920px, 94vw);
+  }
+  #admin-dialog .admin-tabs {
+    position: sticky;
+    z-index: 4;
+    top: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    padding: 5px;
+    border: 0.75px solid rgba(255, 255, 255, 0.85);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(18px);
+  }
+  #admin-dialog .admin-tabs button {
+    min-height: 46px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--v2-muted);
+    font-size: 14px;
+    font-weight: 800;
+  }
+  #admin-dialog .admin-tabs button:is(:hover, :focus-visible) {
+    background: rgba(213, 255, 118, 0.28);
+    color: var(--v2-ink);
+  }
+  #admin-dialog .admin-tabs button.is-active {
+    background: var(--v2-ink);
+    color: #fff;
+  }
+  #admin-dialog .admin-tab-panel {
+    display: none;
+  }
+  #admin-dialog .admin-tab-panel.is-active {
+    display: grid;
+    gap: 16px;
+  }
+  #admin-dialog .admin-tab-panel > small {
+    color: var(--v2-muted);
+    font-size: 12px;
+    line-height: 1.6;
+  }
 }
 @media (max-width: 760px) {
   #admin-dialog .dialog-body {

@@ -2271,9 +2271,23 @@ function renderAdminAlert() {
 }
 // 관리자 화면은 ?admin=1에서만 노출하고, 실제 권한은 Supabase Auth + RLS가 검사합니다.
 $("#admin-toggle").hidden = !new URLSearchParams(location.search).has("admin");
+function setAdminTab(tab) {
+  $$("[data-admin-tab]").forEach((button) => {
+    const active = button.dataset.adminTab === tab;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  $$("[data-admin-panel]").forEach((panel) =>
+    panel.classList.toggle("is-active", panel.dataset.adminPanel === tab),
+  );
+}
+$$('[data-admin-tab]').forEach(
+  (button) => (button.onclick = () => setAdminTab(button.dataset.adminTab)),
+);
 function openAdminPanel() {
   renderAdminPanel();
   renderWorkList();
+  setAdminTab("reports");
   $("#admin-dialog").showModal();
 }
 // ===== 관리자·편집기 진입 (사이드바·모바일 버튼) =====
