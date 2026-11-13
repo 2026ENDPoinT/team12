@@ -5344,3 +5344,8 @@ body.exploring .header {
   border-radius: 50%;
   color: #15212b;
 }
+
+/* 지도 화면: 휴대폰에서 패널 위를 두 손가락으로 벌려도 페이지가 확대되지 않게 합니다(지도는 자체 처리). */
+.map-view {
+  touch-action: pan-x pan-y;
+}

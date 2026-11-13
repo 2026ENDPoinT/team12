@@ -1007,6 +1007,58 @@ $("#v2-minus").onclick = () => map?.zoom(1 / 1.18);
 $("#v2-locate").onclick = () => $("#gps-toggle").click();
 $("#v2-reset").onclick = () => setDimension(false);
 
+// ===== 지도 화면에서는 페이지 확대를 막고 지도만 확대합니다 =====
+// 패널·이름표 위에서 오므리기/벌리기(Ctrl+휠)나 Ctrl·⌘ +/−를 누르면 브라우저가 페이지 전체를
+// 확대해 메뉴·패널이 커지고 화면 밖으로 밀려납니다. 지도 화면에서는 이 확대를 모두 지도로 보냅니다.
+const onMapView = () => !$("#map-view").hidden;
+const mapCanvas = () => $("#campus-map canvas");
+document.addEventListener(
+  "wheel",
+  (e) => {
+    if (!e.ctrlKey || !onMapView()) return;
+    const canvas = mapCanvas();
+    // 지도 위는 지도가 직접 처리합니다(같은 이벤트를 두 번 보내지 않음).
+    if (!canvas || e.target === canvas) return;
+    e.preventDefault();
+    canvas.dispatchEvent(
+      new WheelEvent("wheel", {
+        deltaX: e.deltaX,
+        deltaY: e.deltaY,
+        deltaMode: e.deltaMode,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        ctrlKey: true,
+        cancelable: true,
+      }),
+    );
+  },
+  { passive: false },
+);
+// Safari 트랙패드 제스처: 지도 밖(패널 위)에서도 페이지 대신 지도를 확대합니다.
+let pageGestureScale = null;
+for (const type of ["gesturestart", "gesturechange", "gestureend"])
+  document.addEventListener(type, (e) => {
+    if (!onMapView() || e.target === mapCanvas()) return;
+    e.preventDefault();
+    if (type === "gesturestart") pageGestureScale = e.scale;
+    else if (type === "gesturechange" && pageGestureScale) {
+      map?.zoom(e.scale / pageGestureScale);
+      pageGestureScale = e.scale;
+    } else pageGestureScale = null;
+  });
+// Ctrl·⌘ + / − / 0: 페이지 대신 지도를 확대·축소·처음 시점으로.
+document.addEventListener("keydown", (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || !onMapView()) return;
+  const zoom = { "+": 1.18, "=": 1.18, "-": 1 / 1.18, _: 1 / 1.18 }[e.key];
+  if (zoom) {
+    e.preventDefault();
+    map?.zoom(zoom);
+  } else if (e.key === "0") {
+    e.preventDefault();
+    map?.reset();
+  }
+});
+
 // ===== GPS 현재 위치 추적 =====
 // 공개 데이터의 중심 위·경도를 로컬 미터 좌표로 변환합니다.
 // 실서비스 전에는 학교에서 기준점을 실측해 좌표 오차를 보정해야 합니다.
