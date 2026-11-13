@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git grep *)",
+      "Bash(git check-ignore *)",
+      "Bash(git merge-base *)",
+      "Bash(git ls-tree *)",
+      "mcp__Claude_Browser__find",
+      "mcp__Claude_Browser__get_page_text",
+      "mcp__Claude_Browser__tabs_context",
+      "mcp__1a59c906-04da-521d-bda7-7f71b9f9e01c__read",
+      "mcp__1a59c906-04da-521d-bda7-7f71b9f9e01c__guide"
+    ]
+  }
+}

@@ -49,15 +49,18 @@ test("GPS coordinates convert to the campus east/south meter axes", () => {
   assert.equal(gpsToCampus(NaN, origin.lon, origin), null);
 });
 test("blocked edge is removed from routing; deleting report restores it", () => {
-  const edge = EDGES.find((e) => e.a === "futureDoor" || e.b === "futureDoor"),
-    report = reportFor(edge);
+  // Surveyed paths can add several connections to the same destination.
+  const reports = EDGES.filter(
+    (e) => e.a === "futureDoor" || e.b === "futureDoor",
+  ).map((edge, index) => ({ ...reportFor(edge), id: `blocked-${index}` }));
+  assert.ok(reports.length);
   assert.equal(
     shortestPath(
       "gate",
       "futureDoor",
       "shortest",
       NODES,
-      availableEdges([report]),
+      availableEdges(reports),
     ),
     null,
   );

@@ -48,7 +48,8 @@ src/
       procedural.mjs        공통 파사드 셰이더·옥상 장식
       facade-studies.mjs    중앙도서관 외벽 시안
     landscape/              붕어방·나무·식재·도로 폭 규칙
-  data.mjs                  데이터 연결·건물 이름·출입구 후보
+  data.mjs                  조사 그래프 연결·건물 이름·등록 출입구
+  survey.mjs                팀 조사 GeoJSON을 보행 그래프에 병합
   geo.mjs                   좌표·평면 기하 계산
   routing.mjs               길찾기
   reports.mjs               길 막힘 제보
@@ -62,3 +63,5 @@ dist/                      배포 파일 (`npm run build`로 갱신)
 ```
 
 건물의 형태·색·등록 방법은 [건물 디자인 관리](BUILDING-DESIGN.md)를 참고하세요. 건물 외관 수정은 `src/map/buildings/`에서 진행하고, 생성된 `dist/app.js`는 직접 편집하지 않습니다.
+
+출입구는 `data/team-survey.json`을 기준으로 표시하고 길찾기에 연결합니다. `src/data.mjs`에 출입구 좌표를 따로 적지 않습니다. 조사된 출입구가 없는 건물은 기존 자동 생성 노드로 임시 연결합니다.

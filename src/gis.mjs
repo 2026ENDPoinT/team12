@@ -1,21 +1,7 @@
-const METERS_PER_LATITUDE = 111132;
-const METERS_PER_LONGITUDE = 111320;
+import { toLngLat } from "./geo.mjs";
 
-// 브라우저용 로컬 미터 좌표를 서버·PostGIS가 교환하기 쉬운 WGS84로 되돌립니다.
-export function campusToGps(point, origin) {
-  if (
-    !Number.isFinite(point?.x) ||
-    !Number.isFinite(point?.z) ||
-    !Number.isFinite(origin?.lat) ||
-    !Number.isFinite(origin?.lon)
-  )
-    return null;
-  return [
-    origin.lon +
-      point.x / (METERS_PER_LONGITUDE * Math.cos((origin.lat * Math.PI) / 180)),
-    origin.lat - point.z / METERS_PER_LATITUDE,
-  ];
-}
+// 조사 입력·지도·GIS 출력은 같은 좌표 변환식을 사용합니다.
+export const campusToGps = toLngLat;
 
 function closeRing(ring, origin) {
   const coordinates = ring.map(([x, z]) => campusToGps({ x, z }, origin));

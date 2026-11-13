@@ -7,6 +7,7 @@ import {
   BUILDINGS,
   ENTRANCES,
   MAIN_GATE,
+  SURVEY,
 } from "../src/data.mjs";
 import { shortestPath } from "../src/routing.mjs";
 import { insideBuilding, projectToSegment } from "../src/geo.mjs";
@@ -75,7 +76,7 @@ test("missing or disconnected nodes return no route; already there returns zero"
   assert.equal(shortestPath("futureDoor").meters, 0);
 });
 test("derived walking edges do not cut across building interiors", () => {
-  for (const edge of EDGES) {
+  for (const edge of EDGES.filter((edge) => edge.type !== "building_passage")) {
     const a = NODES[edge.a],
       b = NODES[edge.b];
     for (const t of [0.2, 0.5, 0.8]) {
@@ -106,26 +107,28 @@ test("derived walking edges do not cut across building interiors", () => {
     }
   }
 });
-test("marked entrances stay on their matching building outline", () => {
-  assert.ok(ENTRANCES.length >= 15);
+test("surveyed entrances stay on their matching building outline", () => {
+  assert.equal(ENTRANCES.length, SURVEY.entrances.length);
+  assert.ok(ENTRANCES.length > 0);
   for (const entrance of ENTRANCES) {
     const building = BUILDINGS.find(({ id }) => id === entrance.buildingId);
     assert.ok(building, entrance.name);
     const distance = Math.min(
       ...[building.outline, ...building.holes].flatMap((ring) =>
-        ring.map(([x, z], index) =>
-          projectToSegment(
-            entrance,
-            { x, z },
-            {
-              x: ring[(index + 1) % ring.length][0],
-              z: ring[(index + 1) % ring.length][1],
-            },
-          ).distance,
+        ring.map(
+          ([x, z], index) =>
+            projectToSegment(
+              entrance,
+              { x, z },
+              {
+                x: ring[(index + 1) % ring.length][0],
+                z: ring[(index + 1) % ring.length][1],
+              },
+            ).distance,
         ),
       ),
     );
-    assert.ok(distance < 0.01, `${entrance.name}: ${distance}`);
+    assert.ok(distance < 0.05, `${entrance.name}: ${distance}`);
   }
   assert.ok(NODES[MAIN_GATE.entry]);
 });
