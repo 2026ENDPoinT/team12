@@ -22,8 +22,24 @@ const T = (x, y, z) => new THREE.Vector3(x, z, -y);
 
 export function createView(el, indoor, { onPick } = {}) {
   const { M, FL } = indoor;
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  // 성능: 고해상도 화면(배율 1.5 이상)은 화소가 촘촘해 안티에일리어싱 없이도 매끈 → 끔.
+  // 움직이는 동안만 해상도를 낮추고, 멈추면 원래 해상도로 다시 그림(멈춘 화면은 그대로)
+  const PR_HIGH = Math.min(devicePixelRatio, 2),
+    PR_LOW = Math.min(PR_HIGH, 1.25);
+  const renderer = new THREE.WebGLRenderer({
+    antialias: devicePixelRatio < 1.5,
+    alpha: false,
+    powerPreference: "high-performance",
+  });
+  renderer.setPixelRatio(PR_HIGH);
+  let pr = PR_HIGH,
+    lastMove = -1e9;
+  function setPR(v) {
+    if (v === pr) return;
+    pr = v;
+    renderer.setPixelRatio(v);
+    renderer.setSize(el.clientWidth, el.clientHeight, false);
+  }
   // 질감 재질(materials.mjs)용 톤 매핑. 경로·핀 같은 표시는 toneMapped:false 로 원래 색 그대로
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = LIGHTING.mapExposure;
@@ -680,25 +696,49 @@ export function createView(el, indoor, { onPick } = {}) {
     firstPerson = on;
     ctl.enabled = !on;
     // 위에서 내려다볼 때는 바닥이 칙칙해 보이지 않게 조금 더 밝게
-    renderer.toneMappingExposure = on ? LIGHTING.exposure : LIGHTING.mapExposure;
+    renderer.toneMappingExposure = on
+      ? LIGHTING.exposure
+      : LIGHTING.mapExposure;
     applyVisibility();
     updateLabels();
   }
+  let lastFloorVis = null;
   function setWalkPose(p) {
     Object.assign(walkPose, p);
-    applyVisibility();
-    updateLabels();
+    // 층이 바뀔 때만 보이기 다시 정함(이름표는 그리기에서 0.12초마다)
+    if (walkPose.f !== lastFloorVis) {
+      lastFloorVis = walkPose.f;
+      applyVisibility();
+    }
   }
 
   // ---- 그리기 (필요할 때만)
   let lastLabelUpdate = 0;
+  let lastPoseKey = "";
   (function loop(now) {
     requestAnimationFrame(loop);
     if (firstPerson) {
+      // 위치·방향이 바뀌었을 때만 그림(멈춰 있으면 쉼)
+      const key = `${walkPose.x.toFixed(3)},${walkPose.y.toFixed(3)},${walkPose.z.toFixed(3)},${walkPose.yaw.toFixed(2)},${walkPose.pitch.toFixed(3)}`;
+      const moved = key !== lastPoseKey;
+      if (moved) {
+        lastPoseKey = key;
+        lastMove = now;
+        setPR(PR_LOW);
+      } else if (pr !== PR_HIGH && now - lastMove > 250) {
+        setPR(PR_HIGH);
+        dirty = true;
+      }
+      if (!moved && !dirty) return;
+      dirty = false;
       fp.position.set(walkPose.x, walkPose.z + 1.6, -walkPose.y);
       // yaw: 동쪽 0 반시계(도) → three 카메라 회전
       fp.rotation.set(walkPose.pitch, ((walkPose.yaw - 90) * Math.PI) / 180, 0);
       renderer.render(scene, fp);
+      if (now - lastLabelUpdate > 120) {
+        updateLabels();
+        lastLabelUpdate = now;
+      }
       lr.render(scene, fp);
       return;
     }
@@ -710,7 +750,15 @@ export function createView(el, indoor, { onPick } = {}) {
       if (k >= 1) floorAnim = null;
       dirty = true;
     }
-    if (ctl.update()) dirty = true;
+    const moving = ctl.update() || !!floorAnim;
+    if (moving) {
+      dirty = true;
+      lastMove = now;
+      setPR(PR_LOW);
+    } else if (pr !== PR_HIGH && now - lastMove > 250) {
+      setPR(PR_HIGH);
+      dirty = true;
+    }
     if (!dirty) return;
     dirty = false;
     if (now - lastLabelUpdate > 120) {

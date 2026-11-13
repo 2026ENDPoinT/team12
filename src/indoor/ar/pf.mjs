@@ -99,6 +99,34 @@ export class Localizer {
     }
     this._portals(0.12, "stair", s);
   }
+  /** VIO(ARCore) 이동량: 센서 세계에서 (dx, dy)m. 걸음 감지보다 훨씬 정확해서 잡음을 작게 둡니다.
+   * 입자마다 자기 방향 기준(O)으로 돌려 건물 좌표로 옮깁니다. */
+  move(dx, dy) {
+    if (!this.init) return;
+    const L = Math.hypot(dx, dy);
+    if (L < 1e-4) return;
+    for (let p = 0; p < this.N; p++) {
+      const a = (this.O[p] + this.gauss() * 0.6) * D2R,
+        k = 1 + this.gauss() * 0.03,
+        c = Math.cos(a),
+        s = Math.sin(a);
+      this._move(
+        p,
+        (c * dx - s * dy) * k + this.gauss() * 0.02 * L,
+        (s * dx + c * dy) * k + this.gauss() * 0.02 * L,
+      );
+    }
+  }
+  /** 계단으로 층을 옮김(VIO 높이 변화): 평면 위치는 그대로 두고 층만 바꿈 */
+  shiftFloor(d) {
+    if (!this.init) return;
+    for (let p = 0; p < this.N; p++) {
+      const f = this.F[p] + d;
+      if (this.byFloor.has(f)) this.F[p] = f;
+      else this.W[p] *= 0.05;
+    }
+    this._normalize();
+  }
   /** 걸음 감지가 없을 때 시간 경과(데모 영상·센서 없는 기기): 앞으로 0~1.1m/s, 방향은 넓게 흔들림 */
   drift(dt, sensorYaw, hasSensor) {
     if (!this.init || dt <= 0) return;
@@ -327,6 +355,30 @@ export class Localizer {
     this.lowConf = est.conf < 0.15 ? (this.lowConf || 0) + 1 : 0;
     if (this.weak > 12 || this.lowConf > 6) this.reset();
     return est;
+  }
+  /** 사진 비교 원시 후보(입자와 무관): 층 f 전체에서 잘 맞는 자리 k개(1.5m 안 중복은 뺌).
+   * WebXR에서 VIO 궤적과 함께 모아 정렬을 구할 때 씁니다. 반환 [{f, x, y, yaw, ncc}] */
+  candidates(q, floors, k = 3, ex = null) {
+    const cand = [];
+    for (const f of floors)
+      for (const i of this.byFloor.get(f) || [])
+        if (!(ex && ex.has(i))) cand.push(i);
+    if (!cand.length) return [];
+    const res = matchAll(this.index, this.shots, q, { cand });
+    const out = [];
+    for (const r of res) {
+      if (r.ncc < PF.MIN_NCC) break;
+      const sh = this.shots[r.k];
+      if (
+        out.some(
+          (o) => o.f === sh.f && Math.hypot(o.x - sh.x, o.y - sh.y) < 1.5,
+        )
+      )
+        continue;
+      out.push({ f: sh.f, x: sh.x, y: sh.y, yaw: r.yaw, ncc: r.ncc });
+      if (out.length >= k) break;
+    }
+    return out;
   }
   _seed(q, s, floorHint, ex) {
     const all = this.shots.map((_, i) => i).filter((k) => !(ex && ex.has(k)));
