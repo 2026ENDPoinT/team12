@@ -49,7 +49,8 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   } catch {
     return null;
   }
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const touchFirst = matchMedia("(pointer: coarse)").matches;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, touchFirst ? 1.5 : 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   // Buildings, trees and the sun are static; camera/route changes need no new shadow map.
@@ -69,7 +70,8 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   const controls = new OrbitControls(camera, renderer.domElement);
   const constrainNavigation = createNavigationBounds(CAMPUS_GEOMETRY.boundary);
   controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
+  // Touch drags should move the map with the finger, with a short release tail.
+  controls.dampingFactor = touchFirst ? 0.45 : 0.08;
   controls.minPolarAngle = 0.12;
   controls.maxPolarAngle = Math.PI * 0.47;
   controls.minZoom = 0.5;
@@ -852,17 +854,11 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
       gesture.mode = touchGestureMode(gesture.start, f);
       if (!gesture.mode) return;
     }
-    if (gesture.mode === "zoom") {
-      moveCamera(
-        gesture.start.mid,
-        gesture.start.mid,
-        gesture.last.distance > 0 ? f.distance / gesture.last.distance : 1,
-      );
-    } else if (gesture.mode === "twist") {
+    if (gesture.mode === "zoom" || gesture.mode === "twist") {
       moveCamera(
         gesture.last.mid,
         f.mid,
-        1,
+        gesture.last.distance > 0 ? f.distance / gesture.last.distance : 1,
         touchTurn(gesture.last.angle, f.angle),
       );
     } else {

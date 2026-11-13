@@ -988,6 +988,15 @@ function renderMobileNavigation(guide = null) {
   syncNavigationCameraButtons();
 }
 function syncNavigationCameraButtons() {
+  const status = $("#navigation-status");
+  const message = guidancePending
+    ? "현재 위치 확인 중"
+    : guidanceActive
+      ? guidanceFollowing
+        ? "길안내 중"
+        : "길안내 중 · 지도 추적 일시 정지"
+      : "";
+  if (status.textContent !== message) status.textContent = message;
   $("#navigation-recenter").hidden = !guidanceActive || guidanceFollowing;
   $("#navigation-compass").setAttribute(
     "aria-pressed",
@@ -1084,7 +1093,6 @@ function startGuidance() {
 }
 $("#route-card-start").onclick = startGuidance;
 $("#navigation-stop").onclick = () => endGuidance();
-$("#navigation-layers").onclick = () => side("layers").click();
 $("#navigation-compass").onclick = () => {
   if (!guidanceActive) return;
   if (!guidanceFollowing) {
@@ -1099,7 +1107,6 @@ $("#navigation-back").onclick = () => {
   endGuidance();
   setPanelClosed(false);
 };
-$("#navigation-route").onclick = () => $("#navigation-back").click();
 $("#navigation-recenter").onclick = () => {
   if (!gpsPosition || !guidanceActive) return;
   guidanceFollowing = true;
