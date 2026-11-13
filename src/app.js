@@ -989,6 +989,15 @@ function renderMobileNavigation(guide = null) {
   syncNavigationCameraButtons();
 }
 function syncNavigationCameraButtons() {
+  const status = $("#navigation-status");
+  const message = guidancePending
+    ? "현재 위치 확인 중"
+    : guidanceActive
+      ? guidanceFollowing
+        ? "길안내 중"
+        : "길안내 중 · 지도 추적 일시 정지"
+      : "";
+  if (status.textContent !== message) status.textContent = message;
   $("#navigation-recenter").hidden = !guidanceActive || guidanceFollowing;
   $("#navigation-compass").setAttribute(
     "aria-pressed",

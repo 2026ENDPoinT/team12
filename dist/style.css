@@ -7882,7 +7882,25 @@ body {
   #navigation-minutes { font-size: 23px; }
   #navigation-distance { font-size: 17px; }
   #navigation-eta { color: var(--v2-muted); font-size: 12px; }
-  #navigation-stop { flex: none; width: 44px; height: 44px; margin-left: auto; border: 1px solid var(--v2-stroke); border-radius: 50%; background: var(--v2-tile); font-size: 23px; }
+  #navigation-status {
+    margin: 4px 0 0;
+    color: var(--v2-muted);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  #navigation-stop {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    margin-top: 12px;
+    padding: 8px 16px;
+    border: 1px solid var(--v2-stroke);
+    border-radius: 999px;
+    background: var(--v2-tile);
+    color: var(--v2-ink);
+    font: inherit;
+    font-weight: 700;
+  }
   #navigation-progress { appearance: none; width: 100%; height: 6px; margin-top: 16px; border: 0; border-radius: 99px; overflow: hidden; background: rgba(255,255,255,.6); accent-color: var(--violet); }
   #navigation-progress::-webkit-progress-bar { background: rgba(255,255,255,.6); }
   #navigation-progress::-webkit-progress-value { background: var(--violet); border-radius: 99px; }
@@ -7890,7 +7908,7 @@ body {
   #navigation-recenter {
     position: fixed;
     z-index: 35;
-    bottom: calc(148px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(212px + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -7904,8 +7922,6 @@ body {
     font-weight: 700;
     white-space: nowrap;
   }
-  #navigation-layers,
-  #navigation-route,
   #navigation-compass {
     position: fixed;
     z-index: 35;
@@ -7919,9 +7935,7 @@ body {
     backdrop-filter: var(--v2-glass-filter);
     color: var(--v2-ink);
   }
-  #navigation-layers { right: 16px; top: calc(228px + env(safe-area-inset-top, 0px)); }
-  #navigation-route { left: 16px; bottom: calc(148px + env(safe-area-inset-bottom, 0px)); }
-  #navigation-compass { right: 16px; bottom: calc(148px + env(safe-area-inset-bottom, 0px)); }
+  #navigation-compass { right: 16px; bottom: calc(212px + env(safe-area-inset-bottom, 0px)); }
   .guidance-on .navigation-position {
     display: grid;
     place-items: center;
@@ -8027,6 +8041,8 @@ body {
 /* ===== 데스크톱 길안내 (Figma "길안내 · 내 위치 따라가기" GD-2 · GD-3) =====
    안내 시작 → 지도만 남기고 오른쪽 위 안내 카드, 아래 가운데 남은 거리 바,
    오른쪽 아래 레이어·나침반·확대·축소, 왼쪽 아래 경로 보기. 지도를 움직이면 "내 위치로". */
+#navigation-layers,
+#navigation-route,
 #navigation-zoom-in,
 #navigation-zoom-out {
   display: none;
@@ -8137,7 +8153,7 @@ body {
     bottom: 24px;
     transform: translateX(-50%);
     width: min(520px, calc(100vw - 220px));
-    padding: 16px 16px 18px 22px;
+    padding: 16px 68px 18px 22px;
     border: 1px solid var(--v2-stroke);
     border-radius: 24px;
     background: var(--v2-sheet);
@@ -8163,15 +8179,31 @@ body {
     color: var(--v2-muted);
     font-size: 12px;
   }
+  #navigation-status {
+    display: none;
+  }
   #navigation-stop {
-    flex: none;
+    position: absolute;
+    top: 10px;
+    right: 16px;
     width: 44px;
     height: 44px;
-    margin-left: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
     border: 1px solid var(--v2-stroke);
     border-radius: 50%;
     background: var(--v2-tile);
+    color: transparent;
     font-size: 18px;
+  }
+  #navigation-stop::after {
+    content: "✕";
+    display: grid;
+    place-items: center;
+    position: absolute;
+    inset: 0;
+    color: var(--v2-ink);
   }
   #navigation-progress {
     appearance: none;
