@@ -5317,22 +5317,10 @@ body.exploring .header {
     inset 0 0.75px 0 rgba(255, 255, 255, 0.85),
     0 18px 44px rgba(21, 33, 43, 0.14);
 }
-#campuses .school-card.featured {
-  border: 1.5px solid var(--v2-accent-text);
-  background: linear-gradient(
-    135deg,
-    rgba(213, 255, 118, 0.38) 0%,
-    rgba(255, 255, 255, 0.3) 100%
-  );
-}
 #campuses .school-logo {
   border-radius: 14px;
   background: var(--v2-tile);
   color: var(--v2-muted);
-}
-#campuses .school-card.featured .school-logo {
-  background: var(--lime);
-  color: var(--v2-ink);
 }
 #campuses .school-copy b {
   color: var(--v2-ink);
@@ -5341,8 +5329,38 @@ body.exploring .header {
 #campuses .school-arrow {
   color: var(--v2-muted);
 }
-#campuses .school-card.featured .school-arrow {
+#campuses .school-card.featured:focus-visible,
+#campuses .school-card.featured:active {
+  border: 1.5px solid var(--v2-accent-text);
+  background: linear-gradient(
+    135deg,
+    rgba(213, 255, 118, 0.38) 0%,
+    rgba(255, 255, 255, 0.3) 100%
+  );
+}
+#campuses .school-card.featured:is(:focus-visible, :active) .school-logo {
+  background: var(--lime);
   color: var(--v2-ink);
+}
+#campuses .school-card.featured:is(:focus-visible, :active) .school-arrow {
+  color: var(--v2-ink);
+}
+@media (hover: hover) {
+  #campuses .school-card.featured:hover {
+    border: 1.5px solid var(--v2-accent-text);
+    background: linear-gradient(
+      135deg,
+      rgba(213, 255, 118, 0.38) 0%,
+      rgba(255, 255, 255, 0.3) 100%
+    );
+  }
+  #campuses .school-card.featured:hover .school-logo {
+    background: var(--lime);
+    color: var(--v2-ink);
+  }
+  #campuses .school-card.featured:hover .school-arrow {
+    color: var(--v2-ink);
+  }
 }
 #campuses .school-state {
   color: var(--v2-accent-text);
