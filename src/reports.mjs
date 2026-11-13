@@ -105,6 +105,22 @@ export function sanitizeReports(value, edges = EDGES, nodes = NODES) {
       ...(typeof report.photoPath === "string"
         ? { photoPath: report.photoPath }
         : {}),
+      ...(report.gps &&
+      Number.isFinite(report.gps.x) &&
+      Number.isFinite(report.gps.z)
+        ? {
+            gps: {
+              x: report.gps.x,
+              z: report.gps.z,
+              accuracy: Number.isFinite(report.gps.accuracy)
+                ? report.gps.accuracy
+                : null,
+            },
+          }
+        : {}),
+      ...(typeof report.takenAt === "string"
+        ? { takenAt: report.takenAt }
+        : {}),
       ...(report.confirmed === true ? { confirmed: true } : {}),
       ...(report.isCover === true ? { isCover: true } : {}),
     });
@@ -124,6 +140,10 @@ export function rowToReport(row) {
     createdAt: row.created_at,
     ...(row.reporter_device_id ? { deviceId: row.reporter_device_id } : {}),
     ...(row.photo_path ? { photoPath: row.photo_path } : {}),
+    ...(row.gps_x != null && row.gps_z != null
+      ? { gps: { x: row.gps_x, z: row.gps_z, accuracy: row.gps_accuracy } }
+      : {}),
+    ...(row.taken_at ? { takenAt: row.taken_at } : {}),
     ...(row.status === "confirmed" ? { confirmed: true } : {}),
     ...(row.is_cover ? { isCover: true } : {}),
   };
@@ -177,15 +197,26 @@ export function sanitizeConfirmedEdges(value, edges = EDGES) {
 // 신고 위치끼리 이 거리(m) 안이면 같은 구역으로 묶습니다. 이웃의 이웃도 같은 구역입니다.
 export const CLUSTER_RADIUS = 30;
 
-// 대표 사진: 관리자가 고른 것(isCover) → 없으면 사진이 있는 가장 최근 신고.
-// ponytail: "가장 최근"만 봅니다. GPS 촬영 위치가 생기면(3단계) 신고 지점과 가까운 사진을 우선하세요.
+// 촬영한 GPS 위치에서 신고 지점까지 거리(m). GPS 정보가 없는 예전 신고는 null.
+export const gpsDistance = (report) =>
+  report.gps
+    ? Math.hypot(report.point.x - report.gps.x, report.point.z - report.gps.z)
+    : null;
+
+// 대표 사진: 관리자가 고른 것(isCover) → 사진이 있는 신고 중 촬영 위치가 신고 지점에서
+// 30m 안인 가장 최근 신고 → 그다음 사진이 있는 가장 최근 신고.
 export function pickCover(reports) {
   const newest = [...reports].sort(
     (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
   );
+  const withPhoto = newest.filter((r) => r.photoPath);
   return (
-    newest.find((r) => r.isCover && r.photoPath) ||
-    newest.find((r) => r.photoPath) ||
+    withPhoto.find((r) => r.isCover) ||
+    withPhoto.find((r) => {
+      const d = gpsDistance(r);
+      return d !== null && d <= CLUSTER_RADIUS;
+    }) ||
+    withPhoto[0] ||
     newest[0]
   );
 }

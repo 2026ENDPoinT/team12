@@ -41,6 +41,8 @@ export async function insertReportRow({
   reason,
   reasonNote,
   photoPath,
+  gps,
+  takenAt,
 }) {
   const { error } = await supabase.from("road_reports").insert({
     edge_id: edgeId,
@@ -49,6 +51,11 @@ export async function insertReportRow({
     reason,
     reason_note: reason === "other" ? reasonNote : null,
     photo_path: photoPath,
+    // 신고를 시작할 때 GPS 위치(캠퍼스 미터 좌표)와 정확도, 사진 촬영 시각
+    gps_x: gps?.x ?? null,
+    gps_z: gps?.z ?? null,
+    gps_accuracy: gps?.accuracy ?? null,
+    taken_at: takenAt || null,
     reporter_device_id: getDeviceId(),
   });
   if (error) throw error;

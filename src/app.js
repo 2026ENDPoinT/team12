@@ -6,6 +6,8 @@ import {
   availableEdges,
   clusterReports,
   clusterOf,
+  gpsDistance,
+  locateReportPoint,
   sanitizeReports,
   rowToReport,
   confirmedEdgesFromRows,
@@ -617,8 +619,13 @@ renderAdminAlert();
 routeView();
 loadReports(); // Supabase에서 신고 목록을 비동기로 불러와 위 렌더를 다시 채웁니다.
 
-// ===== 지도 위치를 직접 누르는 공사 신고 시연 =====
-// TODO(백엔드): 사용자 입력은 point{x,z}. 경로 연결 edge는 지도 내부에서 자동 계산합니다.
+// ===== 현장 공사 신고 (GPS 위치 + 앱 안 카메라) =====
+// 스윙·지쿠터처럼 지금 그 자리에서만 신고합니다. 위치는 GPS로 잡고(정확도 50m 이내, 캠퍼스 안),
+// 다른 길이면 GPS 위치 30m 안에서만 다시 고를 수 있습니다. 사진은 앱 안 카메라로만 찍습니다(앨범 X).
+// ponytail: GPS 위치를 조작하는 앱까지는 막지 못합니다. 더 막으려면 서버(Edge Function)에서 검증하세요.
+const REPORT_MAX_ACCURACY = 50,
+  REPORT_ADJUST_RADIUS = 30;
+let reportOrigin = null; // 신고를 시작할 때 잡은 GPS 위치 {x, z, accuracy}
 function setReporting(value) {
   reporting = value;
   $("#report-start").classList.toggle("active", value);
@@ -628,13 +635,69 @@ function setReporting(value) {
     : "⚠ 공사 구간 신고";
   $("#report-picker").hidden = !value;
   map?.setReporting(value);
-  if (!value) map?.clearReportSelection();
+  if (!value) {
+    map?.clearReportSelection();
+    reportOrigin = null;
+    if (gpsWatchId === null) map?.setUserLocation(null);
+  }
   if (value) {
     closeBuildingPopover();
     $("#campus-map canvas")?.focus({ preventScroll: true });
   }
 }
-$("#report-start").onclick = () => setReporting(!reporting);
+function startFieldReport() {
+  if (!window.isSecureContext || !navigator.geolocation) {
+    toast("현장 신고는 https 주소에서 위치 권한을 허용해야 할 수 있어요.");
+    return;
+  }
+  toast("현재 위치를 확인하고 있어요…");
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      if (coords.accuracy > REPORT_MAX_ACCURACY) {
+        toast(
+          `GPS 정확도가 낮아요(약 ${Math.round(coords.accuracy)}m). 하늘이 트인 곳에서 다시 시도해주세요.`,
+        );
+        return;
+      }
+      const point = gpsToCampus(
+        coords.latitude,
+        coords.longitude,
+        CAMPUS_GEOMETRY.meta,
+      );
+      const nearest = point && nearestGraphNode(point);
+      if (!nearest || nearest.distance > 350) {
+        toast("캠퍼스 안에서만 신고할 수 있어요.");
+        return;
+      }
+      const selection = locateReportPoint(
+        point,
+        EDGES,
+        NODES,
+        REPORT_ADJUST_RADIUS,
+      );
+      if (!selection) {
+        toast(
+          `현재 위치 ${REPORT_ADJUST_RADIUS}m 안에 길이 없어요. 길 가까이에서 다시 시도해주세요.`,
+        );
+        return;
+      }
+      reportOrigin = { ...point, accuracy: coords.accuracy };
+      setReporting(true);
+      map?.setUserLocation(reportOrigin, { follow: true });
+      map?.previewReportSelection(selection);
+      openRoadReport(selection);
+    },
+    (error) =>
+      toast(
+        error.code === 1
+          ? "위치 권한이 꺼져 있어요. 브라우저 설정에서 위치 권한을 허용해주세요."
+          : "현재 위치를 확인하지 못했어요. 잠시 후 다시 시도해주세요.",
+      ),
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
+  );
+}
+$("#report-start").onclick = () =>
+  reporting ? setReporting(false) : startFieldReport();
 $("#report-cancel").onclick = () => setReporting(false);
 function openRoadReport(selection) {
   if (selection?.error) {
@@ -645,6 +708,23 @@ function openRoadReport(selection) {
     ? reports.find((r) => r.id === selection.reportId)
     : null;
   if (!existing && (!selection?.point || !selection?.edgeId)) return;
+  if (!existing) {
+    if (!reportOrigin) {
+      toast("⚠ 공사 신고 버튼을 눌러 현재 위치에서 신고해주세요.");
+      return;
+    }
+    const away = Math.hypot(
+      selection.point.x - reportOrigin.x,
+      selection.point.z - reportOrigin.z,
+    );
+    if (away > REPORT_ADJUST_RADIUS) {
+      map?.clearReportSelection();
+      toast(
+        `현재 위치(파란 점)에서 ${REPORT_ADJUST_RADIUS}m 안의 길만 고를 수 있어요.`,
+      );
+      return;
+    }
+  }
   selectedReport = existing || selection;
   $("#report-location").textContent = reportLocation(selectedReport);
   const cluster = existing && clusterOf(existing.id, clusters),
@@ -661,11 +741,7 @@ function openRoadReport(selection) {
   // 내 신고이고 아직 관리자가 확정하지 않았을 때만 삭제할 수 있습니다.
   $("#report-remove").hidden = !(mine && !locked);
   $("#report-photo-field").hidden = !!existing;
-  if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
-  photoPreviewUrl = null;
-  selectedPhotoFile = null;
-  $("#report-photo-input").value = "";
-  $("#report-photo-preview").hidden = true;
+  resetCamera();
   $('input[name="road-reason"][value="construction"]').checked = true;
   $("#report-reason-note").value = "";
   $("#report-reason-note").hidden = true;
@@ -685,6 +761,7 @@ function openRoadReport(selection) {
           : "다른 사람이 올린 신고예요.")
     : `같은 구간에 신고가 ${REPORT_THRESHOLD}건 이상 모이면 지도에 주의(노란색)로 표시되고 관리자에게 검토 알림이 갑니다. 관리자가 확인해 확정하면 통행 막힘(빨간색)으로 바뀌며 우회 경로를 안내합니다.`;
   $("#report-dialog").showModal();
+  if (!existing) startCamera();
 }
 // 사진이 있고, 기타 사유면 글까지 써야 신고 버튼이 켜집니다.
 function updateReportSubmit() {
@@ -700,16 +777,88 @@ for (const radio of $$('input[name="road-reason"]'))
     updateReportSubmit();
   };
 $("#report-reason-note").oninput = updateReportSubmit;
-$("#report-photo-input").onchange = () => {
-  selectedPhotoFile = $("#report-photo-input").files[0] || null;
+// 앱 안 카메라: 촬영과 다시 찍기만 있고 앨범 사진은 고를 수 없습니다.
+let cameraStream = null,
+  photoTakenAt = null;
+function stopCamera() {
+  cameraStream?.getTracks().forEach((track) => track.stop());
+  cameraStream = null;
+  $("#report-camera").srcObject = null;
+}
+function resetCamera() {
+  stopCamera();
   if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
-  photoPreviewUrl = selectedPhotoFile
-    ? URL.createObjectURL(selectedPhotoFile)
-    : null;
-  $("#report-photo-preview").src = photoPreviewUrl || "";
-  $("#report-photo-preview").hidden = !photoPreviewUrl;
+  photoPreviewUrl = null;
+  selectedPhotoFile = null;
+  photoTakenAt = null;
+  for (const id of [
+    "#report-photo-preview",
+    "#report-camera",
+    "#report-shoot",
+    "#report-retake",
+    "#report-camera-error",
+  ])
+    $(id).hidden = true;
   updateReportSubmit();
+}
+function cameraError(message) {
+  $("#report-camera-error").textContent = message;
+  $("#report-camera-error").hidden = false;
+}
+async function startCamera() {
+  resetCamera();
+  if (!navigator.mediaDevices?.getUserMedia) {
+    cameraError(
+      "이 브라우저에서는 카메라를 쓸 수 없어요. https 주소에서 열어주세요.",
+    );
+    return;
+  }
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false,
+    });
+  } catch {
+    cameraError(
+      "카메라 권한이 필요해요. 브라우저 설정에서 카메라를 허용해주세요.",
+    );
+    return;
+  }
+  // 권한을 묻는 사이 신고 창을 닫았으면 카메라를 바로 끕니다.
+  if (!$("#report-dialog").open) return stopCamera();
+  const video = $("#report-camera");
+  video.srcObject = cameraStream;
+  video.hidden = false;
+  $("#report-shoot").hidden = false;
+  await video.play().catch(() => {});
+}
+$("#report-shoot").onclick = () => {
+  const video = $("#report-camera");
+  if (!video.videoWidth) return;
+  const scale = Math.min(1, 1600 / video.videoWidth),
+    canvas = document.createElement("canvas");
+  canvas.width = Math.round(video.videoWidth * scale);
+  canvas.height = Math.round(video.videoHeight * scale);
+  canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+  canvas.toBlob(
+    (blob) => {
+      if (!blob) return;
+      stopCamera();
+      selectedPhotoFile = new File([blob], "photo.jpg", { type: "image/jpeg" });
+      photoTakenAt = new Date().toISOString();
+      photoPreviewUrl = URL.createObjectURL(blob);
+      $("#report-photo-preview").src = photoPreviewUrl;
+      $("#report-photo-preview").hidden = false;
+      video.hidden = true;
+      $("#report-shoot").hidden = true;
+      $("#report-retake").hidden = false;
+      updateReportSubmit();
+    },
+    "image/jpeg",
+    0.85,
+  );
 };
+$("#report-retake").onclick = () => startCamera();
 $("#report-no").onclick = () => {
   map?.clearReportSelection();
   $("#report-dialog").close();
@@ -741,6 +890,10 @@ $("#report-yes").onclick = async () => {
     toast("현장 사진을 찍어 올려야 신고할 수 있어요.");
     return;
   }
+  if (!reportOrigin) {
+    toast("⚠ 공사 신고 버튼을 눌러 현재 위치에서 다시 신고해주세요.");
+    return;
+  }
   if (reason === "other" && !reasonNote) {
     toast("기타 사유를 적어주세요.");
     return;
@@ -761,6 +914,8 @@ $("#report-yes").onclick = async () => {
         reason,
         reasonNote,
         photoPath,
+        gps: reportOrigin,
+        takenAt: photoTakenAt,
       });
     } catch {
       toast("신고 저장에 실패했어요. 다시 시도해주세요.");
@@ -793,6 +948,7 @@ $("#report-remove").onclick = async () => {
   await loadReports();
 };
 $("#report-dialog").addEventListener("close", () => {
+  stopCamera();
   if (!selectedReport?.id) map?.clearReportSelection();
 });
 // 신고 상태를 사람이 읽을 문구로 바꿉니다: 접수 → 주의(노란색) → 관리자 확정(빨간색).
@@ -873,13 +1029,20 @@ function photoCard(cluster, report, { selectable }) {
     img.loading = "lazy";
     label.append(img);
   } else label.append(el("span", "admin-photo-empty", "사진 없음"));
+  // 촬영 시각과, 촬영한 GPS 위치에서 신고 지점까지 거리·GPS 정확도(현장 신고 판단 근거)
+  const away = gpsDistance(report),
+    gpsInfo =
+      away === null
+        ? "GPS 정보 없음"
+        : `촬영 위치에서 ${Math.round(away)}m · GPS ±${Math.round(report.gps.accuracy ?? 0)}m`;
   card.append(
     label,
     el(
       "small",
       "",
-      `${reasonLabel(report)} · ${new Date(report.createdAt).toLocaleString("ko-KR")}`,
+      `${reasonLabel(report)} · ${new Date(report.takenAt || report.createdAt).toLocaleString("ko-KR")}`,
     ),
+    el("small", "admin-photo-gps", gpsInfo),
   );
   const actions = el("div", "admin-photo-actions");
   if (url) {

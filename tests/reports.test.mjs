@@ -9,6 +9,7 @@ import {
   locateReportPoint,
   clusterReports,
   pickCover,
+  gpsDistance,
   CLUSTER_RADIUS,
   sanitizeConfirmedEdges,
   rowToReport,
@@ -313,4 +314,46 @@ test("sanitizeReports rejects malformed or out-of-range entries", () => {
     [],
   );
   assert.equal(sanitizeReports([ok]).length, 1);
+});
+test("GPS shot position flows from DB rows and drives the auto-picked cover", () => {
+  const edge = EDGES[0],
+    base = reportFor(edge),
+    row = rowToReport({
+      id: "g1",
+      edge_id: edgeId(edge),
+      point_x: base.point.x,
+      point_z: base.point.z,
+      reason: "construction",
+      created_at: "2026-11-13T00:00:00Z",
+      gps_x: base.point.x + 3,
+      gps_z: base.point.z + 4,
+      gps_accuracy: 8,
+      taken_at: "2026-11-13T00:00:00Z",
+    });
+  assert.deepEqual(row.gps, {
+    x: base.point.x + 3,
+    z: base.point.z + 4,
+    accuracy: 8,
+  });
+  assert.equal(row.takenAt, "2026-11-13T00:00:00Z");
+  assert.equal(gpsDistance(sanitizeReports([row])[0]), 5);
+  assert.equal(gpsDistance(base), null);
+  // 더 최근이어도 촬영 위치가 30m 밖인 사진보다, 가까이서 찍은 사진을 대표로 고릅니다.
+  const near = reportFor(edge, {
+      id: "near",
+      photoPath: "p/near.jpg",
+      createdAt: "2026-11-01T00:00:00Z",
+      gps: { x: base.point.x + 2, z: base.point.z, accuracy: 6 },
+    }),
+    far = reportFor(edge, {
+      id: "far",
+      photoPath: "p/far.jpg",
+      createdAt: "2026-11-09T00:00:00Z",
+      gps: {
+        x: base.point.x + CLUSTER_RADIUS + 10,
+        z: base.point.z,
+        accuracy: 6,
+      },
+    });
+  assert.equal(pickCover([near, far]).id, "near");
 });

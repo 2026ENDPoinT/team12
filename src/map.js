@@ -997,6 +997,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     setReports,
     setWorks,
     setReporting,
+    previewReportSelection,
     clearReportSelection,
     setUserLocation,
     zoom,

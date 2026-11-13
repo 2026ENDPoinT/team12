@@ -3462,3 +3462,42 @@ body.exploring .header {
   text-decoration: underline;
   cursor: pointer;
 }
+/* 현장 신고: 앱 안 카메라 */
+.report-camera,
+#report-photo-preview {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  margin-top: 6px;
+  border-radius: 8px;
+  background: #1d1a22;
+  object-fit: cover;
+}
+.report-camera[hidden],
+#report-photo-preview[hidden] {
+  display: none;
+}
+.camera-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.camera-actions button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #b48025;
+  background: #fff;
+  color: #8a611f;
+  font-size: 12px;
+  font-weight: 600;
+}
+.camera-actions #report-shoot {
+  background: #b48025;
+  color: #fff;
+}
+.report-camera-error {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #b3362c;
+}
