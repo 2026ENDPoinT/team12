@@ -1007,9 +1007,9 @@ $("#v2-minus").onclick = () => map?.zoom(1 / 1.18);
 $("#v2-locate").onclick = () => $("#gps-toggle").click();
 $("#v2-reset").onclick = () => setDimension(false);
 
-// ===== 페이지 확대를 막습니다(표지·학교 검색 화면과 지도 화면 모두) =====
-// 오므리기/벌리기(Ctrl+휠)나 Ctrl·⌘ +/−를 누르면 브라우저가 페이지 전체를 확대해
-// 메뉴·패널이 커지고 화면 밖으로 밀려납니다. 페이지는 항상 같은 크기로 두고,
+// ===== 트랙패드 확대 제스처로 페이지가 커지지 않게 합니다(표지·지도 화면 모두) =====
+// 트랙패드 오므리기/벌리기(Ctrl+휠)를 그냥 두면 브라우저가 페이지 전체를 확대해
+// 메뉴·패널이 커지고 화면 밖으로 밀려납니다. 이 제스처로는 페이지를 확대하지 않고,
 // 지도 화면에서는 그 확대를 지도로 보냅니다.
 const onMapView = () => !$("#map-view").hidden;
 const mapCanvas = () => $("#campus-map canvas");
@@ -1049,20 +1049,7 @@ for (const type of ["gesturestart", "gesturechange", "gestureend"])
       pageGestureScale = e.scale;
     } else pageGestureScale = null;
   });
-// Ctrl·⌘ + / −: 페이지 확대를 막고, 지도 화면이면 지도를 확대·축소합니다.
-// Ctrl·⌘ 0은 표지 화면에서는 브라우저에 맡겨(이미 확대된 페이지를 되돌릴 수 있게) 두고,
-// 지도 화면에서는 지도 처음 시점으로 씁니다.
-document.addEventListener("keydown", (e) => {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-  const zoom = { "+": 1.18, "=": 1.18, "-": 1 / 1.18, _: 1 / 1.18 }[e.key];
-  if (zoom) {
-    e.preventDefault();
-    if (onMapView()) map?.zoom(zoom);
-  } else if (e.key === "0" && onMapView()) {
-    e.preventDefault();
-    map?.reset();
-  }
-});
+// Ctrl·⌘ + / − / 0 키 확대는 막지 않습니다(글자를 키워 보는 접근성 기능, 사용자 결정).
 
 // ===== GPS 현재 위치 추적 =====
 // 공개 데이터의 중심 위·경도를 로컬 미터 좌표로 변환합니다.
