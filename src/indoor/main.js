@@ -119,7 +119,17 @@ function setStart(s) {
 }
 
 // ---------- 층 버튼
+const overviewButton = $("#floor-overview");
+function setFloorOverview(open) {
+  view.setFloorOverview(open);
+  document.body.classList.toggle("floor-overview-open", open);
+  overviewButton.setAttribute("aria-pressed", String(open));
+  overviewButton.lastElementChild.textContent = open ? "현재 층" : "전체 층";
+}
+overviewButton.onclick = () => setFloorOverview(!view.floorOverview);
+
 function buildFloors() {
+  overviewButton.hidden = false;
   const nav = $("#floors");
   nav.replaceChildren();
   for (const n of [...indoor.floors].sort((a, b) => b - a)) {
@@ -132,6 +142,7 @@ function buildFloors() {
   }
 }
 function goFloor(n) {
+  if (view.floorOverview) setFloorOverview(false);
   if (n === view.floor) return;
   const up = n > view.floor;
   view.setFloor(n, false, true);
@@ -205,8 +216,10 @@ function showPlace(d) {
     .join(" · ");
   setSheet("place");
   const p = d.center || d.doors[0];
-  if (d.f !== view.floor) goFloor(d.f);
-  view.focus(p[0], p[1], d.f, 48);
+  if (!view.floorOverview) {
+    if (d.f !== view.floor) goFloor(d.f);
+    view.focus(p[0], p[1], d.f, 48);
+  }
   syncFloors();
 }
 $("#place-close").onclick = () => {
@@ -263,6 +276,7 @@ function remember(d) {
 // ---------- 검색
 function openSearch(mode = "dest", focus = true) {
   if (!indoor) return;
+  setFloorOverview(true);
   state.searchMode = mode;
   $("#search").hidden = false;
   document.body.classList.add("searching");
@@ -530,7 +544,7 @@ function computeRoute() {
   renderSteps();
   $("#sheet").scrollTop = 0;
   view.showRoute(r, d, state.steps);
-  if (view.floor !== r.pts[0].f) view.setFloor(r.pts[0].f);
+  if (!view.floorOverview && view.floor !== r.pts[0].f) view.setFloor(r.pts[0].f);
   view.setMe(state.start);
   frameRoute();
   syncFloors();
@@ -543,6 +557,7 @@ function sheetCover() {
       : $("#sheet").offsetHeight;
 }
 function frameRoute() {
+  if (view.floorOverview) return;
   const P = state.route.pts.filter((p) => p.f === view.floor);
   const use = P.length ? P : state.route.pts;
   let x0 = Infinity,
@@ -644,7 +659,7 @@ function focusStep(i) {
   for (const li of $$("#route-steps li"))
     li.classList.toggle("on", +li.dataset.i === i);
   view.highlightStep(i);
-  if (st.f !== view.floor) goFloor(st.f);
+  if (view.floorOverview || st.f !== view.floor) goFloor(st.f);
   view.focus(st.at[0], st.at[1], st.f, 32);
   syncFloors();
   if (innerWidth < 820) $("#sheet").classList.add("collapsed");
@@ -706,6 +721,7 @@ $("#walk-open").onclick = async () => {
   $("#walk").hidden = false;
   document.body.classList.add("walking");
   view.resize();
+  if (view.floorOverview) setFloorOverview(false);
   for (const s of ["#sheet", ".topbar", "#floor-controls"]) $(s).hidden = true;
   view.setFirstPerson(true);
   syncWalkButtons();

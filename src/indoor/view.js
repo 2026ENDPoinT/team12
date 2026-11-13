@@ -77,6 +77,10 @@ export function createView(el, indoor, { onPick } = {}) {
     dirty = true;
   const nodes = {};
   const floorBounds = new Map();
+  const meshBaseHeight = new Map();
+  let floorOverview = false;
+  let overviewCamera = null;
+  const overviewCenter = (Math.min(...indoor.floors) + Math.max(...indoor.floors)) / 2;
   const labels = [];
   const routeGroup = new THREE.Group();
   scene.add(routeGroup);
@@ -162,6 +166,7 @@ export function createView(el, indoor, { onPick } = {}) {
           { elevDoors: elevDoorsOf(+o.name.slice(1)) },
         );
       nodes[o.name] = o;
+      meshBaseHeight.set(o, o.position.y);
     });
     scene.add(g.scene);
     g.scene.updateMatrixWorld(true);
@@ -287,7 +292,7 @@ export function createView(el, indoor, { onPick } = {}) {
           d.f === walkPose.f &&
           Math.hypot(p[0] - walkPose.x, p[1] - walkPose.y) < 12;
       } else
-        o.visible =
+        o.visible = floorOverview ? sel :
           d.f === floor &&
           (sel ||
             d.cat === "toilet" ||
@@ -295,8 +300,18 @@ export function createView(el, indoor, { onPick } = {}) {
     }
   }
 
+  function overviewOffset(n) {
+    return (n - overviewCenter) * 22 - FL(n).z;
+  }
+
   function applyVisibility() {
-    facilityGroup.visible = !firstPerson;
+    facilityGroup.visible = !firstPerson && !floorOverview;
+    me.visible = !firstPerson && !floorOverview && me.userData.floor === floor;
+    for (const label of labels) {
+      label.userData.baseY ??= label.position.y;
+      label.position.y = label.userData.baseY +
+        (floorOverview ? overviewOffset(label.userData.d.f) : 0);
+    }
     for (const group of facilityGroup.children)
       group.visible = group.userData.f === floor;
     for (const key in nodes) {
@@ -304,16 +319,33 @@ export function createView(el, indoor, { onPick } = {}) {
         n = +key.slice(1);
       if (kind === "X") nodes[key].visible = firstPerson;
       else if (firstPerson) nodes[key].visible = Math.abs(n - walkPose.f) <= 1;
-      else nodes[key].visible = kind !== "C" && n === floor;
+      else nodes[key].visible = kind !== "C" && (floorOverview || n === floor);
+      const mesh = nodes[key];
+      mesh.position.y = meshBaseHeight.get(mesh) +
+        (floorOverview && Number.isFinite(n) && indoor.floors.includes(n)
+          ? overviewOffset(n)
+          : 0);
     }
     const mode = firstPerson ? "walk" : "map";
-    for (const c of routeGroup.children)
-      c.visible =
-        c.userData.mode && c.userData.mode !== mode
-          ? false
-          : firstPerson
-            ? !c.isCSS2DObject || routeTagSeen(c)
-            : c.userData.f == null || c.userData.f === floor;
+    for (const object of routeGroup.children) {
+      const { f, mode: routeMode, singleFloor, overviewLabel } = object.userData;
+      object.userData.baseY ??= object.position.y;
+      object.position.y =
+        object.userData.baseY +
+        (floorOverview && indoor.floors.includes(f) ? overviewOffset(f) : 0);
+      if (floorOverview) {
+        object.visible =
+          overviewLabel ||
+          routeMode === "overview" ||
+          (routeMode === "map" && !singleFloor);
+      } else {
+        object.visible =
+          (!routeMode || routeMode === mode) &&
+          (firstPerson
+            ? !object.isCSS2DObject || routeTagSeen(object)
+            : f == null || f === floor);
+      }
+    }
     routeDepth();
     dirty = true;
   }
@@ -368,6 +400,52 @@ export function createView(el, indoor, { onPick } = {}) {
     dirty = true;
   }
   ctl.addEventListener("start", () => (floorAnim = null)); // 사용자가 만지면 바로 멈춤
+  function frameOverview(reduced) {
+    const target = T(0, -1, 0);
+    const direction = el.clientWidth < el.clientHeight
+      ? new THREE.Vector3(-1, 0.95, 0.4)
+      : new THREE.Vector3(-0.65, 0.8, 1);
+    const distance = Math.max(195, 48 / Math.tan(Math.atan(Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * cam.aspect)));
+    ctl.maxDistance = Math.max(ctl.maxDistance, distance * 1.2);
+    flyTo(target.clone().add(direction.setLength(distance)), target, reduced ? 1 : 480);
+  }
+
+  function setFloorOverview(open) {
+    if (open === floorOverview) return;
+    floorOverview = open;
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (open) {
+      overviewCamera = {
+        position: cam.position.clone(),
+        target: ctl.target.clone(),
+        maxDistance: ctl.maxDistance,
+        mouseButtons: ctl.mouseButtons,
+        touches: ctl.touches,
+      };
+      ctl.mouseButtons = {
+        ...ctl.mouseButtons,
+        LEFT: THREE.MOUSE.ROTATE,
+        RIGHT: THREE.MOUSE.PAN,
+      };
+      ctl.touches = {
+        ONE: THREE.TOUCH.ROTATE,
+        TWO: THREE.TOUCH.DOLLY_PAN,
+      };
+      frameOverview(reduced);
+    } else {
+      // Restore synchronously so selecting a floor can immediately start its own transition.
+      floorAnim = null;
+      ctl.maxDistance = overviewCamera.maxDistance;
+      ctl.mouseButtons = overviewCamera.mouseButtons;
+      ctl.touches = overviewCamera.touches;
+      cam.position.copy(overviewCamera.position);
+      ctl.target.copy(overviewCamera.target);
+      ctl.update();
+    }
+    applyVisibility();
+    updateLabels();
+  }
+
   function setFloor(n, reframe = false, animate = false) {
     const prevZ = FL(floor).z;
     floor = n;
@@ -393,6 +471,7 @@ export function createView(el, indoor, { onPick } = {}) {
   }
   // 현재 층 모델의 실제 중심·크기로 맞춤. 초기화 시 기울기와 방향도 복원합니다.
   function frame({ resetOrientation = true, animate = false } = {}) {
+    if (floorOverview) return frameOverview(!animate || matchMedia("(prefers-reduced-motion: reduce)").matches);
     const bounds = floorBounds.get(floor);
     if (!bounds) return;
     const direction = resetOrientation
@@ -480,7 +559,7 @@ export function createView(el, indoor, { onPick } = {}) {
     (e) => (down = [e.clientX, e.clientY, performance.now()]),
   );
   renderer.domElement.addEventListener("pointerup", (e) => {
-    if (!down || firstPerson) return;
+    if (!down || firstPerson || floorOverview) return;
     const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]);
     if (moved > 8 || performance.now() - down[2] > 450) return;
     const r = renderer.domElement.getBoundingClientRect();
@@ -651,6 +730,13 @@ export function createView(el, indoor, { onPick } = {}) {
     }
     dirty = true;
   }
+  const overviewConnectorMaterial = new THREE.LineDashedMaterial({
+    color: VIOLET,
+    dashSize: 1.2,
+    gapSize: 0.65,
+    toneMapped: false,
+  });
+
   function showRoute(route, dest, steps = []) {
     clearRoute();
     selectedKey = dest?.key || null;
@@ -669,6 +755,27 @@ export function createView(el, indoor, { onPick } = {}) {
       }
       cur.pts.push([p.x, p.y, p.z + 0.08]);
     }
+    // Draw overview segments from the actual walking legs. Vertical legs
+    // get a dashed connector across the visual gap between floors.
+    for (const leg of route.legs) {
+      if (leg.kind === "walk") {
+        const pts = leg.pts.map(([x, y]) => [x, y, FL(leg.f).z + 0.1]);
+        const line = new THREE.Mesh(ribbon(pts, 1), matMain);
+        line.userData = { f: leg.f, mode: "overview" };
+        line.renderOrder = 2;
+        routeGroup.add(line);
+        continue;
+      }
+      const a = route.pts[leg.i0];
+      const b = route.pts[leg.i1];
+      const geo = new THREE.BufferGeometry().setFromPoints(
+        [a, b].map((p) => T(p.x, p.y, p.z + overviewOffset(p.f) + 0.1)),
+      );
+      const line = new THREE.Line(geo, overviewConnectorMaterial);
+      line.computeLineDistances();
+      line.userData.mode = "overview";
+      routeGroup.add(line);
+    }
     for (const r of runs) {
       if (r.pts.length < 2) continue;
       // Figma 실내 UI의 보라색 경로 띠와 흰색 방향 표시.
@@ -679,7 +786,7 @@ export function createView(el, indoor, { onPick } = {}) {
       ]) {
         const m = new THREE.Mesh(geo, mat);
         m.renderOrder = order;
-        m.userData = { f: r.f, mode: "map" };
+        m.userData = { f: r.f, mode: "map", singleFloor: true };
         routeGroup.add(m);
       }
       // 미리 걷기: 눈높이에서도 진행 방향을 읽을 수 있는 경로 띠.
@@ -770,7 +877,7 @@ export function createView(el, indoor, { onPick } = {}) {
         div.textContent = txt;
         const o = new CSS2DObject(div);
         o.position.copy(T(p[0], p[1], FL(f).z + 1.6));
-        o.userData.f = f;
+        o.userData = { f, overviewLabel: true };
         routeGroup.add(o);
       }
     }
@@ -930,7 +1037,8 @@ export function createView(el, indoor, { onPick } = {}) {
     return g;
   }
   function setMe(p) {
-    me.visible = !!p && p.f === floor && !firstPerson;
+    me.userData.floor = p?.f;
+    me.visible = !!p && p.f === floor && !firstPerson && !floorOverview;
     if (p) {
       me.position.copy(T(p.x, p.y, FL(p.f).z + 0.12));
       me.userData.cone.visible = p.yaw != null;
@@ -1022,6 +1130,10 @@ export function createView(el, indoor, { onPick } = {}) {
     load,
     resize,
     setFloor,
+    setFloorOverview,
+    get floorOverview() {
+      return floorOverview;
+    },
     get floor() {
       return floor;
     },
