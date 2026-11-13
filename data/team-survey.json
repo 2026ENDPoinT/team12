@@ -8,10 +8,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0795266,
-          37.629447
-        ]
+        "coordinates": [127.0795266, 37.629447]
       },
       "properties": {
         "id": "ent-gym-1",
@@ -27,10 +24,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0814906,
-          37.6293362
-        ]
+        "coordinates": [127.0814906, 37.6293362]
       },
       "properties": {
         "id": "ent-future-2",
@@ -47,18 +41,9 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0810401,
-            37.6294274
-          ],
-          [
-            127.0809713,
-            37.6291605
-          ],
-          [
-            127.081138,
-            37.6291439
-          ]
+          [127.0810401, 37.6294274],
+          [127.0809713, 37.6291605],
+          [127.081138, 37.6291439]
         ]
       },
       "properties": {
@@ -73,10 +58,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0811447,
-          37.6291517
-        ]
+        "coordinates": [127.0811447, 37.6291517]
       },
       "properties": {
         "id": "ent-future-7",
@@ -92,10 +74,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0815375,
-          37.629738
-        ]
+        "coordinates": [127.0815375, 37.629738]
       },
       "properties": {
         "id": "ent-future-3",
@@ -111,10 +90,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.081493,
-          37.6295762
-        ]
+        "coordinates": [127.081493, 37.6295762]
       },
       "properties": {
         "id": "ent-future-4",
@@ -131,14 +107,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.081493,
-            37.6295762
-          ],
-          [
-            127.0815376,
-            37.629738
-          ]
+          [127.081493, 37.6295762],
+          [127.0815376, 37.629738]
         ]
       },
       "properties": {
@@ -157,10 +127,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0807071,
-          37.6292542
-        ]
+        "coordinates": [127.0807071, 37.6292542]
       },
       "properties": {
         "id": "ent-way-470639154-1",
@@ -176,10 +143,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0807132,
-          37.6292959
-        ]
+        "coordinates": [127.0807132, 37.6292959]
       },
       "properties": {
         "id": "ent-way-470639154-2",
@@ -196,14 +160,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0807131,
-            37.6292959
-          ],
-          [
-            127.0807071,
-            37.6292542
-          ]
+          [127.0807131, 37.6292959],
+          [127.0807071, 37.6292542]
         ]
       },
       "properties": {
@@ -222,10 +180,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0803829,
-          37.6291998
-        ]
+        "coordinates": [127.0803829, 37.6291998]
       },
       "properties": {
         "id": "ent-way-470639154-3",
@@ -241,10 +196,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0804276,
-          37.6293996
-        ]
+        "coordinates": [127.0804276, 37.6293996]
       },
       "properties": {
         "id": "ent-way-470639154-4",
@@ -261,14 +213,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0803829,
-            37.6291998
-          ],
-          [
-            127.0804277,
-            37.6293996
-          ]
+          [127.0803829, 37.6291998],
+          [127.0804277, 37.6293996]
         ]
       },
       "properties": {
@@ -287,10 +233,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0800892,
-          37.6293603
-        ]
+        "coordinates": [127.0800892, 37.6293603]
       },
       "properties": {
         "id": "ent-way-470639154-5",
@@ -306,10 +249,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0800996,
-          37.6293979
-        ]
+        "coordinates": [127.0800996, 37.6293979]
       },
       "properties": {
         "id": "ent-way-470639154-6",
@@ -326,14 +266,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0800996,
-            37.6293979
-          ],
-          [
-            127.0800891,
-            37.6293603
-          ]
+          [127.0800996, 37.6293979],
+          [127.0800891, 37.6293603]
         ]
       },
       "properties": {
@@ -352,10 +286,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0797859,
-          37.6291987
-        ]
+        "coordinates": [127.0797859, 37.6291987]
       },
       "properties": {
         "id": "ent-gym-2",
@@ -371,10 +302,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0791654,
-          37.6292914
-        ]
+        "coordinates": [127.0791654, 37.6292914]
       },
       "properties": {
         "id": "ent-gym-3",
@@ -390,10 +318,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0807864,
-          37.6295839
-        ]
+        "coordinates": [127.0807864, 37.6295839]
       },
       "properties": {
         "id": "ent-way-382499351-1",
@@ -409,10 +334,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0803119,
-          37.6298154
-        ]
+        "coordinates": [127.0803119, 37.6298154]
       },
       "properties": {
         "id": "ent-way-382499351-2",
@@ -428,10 +350,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0808883,
-          37.6300096
-        ]
+        "coordinates": [127.0808883, 37.6300096]
       },
       "properties": {
         "id": "ent-way-382499351-3",
@@ -447,10 +366,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0811056,
-          37.6302605
-        ]
+        "coordinates": [127.0811056, 37.6302605]
       },
       "properties": {
         "id": "ent-way-382499351-4",
@@ -466,10 +382,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0804779,
-          37.6303598
-        ]
+        "coordinates": [127.0804779, 37.6303598]
       },
       "properties": {
         "id": "ent-way-382499351-5",
@@ -485,10 +398,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0798316,
-          37.6296995
-        ]
+        "coordinates": [127.0798316, 37.6296995]
       },
       "properties": {
         "id": "ent-cube-1",
@@ -504,10 +414,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0795788,
-          37.6299079
-        ]
+        "coordinates": [127.0795788, 37.6299079]
       },
       "properties": {
         "id": "ent-cube-2",
@@ -523,10 +430,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0798784,
-          37.6300017
-        ]
+        "coordinates": [127.0798784, 37.6300017]
       },
       "properties": {
         "id": "ent-cube-3",
@@ -543,68 +447,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0798316,
-            37.6296995
-          ],
-          [
-            127.0798784,
-            37.6300017
-          ]
-        ]
-      },
-      "properties": {
-        "id": "pass-6",
-        "campus_id": "SEOULTECH",
-        "feature_type": "building_passage",
-        "building_id": "cube",
-        "from": "ent-cube-1",
-        "to": "ent-cube-3",
-        "length_m": 34,
-        "source_kind": "team_input",
-        "verification_status": "candidate"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            127.0798316,
-            37.6296995
-          ],
-          [
-            127.0795788,
-            37.6299079
-          ]
-        ]
-      },
-      "properties": {
-        "id": "pass-7",
-        "campus_id": "SEOULTECH",
-        "feature_type": "building_passage",
-        "building_id": "cube",
-        "from": "ent-cube-1",
-        "to": "ent-cube-2",
-        "length_m": 32,
-        "source_kind": "team_input",
-        "verification_status": "candidate"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            127.0795788,
-            37.6299079
-          ],
-          [
-            127.0798784,
-            37.6300017
-          ]
+          [127.0795788, 37.6299079],
+          [127.0798784, 37.6300017]
         ]
       },
       "properties": {
@@ -623,10 +467,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0799501,
-          37.6309711
-        ]
+        "coordinates": [127.0799501, 37.6309711]
       },
       "properties": {
         "id": "ent-way-579071105-1",
@@ -642,10 +483,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0807249,
-          37.6310379
-        ]
+        "coordinates": [127.0807249, 37.6310379]
       },
       "properties": {
         "id": "ent-way-579071105-2",
@@ -662,14 +500,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0807249,
-            37.6310379
-          ],
-          [
-            127.0799501,
-            37.6309711
-          ]
+          [127.0807249, 37.6310379],
+          [127.0799501, 37.6309711]
         ]
       },
       "properties": {
@@ -689,14 +521,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0804778,
-            37.6303598
-          ],
-          [
-            127.0811056,
-            37.6302605
-          ]
+          [127.0804778, 37.6303598],
+          [127.0811056, 37.6302605]
         ]
       },
       "properties": {
@@ -716,14 +542,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0811056,
-            37.6302605
-          ],
-          [
-            127.0808883,
-            37.6300096
-          ]
+          [127.0811056, 37.6302605],
+          [127.0808883, 37.6300096]
         ]
       },
       "properties": {
@@ -743,14 +563,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0808883,
-            37.6300096
-          ],
-          [
-            127.0807864,
-            37.6295839
-          ]
+          [127.0808883, 37.6300096],
+          [127.0807864, 37.6295839]
         ]
       },
       "properties": {
@@ -768,38 +582,8 @@
     {
       "type": "Feature",
       "geometry": {
-        "type": "LineString",
-        "coordinates": [
-          [
-            127.0803119,
-            37.6298154
-          ],
-          [
-            127.0807864,
-            37.6295839
-          ]
-        ]
-      },
-      "properties": {
-        "id": "pass-13",
-        "campus_id": "SEOULTECH",
-        "feature_type": "building_passage",
-        "building_id": "way-382499351",
-        "from": "ent-way-382499351-2",
-        "to": "ent-way-382499351-1",
-        "length_m": 49,
-        "source_kind": "team_input",
-        "verification_status": "candidate"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0817251,
-          37.6292447
-        ]
+        "coordinates": [127.0817251, 37.6292447]
       },
       "properties": {
         "id": "ent-future-1",
@@ -816,14 +600,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0814907,
-            37.6293362
-          ],
-          [
-            127.0817251,
-            37.6292447
-          ]
+          [127.0814907, 37.6293362],
+          [127.0817251, 37.6292447]
         ]
       },
       "properties": {
@@ -843,14 +621,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0814907,
-            37.6293362
-          ],
-          [
-            127.0815376,
-            37.629738
-          ]
+          [127.0814907, 37.6293362],
+          [127.0815376, 37.629738]
         ]
       },
       "properties": {
@@ -870,14 +642,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0817251,
-            37.6292447
-          ],
-          [
-            127.0815376,
-            37.629738
-          ]
+          [127.0817251, 37.6292447],
+          [127.0815376, 37.629738]
         ]
       },
       "properties": {
@@ -896,10 +662,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0812076,
-          37.6307828
-        ]
+        "coordinates": [127.0812076, 37.6307828]
       },
       "properties": {
         "id": "ent-mugung-1",
@@ -915,10 +678,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0816314,
-          37.6308326
-        ]
+        "coordinates": [127.0816314, 37.6308326]
       },
       "properties": {
         "id": "ent-mugung-3",
@@ -935,14 +695,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0814964,
-            37.6305131
-          ],
-          [
-            127.0815268,
-            37.6306578
-          ]
+          [127.0814964, 37.6305131],
+          [127.0815268, 37.6306578]
         ]
       },
       "properties": {
@@ -957,10 +711,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0814974,
-          37.6305143
-        ]
+        "coordinates": [127.0814974, 37.6305143]
       },
       "properties": {
         "id": "ent-vw-99-1",
@@ -976,10 +727,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0815294,
-          37.6306573
-        ]
+        "coordinates": [127.0815294, 37.6306573]
       },
       "properties": {
         "id": "ent-mugung-4",
@@ -995,10 +743,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0814568,
-          37.6303537
-        ]
+        "coordinates": [127.0814568, 37.6303537]
       },
       "properties": {
         "id": "ent-vw-99-2",
@@ -1015,14 +760,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0816314,
-            37.6308326
-          ],
-          [
-            127.0815294,
-            37.6306573
-          ]
+          [127.0816314, 37.6308326],
+          [127.0815294, 37.6306573]
         ]
       },
       "properties": {
@@ -1042,14 +781,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0812077,
-            37.6307828
-          ],
-          [
-            127.0815294,
-            37.6306573
-          ]
+          [127.0812077, 37.6307828],
+          [127.0815294, 37.6306573]
         ]
       },
       "properties": {
@@ -1069,14 +802,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0816314,
-            37.6308326
-          ],
-          [
-            127.0812077,
-            37.6307828
-          ]
+          [127.0816314, 37.6308326],
+          [127.0812077, 37.6307828]
         ]
       },
       "properties": {
@@ -1096,14 +823,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0814975,
-            37.6305143
-          ],
-          [
-            127.0814568,
-            37.6303537
-          ]
+          [127.0814975, 37.6305143],
+          [127.0814568, 37.6303537]
         ]
       },
       "properties": {
@@ -1123,14 +844,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0797859,
-            37.6291987
-          ],
-          [
-            127.0791654,
-            37.6292914
-          ]
+          [127.0797859, 37.6291987],
+          [127.0791654, 37.6292914]
         ]
       },
       "properties": {
@@ -1150,14 +865,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0795265,
-            37.629447
-          ],
-          [
-            127.0791654,
-            37.6292914
-          ]
+          [127.0795265, 37.629447],
+          [127.0791654, 37.6292914]
         ]
       },
       "properties": {
@@ -1177,14 +886,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0795265,
-            37.629447
-          ],
-          [
-            127.0797859,
-            37.6291987
-          ]
+          [127.0795265, 37.629447],
+          [127.0797859, 37.6291987]
         ]
       },
       "properties": {
@@ -1203,10 +906,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0788564,
-          37.6308295
-        ]
+        "coordinates": [127.0788564, 37.6308295]
       },
       "properties": {
         "id": "ent-memorial-1",
@@ -1222,10 +922,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0783686,
-          37.6306831
-        ]
+        "coordinates": [127.0783686, 37.6306831]
       },
       "properties": {
         "id": "ent-memorial-2",
@@ -1242,14 +939,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0781007,
-            37.6304812
-          ],
-          [
-            127.0781233,
-            37.6307217
-          ]
+          [127.0781007, 37.6304812],
+          [127.0781233, 37.6307217]
         ]
       },
       "properties": {
@@ -1265,14 +956,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0788564,
-            37.6308295
-          ],
-          [
-            127.0783686,
-            37.6306831
-          ]
+          [127.0788564, 37.6308295],
+          [127.0783686, 37.6306831]
         ]
       },
       "properties": {
@@ -1291,10 +976,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0794716,
-          37.6307802
-        ]
+        "coordinates": [127.0794716, 37.6307802]
       },
       "properties": {
         "id": "ent-student2-1",
@@ -1310,10 +992,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0791389,
-          37.63088
-        ]
+        "coordinates": [127.0791389, 37.63088]
       },
       "properties": {
         "id": "ent-student2-2",
@@ -1329,10 +1008,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0760652,
-          37.6310994
-        ]
+        "coordinates": [127.0760652, 37.6310994]
       },
       "properties": {
         "id": "ent-frontier-1",
@@ -1349,14 +1025,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0760652,
-            37.6310994
-          ],
-          [
-            127.0760864,
-            37.631093
-          ]
+          [127.0760652, 37.6310994],
+          [127.0760864, 37.631093]
         ]
       },
       "properties": {
@@ -1371,10 +1041,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0761284,
-          37.6312852
-        ]
+        "coordinates": [127.0761284, 37.6312852]
       },
       "properties": {
         "id": "ent-frontier-2",
@@ -1390,10 +1057,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0764777,
-          37.6313372
-        ]
+        "coordinates": [127.0764777, 37.6313372]
       },
       "properties": {
         "id": "ent-frontier-3",
@@ -1409,10 +1073,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0759043,
-          37.6313257
-        ]
+        "coordinates": [127.0759043, 37.6313257]
       },
       "properties": {
         "id": "ent-frontier-4",
@@ -1428,10 +1089,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.076514,
-          37.6315001
-        ]
+        "coordinates": [127.076514, 37.6315001]
       },
       "properties": {
         "id": "ent-frontier-5",
@@ -1448,14 +1106,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0759043,
-            37.6313257
-          ],
-          [
-            127.0761284,
-            37.6312852
-          ]
+          [127.0759043, 37.6313257],
+          [127.0761284, 37.6312852]
         ]
       },
       "properties": {
@@ -1475,14 +1127,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0760652,
-            37.6310994
-          ],
-          [
-            127.0759043,
-            37.6313257
-          ]
+          [127.0760652, 37.6310994],
+          [127.0759043, 37.6313257]
         ]
       },
       "properties": {
@@ -1502,14 +1148,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0760652,
-            37.6310994
-          ],
-          [
-            127.0761284,
-            37.6312852
-          ]
+          [127.0760652, 37.6310994],
+          [127.0761284, 37.6312852]
         ]
       },
       "properties": {
@@ -1529,14 +1169,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0764777,
-            37.6313372
-          ],
-          [
-            127.0765139,
-            37.6315001
-          ]
+          [127.0764777, 37.6313372],
+          [127.0765139, 37.6315001]
         ]
       },
       "properties": {
@@ -1556,14 +1190,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0814939,
-            37.6308569
-          ],
-          [
-            127.0815261,
-            37.631037
-          ]
+          [127.0814939, 37.6308569],
+          [127.0815261, 37.631037]
         ]
       },
       "properties": {
@@ -1578,10 +1206,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0814928,
-          37.6308539
-        ]
+        "coordinates": [127.0814928, 37.6308539]
       },
       "properties": {
         "id": "ent-mugung-2",
@@ -1598,14 +1223,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0814928,
-            37.6308539
-          ],
-          [
-            127.0815294,
-            37.6306573
-          ]
+          [127.0814928, 37.6308539],
+          [127.0815294, 37.6306573]
         ]
       },
       "properties": {
@@ -1625,14 +1244,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0814928,
-            37.6308539
-          ],
-          [
-            127.0812077,
-            37.6307828
-          ]
+          [127.0814928, 37.6308539],
+          [127.0812077, 37.6307828]
         ]
       },
       "properties": {
@@ -1652,14 +1265,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0810836,
-            37.6307947
-          ],
-          [
-            127.0812077,
-            37.6307828
-          ]
+          [127.0810836, 37.6307947],
+          [127.0812077, 37.6307828]
         ]
       },
       "properties": {
@@ -1675,22 +1282,10 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0812048,
-            37.6307758
-          ],
-          [
-            127.0811714,
-            37.6306792
-          ],
-          [
-            127.0815189,
-            37.6306202
-          ],
-          [
-            127.0814964,
-            37.6305131
-          ]
+          [127.0812048, 37.6307758],
+          [127.0811714, 37.6306792],
+          [127.0815189, 37.6306202],
+          [127.0814964, 37.6305131]
         ]
       },
       "properties": {
@@ -1706,18 +1301,9 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0786977,
-            37.6320453
-          ],
-          [
-            127.0786977,
-            37.6320453
-          ],
-          [
-            127.0787729,
-            37.6320283
-          ]
+          [127.0786977, 37.6320453],
+          [127.0786977, 37.6320453],
+          [127.0787729, 37.6320283]
         ]
       },
       "properties": {
@@ -1733,14 +1319,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0793118,
-            37.6319912
-          ],
-          [
-            127.0793695,
-            37.6319363
-          ]
+          [127.0793118, 37.6319912],
+          [127.0793695, 37.6319363]
         ]
       },
       "properties": {
@@ -1755,10 +1335,7 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [
-          127.0802756,
-          37.631708
-        ]
+        "coordinates": [127.0802756, 37.631708]
       },
       "properties": {
         "id": "ent-admin-1",
@@ -1775,14 +1352,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0797049,
-            37.6314606
-          ],
-          [
-            127.0796494,
-            37.6313236
-          ]
+          [127.0797049, 37.6314606],
+          [127.0796494, 37.6313236]
         ]
       },
       "properties": {
@@ -1798,14 +1369,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0795814,
-            37.6314209
-          ],
-          [
-            127.0796765,
-            37.6313906
-          ]
+          [127.0795814, 37.6314209],
+          [127.0796765, 37.6313906]
         ]
       },
       "properties": {
@@ -1821,14 +1386,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.079595,
-            37.6313461
-          ],
-          [
-            127.0796267,
-            37.63132
-          ]
+          [127.079595, 37.6313461],
+          [127.0796267, 37.63132]
         ]
       },
       "properties": {
@@ -1844,18 +1403,9 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0799235,
-            37.6314425
-          ],
-          [
-            127.0799208,
-            37.6313877
-          ],
-          [
-            127.0802441,
-            37.631411
-          ]
+          [127.0799235, 37.6314425],
+          [127.0799208, 37.6313877],
+          [127.0802441, 37.631411]
         ]
       },
       "properties": {
@@ -1871,14 +1421,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0802509,
-            37.6313705
-          ],
-          [
-            127.0800765,
-            37.6313669
-          ]
+          [127.0802509, 37.6313705],
+          [127.0800765, 37.6313669]
         ]
       },
       "properties": {
@@ -1894,14 +1438,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0802045,
-            37.6313281
-          ],
-          [
-            127.080081,
-            37.6313209
-          ]
+          [127.0802045, 37.6313281],
+          [127.080081, 37.6313209]
         ]
       },
       "properties": {
@@ -1917,14 +1455,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0798635,
-            37.6313542
-          ],
-          [
-            127.0798941,
-            37.6314389
-          ]
+          [127.0798635, 37.6313542],
+          [127.0798941, 37.6314389]
         ]
       },
       "properties": {
@@ -1940,14 +1472,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0787634,
-            37.631702
-          ],
-          [
-            127.0788416,
-            37.6316813
-          ]
+          [127.0787634, 37.631702],
+          [127.0788416, 37.6316813]
         ]
       },
       "properties": {
@@ -1963,14 +1489,8 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0787729,
-            37.6320283
-          ],
-          [
-            127.0791169,
-            37.6316822
-          ]
+          [127.0787729, 37.6320283],
+          [127.0791169, 37.6316822]
         ]
       },
       "properties": {
@@ -1986,18 +1506,9 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0791169,
-            37.6316822
-          ],
-          [
-            127.0791248,
-            37.6316372
-          ],
-          [
-            127.0791441,
-            37.6316002
-          ]
+          [127.0791169, 37.6316822],
+          [127.0791248, 37.6316372],
+          [127.0791441, 37.6316002]
         ]
       },
       "properties": {
@@ -2013,20 +1524,1076 @@
       "geometry": {
         "type": "LineString",
         "coordinates": [
-          [
-            127.0787464,
-            37.631657
-          ],
-          [
-            127.0788235,
-            37.6316381
-          ]
+          [127.0787464, 37.631657],
+          [127.0788235, 37.6316381]
         ]
       },
       "properties": {
         "id": "path-20",
         "campus_id": "SEOULTECH",
         "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0791389, 37.63088],
+          [127.0794716, 37.6307802]
+        ]
+      },
+      "properties": {
+        "id": "pass-6",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "student2",
+        "from": "ent-student2-2",
+        "to": "ent-student2-1",
+        "length_m": 31,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0791289, 37.6309485],
+          [127.0791389, 37.63088]
+        ]
+      },
+      "properties": {
+        "id": "path-21",
+        "campus_id": "SEOULTECH",
+        "feature_type": "stairs",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.077072, 37.6323309],
+          [127.0770709, 37.6323048]
+        ]
+      },
+      "properties": {
+        "id": "path-22",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0766956, 37.6332542]
+      },
+      "properties": {
+        "id": "ent-library-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "library",
+        "name": "중앙도서관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0768209, 37.6328275]
+      },
+      "properties": {
+        "id": "ent-library-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "library",
+        "name": "중앙도서관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0764587, 37.6337633]
+      },
+      "properties": {
+        "id": "ent-way-382499356-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-382499356",
+        "name": "중앙도서관 별관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0767032, 37.6341079]
+      },
+      "properties": {
+        "id": "ent-student-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "student",
+        "name": "학생회관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0769543, 37.6340903]
+      },
+      "properties": {
+        "id": "ent-student-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "student",
+        "name": "학생회관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0773447, 37.6341626]
+      },
+      "properties": {
+        "id": "ent-student-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "student",
+        "name": "학생회관 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0770877, 37.6344282]
+      },
+      "properties": {
+        "id": "ent-way-470633638-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-470633638",
+        "name": "누리학사 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.076992, 37.6343732],
+          [127.0770207, 37.6344432]
+        ]
+      },
+      "properties": {
+        "id": "path-23",
+        "campus_id": "SEOULTECH",
+        "feature_type": "stairs",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0770207, 37.6344432],
+          [127.0771484, 37.634746]
+        ]
+      },
+      "properties": {
+        "id": "path-24",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0768341, 37.6352509]
+      },
+      "properties": {
+        "id": "ent-eoui-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "eoui",
+        "name": "어의관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0766195, 37.6353408]
+      },
+      "properties": {
+        "id": "ent-eoui-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "eoui",
+        "name": "어의관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0763546, 37.63497],
+          [127.0764193, 37.6349686]
+        ]
+      },
+      "properties": {
+        "id": "path-25",
+        "campus_id": "SEOULTECH",
+        "feature_type": "stairs",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0764193, 37.6349686],
+          [127.0764489, 37.6350449]
+        ]
+      },
+      "properties": {
+        "id": "path-26",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0769003, 37.6357624]
+      },
+      "properties": {
+        "id": "ent-eoui-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "eoui",
+        "name": "어의관 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0764991, 37.6350317]
+      },
+      "properties": {
+        "id": "ent-eoui-4",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "eoui",
+        "name": "어의관 출입구 4",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0759506, 37.6354198]
+      },
+      "properties": {
+        "id": "ent-relation-8201876-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "relation-8201876",
+        "name": "성림학사 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0761608, 37.6362778]
+      },
+      "properties": {
+        "id": "ent-way-579071094-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-579071094",
+        "name": "불암학사 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0760199, 37.636185]
+      },
+      "properties": {
+        "id": "ent-way-579071094-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-579071094",
+        "name": "불암학사 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0759014, 37.6359241]
+      },
+      "properties": {
+        "id": "ent-way-382499375-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-382499375",
+        "name": "KB학사 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0759551, 37.6360499]
+      },
+      "properties": {
+        "id": "ent-way-382499375-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-382499375",
+        "name": "KB학사 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0763719, 37.6359397]
+      },
+      "properties": {
+        "id": "ent-way-382499375-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-382499375",
+        "name": "KB학사 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0763168, 37.6358138]
+      },
+      "properties": {
+        "id": "ent-way-382499375-4",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-382499375",
+        "name": "KB학사 출입구 4",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0759176, 37.636125],
+          [127.0759606, 37.6361142]
+        ]
+      },
+      "properties": {
+        "id": "path-27",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0766195, 37.6353408],
+          [127.0768341, 37.6352509]
+        ]
+      },
+      "properties": {
+        "id": "pass-7",
+        "campus_id": "SEOULTECH",
+        "feature_type": "building_passage",
+        "building_id": "eoui",
+        "from": "ent-eoui-2",
+        "to": "ent-eoui-1",
+        "length_m": 21,
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0779028, 37.635812]
+      },
+      "properties": {
+        "id": "ent-way-579071106-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-579071106",
+        "name": "수림학사 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0774929, 37.6348079]
+      },
+      "properties": {
+        "id": "ent-way-382499369-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-382499369",
+        "name": "국제관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0777475, 37.6349954]
+      },
+      "properties": {
+        "id": "ent-way-382499369-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-382499369",
+        "name": "국제관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0771796, 37.6348194],
+          [127.0770755, 37.6348469],
+          [127.077021, 37.6348618]
+        ]
+      },
+      "properties": {
+        "id": "path-28",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0775609, 37.6350878]
+      },
+      "properties": {
+        "id": "ent-way-382499369-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-382499369",
+        "name": "국제관 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0786087, 37.6351882]
+      },
+      "properties": {
+        "id": "ent-davinci-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "davinci",
+        "name": "다빈치관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.078279, 37.6353546]
+      },
+      "properties": {
+        "id": "ent-davinci-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "davinci",
+        "name": "다빈치관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0789226, 37.6355301]
+      },
+      "properties": {
+        "id": "ent-davinci-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "davinci",
+        "name": "다빈치관 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0791048, 37.6352106]
+      },
+      "properties": {
+        "id": "ent-way-579071098-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-579071098",
+        "name": "도예관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0797684, 37.6347178]
+      },
+      "properties": {
+        "id": "ent-creative-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "creative",
+        "name": "창조관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0793185, 37.6346648]
+      },
+      "properties": {
+        "id": "ent-creative-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "creative",
+        "name": "창조관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0807041, 37.6342536],
+          [127.0807679, 37.6343981]
+        ]
+      },
+      "properties": {
+        "id": "path-29",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0807757, 37.6344137]
+      },
+      "properties": {
+        "id": "ent-techno-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "techno",
+        "name": "서울테크노파크 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0806642, 37.6344414]
+      },
+      "properties": {
+        "id": "ent-techno-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "techno",
+        "name": "서울테크노파크 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0797864, 37.6342266],
+          [127.0797253, 37.634205]
+        ]
+      },
+      "properties": {
+        "id": "path-30",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0794964, 37.6340509],
+          [127.0798046, 37.6341662]
+        ]
+      },
+      "properties": {
+        "id": "path-31",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.080749, 37.633281]
+      },
+      "properties": {
+        "id": "ent-cheongun-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "cheongun",
+        "name": "청운관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0813011, 37.6332542]
+      },
+      "properties": {
+        "id": "ent-cheongun-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "cheongun",
+        "name": "청운관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0779469, 37.6321399]
+      },
+      "properties": {
+        "id": "ent-dasan-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "dasan",
+        "name": "다산관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0785537, 37.6323263]
+      },
+      "properties": {
+        "id": "ent-dasan-2",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "dasan",
+        "name": "다산관 출입구 2",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0781902, 37.6327021],
+          [127.0780696, 37.6323795]
+        ]
+      },
+      "properties": {
+        "id": "path-32",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0780645, 37.6323692]
+      },
+      "properties": {
+        "id": "ent-dasan-3",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "dasan",
+        "name": "다산관 출입구 3",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0778684, 37.6339076],
+          [127.0778832, 37.633904]
+        ]
+      },
+      "properties": {
+        "id": "path-33",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [127.0819684, 37.6315363]
+      },
+      "properties": {
+        "id": "ent-way-381113088-1",
+        "campus_id": "SEOULTECH",
+        "feature_type": "entrance",
+        "building_id": "way-381113088",
+        "name": "혜성관 출입구 1",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0821145, 37.6309542],
+          [127.0820862, 37.6309578]
+        ]
+      },
+      "properties": {
+        "id": "path-34",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0819129, 37.631047],
+          [127.0819127, 37.6309785]
+        ]
+      },
+      "properties": {
+        "id": "path-35",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0779931, 37.628818],
+          [127.0787703, 37.6290833]
+        ]
+      },
+      "properties": {
+        "id": "path-36",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0787703, 37.6290833],
+          [127.0788007, 37.629185]
+        ]
+      },
+      "properties": {
+        "id": "path-37",
+        "campus_id": "SEOULTECH",
+        "feature_type": "stairs",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0788007, 37.629185],
+          [127.0791169, 37.6293243]
+        ]
+      },
+      "properties": {
+        "id": "path-38",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0791809, 37.6294506],
+          [127.0791041, 37.6294619]
+        ]
+      },
+      "properties": {
+        "id": "path-39",
+        "campus_id": "SEOULTECH",
+        "feature_type": "stairs",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0790149, 37.6297964],
+          [127.0791766, 37.6297682]
+        ]
+      },
+      "properties": {
+        "id": "path-40",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0791766, 37.6297682],
+          [127.0791041, 37.6294619]
+        ]
+      },
+      "properties": {
+        "id": "path-41",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.078964, 37.6297766],
+          [127.0787047, 37.6290609]
+        ]
+      },
+      "properties": {
+        "id": "path-42",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0788619, 37.6294949],
+          [127.0788771, 37.6294291]
+        ]
+      },
+      "properties": {
+        "id": "path-43",
+        "campus_id": "SEOULTECH",
+        "feature_type": "stairs",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0788771, 37.6294291],
+          [127.0791169, 37.6293243]
+        ]
+      },
+      "properties": {
+        "id": "path-44",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0771219, 37.63021],
+          [127.0780497, 37.6299055],
+          [127.078964, 37.6297766]
+        ]
+      },
+      "properties": {
+        "id": "path-45",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.080311, 37.6298163],
+          [127.0802498, 37.6298262]
+        ]
+      },
+      "properties": {
+        "id": "path-46",
+        "campus_id": "SEOULTECH",
+        "feature_type": "stairs",
         "source_kind": "team_input",
         "verification_status": "candidate"
       }
