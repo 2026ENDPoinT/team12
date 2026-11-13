@@ -268,7 +268,10 @@ test("fast route keeps stairs for 1–2 floors, prefers elevator for 3+", () => 
       const from = { f, x: src.doors[0][0], y: src.doors[0][1] };
       const r = I.routeTo(from, d, { mode: "stairs" });
       assert.ok(r, `${src.key}→${d.key}`);
-      assert.ok(r.stairFloors < 3, `${src.key}→${d.key} stairs ${r.stairFloors}`);
+      assert.ok(
+        r.stairFloors < 3,
+        `${src.key}→${d.key} stairs ${r.stairFloors}`,
+      );
     }
   }
   // 1개 층은 계단 그대로
@@ -300,7 +303,8 @@ function walkShots(f, n) {
     const seq = list.slice(i, i + n);
     let ok = true;
     for (let j = 1; j < seq.length; j++)
-      if (Math.hypot(seq[j].x - seq[j - 1].x, seq[j].y - seq[j - 1].y) > 2.5) ok = false;
+      if (Math.hypot(seq[j].x - seq[j - 1].x, seq[j].y - seq[j - 1].y) > 2.5)
+        ok = false;
     const span = Math.hypot(seq.at(-1).x - seq[0].x, seq.at(-1).y - seq[0].y);
     if (ok && span > 8) return seq;
   }
@@ -330,13 +334,18 @@ test("AR particle filter tracks a walk on the expected floor with sensor offset"
       for (let i = 0; i < n; i++) pf.step(d / n, h - OFF);
     }
     // 바로 그 사진은 빼고(자기 자신과 비교 금지) 질의
-    est = pf.measure(stripQuery(s.k), s.yaw - OFF, 1, { exclude: new Set([s.k]) });
+    est = pf.measure(stripQuery(s.k), s.yaw - OFF, 1, {
+      exclude: new Set([s.k]),
+    });
     if (j >= 5 && est.ok) errs.push(Math.hypot(est.x - s.x, est.y - s.y));
     if (j >= 5 && est.ok) assert.equal(est.f, 1, "stays on the route floor");
   });
   assert.ok(errs.length >= 15, `tracked most of the walk (${errs.length})`);
   errs.sort((a, b) => a - b);
-  assert.ok(errs[errs.length >> 1] < 2, `median error ${errs[errs.length >> 1]}`);
+  assert.ok(
+    errs[errs.length >> 1] < 2,
+    `median error ${errs[errs.length >> 1]}`,
+  );
   // 센서 기준 차이(건물 − 센서)를 알아냄
   const dOff = Math.abs(((((est.off - OFF) % 360) + 540) % 360) - 180);
   assert.ok(dOff < 15, `heading offset error ${dOff}`);
@@ -358,26 +367,44 @@ test("AR particle filter accepts an external fix and floor override", () => {
 });
 
 // ---- AR 보정: 화각 자동 보정, 방향 기준 필터
-import { FovCalib, OffsetFilter, columnProfile, relTurn, manhattanAxis } from "../src/indoor/ar/calib.mjs";
+import {
+  FovCalib,
+  OffsetFilter,
+  columnProfile,
+  relTurn,
+  manhattanAxis,
+} from "../src/indoor/ar/calib.mjs";
 function levelR(hDeg, pDeg = 0) {
   const h = (hDeg * Math.PI) / 180,
     p = (pDeg * Math.PI) / 180;
   const f = [Math.cos(p) * Math.cos(h), Math.cos(p) * Math.sin(h), Math.sin(p)];
   const r = [Math.sin(h), -Math.cos(h), 0];
-  const d = [Math.sin(p) * Math.cos(h), Math.sin(p) * Math.sin(h), -Math.cos(p)];
+  const d = [
+    Math.sin(p) * Math.cos(h),
+    Math.sin(p) * Math.sin(h),
+    -Math.cos(p),
+  ];
   return [r[0], d[0], f[0], r[1], d[1], f[1], r[2], d[2], f[2]];
 }
 test("relTurn: turning right is positive yaw", () => {
   const t = relTurn(levelR(90), levelR(80));
-  assert.ok(Math.abs(t.yaw - 10) < 0.01 && Math.abs(t.pitch) < 0.01, JSON.stringify(t));
+  assert.ok(
+    Math.abs(t.yaw - 10) < 0.01 && Math.abs(t.pitch) < 0.01,
+    JSON.stringify(t),
+  );
 });
 test("FOV calibration recovers the camera field of view from panning", () => {
   for (const trueFov of [58, 66, 75]) {
-    const w = 165, h = 220, long = 220; // 세로 화면: 긴 변은 세로
+    const w = 165,
+      h = 220,
+      long = 220; // 세로 화면: 긴 변은 세로
     const f = long / 2 / Math.tan(((trueFov / 2) * Math.PI) / 180);
     // 세계 방위에 따라 밝기가 바뀌는 무늬 (불규칙)
     const tex = (deg) =>
-      128 + 60 * Math.sin(deg * 0.21) + 40 * Math.sin(deg * 0.57 + 1) + 25 * Math.sin(deg * 1.33 + 2);
+      128 +
+      60 * Math.sin(deg * 0.21) +
+      40 * Math.sin(deg * 0.57 + 1) +
+      25 * Math.sin(deg * 1.33 + 2);
     const cal = new FovCalib(long);
     let H = 120;
     for (let k = 0; k < 14; k++) {
@@ -403,61 +430,241 @@ test("offset filter ignores outliers and follows the consensus", () => {
   // ±180 경계
   const G = new OffsetFilter();
   for (const v of [178, -179, 179, -178, 177]) G.add(v);
-  assert.ok(Math.abs(((((G.value - 179) % 360) + 540) % 360) - 180) < 3, `wrap ${G.value}`);
+  assert.ok(
+    Math.abs(((((G.value - 179) % 360) + 540) % 360) - 180) < 3,
+    `wrap ${G.value}`,
+  );
 });
 
 // 복도(폭 3m, 높이 2.75m)를 광선으로 그린 합성 화면: 바닥 타일·걸레받이·천장 줄
 function corridorShot(alpha, yaw, pitch, w = 220, h = 165, fov = 66) {
   const D = Math.PI / 180;
   const f = w / 2 / Math.tan((fov / 2) * D);
-  const h0 = yaw * D, p0 = pitch * D;
-  const fw = [Math.cos(p0) * Math.cos(h0), Math.cos(p0) * Math.sin(h0), Math.sin(p0)];
+  const h0 = yaw * D,
+    p0 = pitch * D;
+  const fw = [
+    Math.cos(p0) * Math.cos(h0),
+    Math.cos(p0) * Math.sin(h0),
+    Math.sin(p0),
+  ];
   const rt = [Math.sin(h0), -Math.cos(h0), 0];
-  const dn = [Math.sin(p0) * Math.cos(h0), Math.sin(p0) * Math.sin(h0), -Math.cos(p0)];
+  const dn = [
+    Math.sin(p0) * Math.cos(h0),
+    Math.sin(p0) * Math.sin(h0),
+    -Math.cos(p0),
+  ];
   const R = [rt[0], dn[0], fw[0], rt[1], dn[1], fw[1], rt[2], dn[2], fw[2]];
-  const ca = Math.cos(alpha * D), sa = Math.sin(alpha * D);
+  const ca = Math.cos(alpha * D),
+    sa = Math.sin(alpha * D);
   const g = new Float32Array(w * h);
   const shade = (x, y) => {
-      const c = [(x - w / 2) / f, (y - h / 2) / f, 1];
-      const d = [0, 1, 2].map((i) => R[i * 3] * c[0] + R[i * 3 + 1] * c[1] + R[i * 3 + 2] * c[2]);
-      // 복도 좌표(u: 복도 방향, v: 가로)
-      const du = d[0] * ca + d[1] * sa, dv = -d[0] * sa + d[1] * ca, dz = d[2];
-      let t = Infinity, kind = 0;
-      if (dz < 0) { t = 1.35 / -dz; kind = 1; }
-      if (dz > 0) { t = 1.4 / dz; kind = 2; }
-      if (dv !== 0) { const tw = 1.5 / Math.abs(dv); if (tw < t) { t = tw; kind = 3; } }
-      const u = du * t, v = dv * t, z = dz * t;
-      let val;
-      if (kind === 1) val = (u % 1 + 1) % 1 < 0.06 || (v % 1 + 1) % 1 < 0.06 ? 200 : 90;
-      else if (kind === 2) val = (u % 2 + 2) % 2 < 0.1 ? 250 : 200;
-      else val = z < -1.2 ? 40 : z > 0.6 && z < 0.7 ? 90 : 160;
-      return val;
-    };
+    const c = [(x - w / 2) / f, (y - h / 2) / f, 1];
+    const d = [0, 1, 2].map(
+      (i) => R[i * 3] * c[0] + R[i * 3 + 1] * c[1] + R[i * 3 + 2] * c[2],
+    );
+    // 복도 좌표(u: 복도 방향, v: 가로)
+    const du = d[0] * ca + d[1] * sa,
+      dv = -d[0] * sa + d[1] * ca,
+      dz = d[2];
+    let t = Infinity,
+      kind = 0;
+    if (dz < 0) {
+      t = 1.35 / -dz;
+      kind = 1;
+    }
+    if (dz > 0) {
+      t = 1.4 / dz;
+      kind = 2;
+    }
+    if (dv !== 0) {
+      const tw = 1.5 / Math.abs(dv);
+      if (tw < t) {
+        t = tw;
+        kind = 3;
+      }
+    }
+    const u = du * t,
+      v = dv * t,
+      z = dz * t;
+    let val;
+    if (kind === 1)
+      val = ((u % 1) + 1) % 1 < 0.06 || ((v % 1) + 1) % 1 < 0.06 ? 200 : 90;
+    else if (kind === 2) val = ((u % 2) + 2) % 2 < 0.1 ? 250 : 200;
+    else val = z < -1.2 ? 40 : z > 0.6 && z < 0.7 ? 90 : 160;
+    return val;
+  };
   // 3×3 표본 평균(계단 현상 없이)
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       let sum = 0;
-      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) sum += shade(x + b / 3, y + a / 3);
+      for (let a = -1; a <= 1; a++)
+        for (let b = -1; b <= 1; b++) sum += shade(x + b / 3, y + a / 3);
       g[y * w + x] = sum / 9;
     }
   return { g, w, h, K: { fx: f, fy: f, cx: w / 2, cy: h / 2 }, R };
 }
 
 test("소실점 나침반: 복도 벽 방향을 1° 안으로 찾음(카메라 방향·기울기 무관)", () => {
-  for (const [alpha, yaw, pitch] of [[0, 20, -10], [9.75, -20, -5], [30, 200, -15], [72, 75, 0]]) {
+  for (const [alpha, yaw, pitch] of [
+    [0, 20, -10],
+    [9.75, -20, -5],
+    [30, 200, -15],
+    [72, 75, 0],
+  ]) {
     const s = corridorShot(alpha, yaw, pitch);
     const r = manhattanAxis(s.g, s.w, s.h, s.K, s.R);
     assert.ok(r, `결과 없음 ${alpha}`);
-    const e = Math.abs((((r.axis - alpha) % 90) + 135) % 90 - 45);
+    const e = Math.abs(((((r.axis - alpha) % 90) + 135) % 90) - 45);
     assert.ok(e < 1, `복도 ${alpha}° → ${r.axis.toFixed(2)}°`);
     assert.ok(r.ratio > 2, `봉우리 선명도 ${r.ratio}`);
   }
 });
 
 test("입자 필터: 소실점 방향 기준을 받으면 방향이 그쪽으로 모임", () => {
-  const loc = new Localizer({ index: INDEX, shots: SV.shots, walk: I.walk, portals: portalsFrom(I.links), seed: 3 });
+  const loc = new Localizer({
+    index: INDEX,
+    shots: SV.shots,
+    walk: I.walk,
+    portals: portalsFrom(I.links),
+    seed: 3,
+  });
   loc.fix({ f: 1, x: 0, y: 9, yaw: 90, conf: 0.9 }, 60);
   for (let k = 0; k < 4; k++) loc.heading(40, 5);
   const e = loc.estimate(60);
   assert.ok(Math.abs(e.off - 40) < 4, `off ${e.off}`);
+});
+
+test("every indoor start entrance (front, back, side, west, B1) routes to rooms on all floors", () => {
+  const names = E.entrances.map((e) => e.name);
+  for (const n of [
+    "1층 로비 정문",
+    "1층 로비 후문",
+    "1층 측면 입구 (106호 쪽)",
+    "1층 서쪽 입구 (103호 쪽)",
+    "지하 1층 출입구",
+  ])
+    assert.ok(names.includes(n), `entrance ${n}`);
+  for (const e of E.entrances) {
+    assert.ok(I.walk(e.f, e.p[0], e.p[1]), `${e.name} is on the walk grid`);
+    for (const id of ["108", "212", "308"]) {
+      const d = I.findDest(id);
+      const r = I.routeTo({ f: e.f, x: e.p[0], y: e.p[1] }, d, {});
+      assert.ok(r && r.pts.length > 1, `${e.name} → ${id}`);
+    }
+  }
+});
+
+test("room names from the floor directory sign (B1–3F) show and are searchable", () => {
+  const name = (key) => I.destinations.find((d) => d.key === key)?.name;
+  assert.equal(name("3:324"), "손일수 교수연구실");
+  assert.equal(name("3:308"), "이동지능연구실2");
+  assert.equal(name("2:207"), "제어, 데이터와보안연구실 (김준수)");
+  assert.equal(name("2:208"), "강의실");
+  assert.equal(name("1:122"), "이동지능연구실");
+  assert.equal(name("0:B109"), "전력전자실험실");
+  assert.equal(I.search("손일수")[0]?.key, "3:324");
+  assert.equal(I.search("전은솜")[0]?.key, "2:225");
+});
+
+// ---- WebXR(VIO) 방식
+import {
+  poseFromXR,
+  intrinsicsFromProjection,
+  yawOf,
+  Anchor,
+  LevelTracker,
+  worldTransform,
+  VisualAligner,
+} from "../src/indoor/ar/xr-math.mjs";
+
+// XR 카메라 자세(열 우선 4×4): 수평으로 방위 yaw(동쪽 0, 반시계)를 보고 pitch만큼 숙임, 위치 (x, h, z)
+function xrMatrix(yawDeg, pitchDeg, x, h, z) {
+  const y = (yawDeg * Math.PI) / 180,
+    p = (pitchDeg * Math.PI) / 180;
+  // 센서 세계 앞 방향 f=(cos y cos p, sin y cos p, sin p) → XR (fx, fz_up, -fy)
+  const f = [Math.cos(y) * Math.cos(p), Math.sin(p), -Math.sin(y) * Math.cos(p)];
+  const r = [Math.sin(y), 0, Math.cos(y)]; // 오른쪽(수평)
+  const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]]; // r × f
+  const zc = [-f[0], -f[1], -f[2]]; // 카메라 -z가 앞
+  return [...r, 0, ...u, 0, ...zc, 0, x, h, z, 1];
+}
+
+test("WebXR 자세 → 센서 세계: 방위·위치·높이·중력 축이 맞음", () => {
+  for (const [yaw, pitch] of [[0, 0], [90, -10], [-135, 5]]) {
+    const P = poseFromXR(xrMatrix(yaw, pitch, 2, 1.4, -3));
+    assert.ok(Math.abs(((yawOf(P.R) - yaw + 540) % 360) - 180) < 1e-6, `yaw ${yaw}`);
+    assert.ok(Math.abs((Math.asin(P.R[8]) * 180) / Math.PI - pitch) < 1e-9, "pitch from R[8]");
+    assert.deepEqual([P.x, P.y, P.h].map((v) => +v.toFixed(6)), [2, 3, 1.4]);
+    // OpenCV y축(아래)은 세계 z가 음수 쪽
+    assert.ok(P.R[7] < 0, "camera down axis points down");
+  }
+  const K = intrinsicsFromProjection([1.6, 0, 0, 0, 0, 2.1, 0, 0, 0.02, -0.04, -1, -1, 0, 0, -0.1, 0], 220, 165);
+  assert.ok(Math.abs(K.fx - 176) < 1e-9 && Math.abs(K.fy - 173.25) < 1e-9);
+  assert.ok(Math.abs(K.cx - 107.8) < 1e-9 && Math.abs(K.cy - 79.2) < 1e-9);
+});
+
+test("WebXR 정렬: 건물 ↔ VIO 변환이 서로 맞고, 경로 묶음이 같은 곳에 놓임", () => {
+  const a = new Anchor();
+  a.update({ x: 10, y: -4 }, { x: 1, y: 2 }, 37, 1);
+  const b = a.toBuilding(1, 2);
+  assert.ok(Math.hypot(b.x - 10, b.y + 4) < 1e-9);
+  const s = a.toSensor(-3, 8),
+    back = a.toBuilding(s.x, s.y);
+  assert.ok(Math.hypot(back.x + 3, back.y - 8) < 1e-9);
+  // three: 건물 (x, z, -y) 를 묶음 변환 → VIO (센서 x, 높이, -센서 y)
+  const wt = worldTransform(a, -0.2);
+  const B = [-3, 0.2, -8];
+  const X = Math.cos(wt.rotY) * B[0] + Math.sin(wt.rotY) * B[2] + wt.px,
+    Z = -Math.sin(wt.rotY) * B[0] + Math.cos(wt.rotY) * B[2] + wt.pz;
+  assert.ok(Math.abs(X - s.x) < 1e-9 && Math.abs(Z + s.y) < 1e-9 && Math.abs(B[1] + wt.py) < 1e-9);
+  // 크게 다른 추정 한 번은 무시, 같은 곳이 두 번 나오면 받아들임
+  assert.equal(a.update({ x: 30, y: 0 }, { x: 1, y: 2 }, 37, 1), "hold");
+  assert.equal(a.update({ x: 30, y: 0 }, { x: 1, y: 2 }, 37, 1), "snap");
+  assert.ok(Math.hypot(a.toBuilding(1, 2).x - 30, a.toBuilding(1, 2).y) < 1e-9);
+});
+
+test("WebXR 층 추적: 계단으로 한 층 오르내리면 ±1, 손 높이 흔들림은 무시", () => {
+  const lv = new LevelTracker(4);
+  assert.equal(lv.update(1.4), 0);
+  for (const h of [1.3, 1.5, 1.2, 1.45]) assert.equal(lv.update(h), 0);
+  let up = 0;
+  for (let h = 1.4; h <= 5.5; h += 0.1) up += lv.update(h);
+  assert.equal(up, 1);
+  assert.ok(Math.abs(lv.floorY - 4) < 1e-9);
+  let down = 0;
+  for (let h = 5.4; h >= 1.3; h -= 0.1) down += lv.update(h);
+  assert.equal(down, -1);
+});
+
+test("WebXR 위치 추정: VIO 궤적 + 사진 후보 RANSAC 정렬로 0.5m 안, 틀린 정렬은 내지 않음", () => {
+  const seq = walkShots(1, 30);
+  const pf = new Localizer({ index: INDEX, shots: SV.shots, walk: I.walk, portals: portalsFrom(I.links), seed: 21 });
+  // VIO 세계는 건물과 41° 돌아가 있고 원점도 다름(정렬기는 모름)
+  const OFF = 41;
+  const truth = new Anchor();
+  Object.assign(truth, { off: OFF, tx: 7, ty: -3 });
+  const va = new VisualAligner();
+  const anchor = new Anchor(); // 앱처럼: 한 번 잡힌 정렬을 VIO로 이어 가고, 새 정렬로 다듬음
+  const errs = [];
+  seq.forEach((s, j) => {
+    const sp = truth.toSensor(s.x, s.y);
+    const cands = pf.candidates(stripQuery(s.k), [1], 3, new Set([s.k]));
+    va.add(j * 0.8, { x: sp.x, y: sp.y, yaw: s.yaw - OFF }, 0, cands);
+    const a = va.solve();
+    if (a) {
+      assert.equal(a.df, 1, "floor offset");
+      assert.ok(Math.abs(((((a.off - OFF) % 360) + 540) % 360) - 180) < 4, `heading ${a.off}`);
+      const A = new Anchor();
+      Object.assign(A, a);
+      anchor.update(A.toBuilding(sp.x, sp.y), sp, a.off, Math.min(1, a.n / 12));
+    }
+    if (anchor.ok) {
+      const b = anchor.toBuilding(sp.x, sp.y);
+      errs.push(Math.hypot(b.x - s.x, b.y - s.y));
+    }
+  });
+  assert.ok(errs.length >= 8, `aligned for part of the walk (${errs.length})`);
+  assert.ok(Math.max(...errs) < 1, `max error ${Math.max(...errs)}`);
+  errs.sort((a, b) => a - b);
+  assert.ok(errs[errs.length >> 1] < 0.5, `median error ${errs[errs.length >> 1]}`);
 });

@@ -84,7 +84,7 @@ export function createBuildingLayer(buildings, entrances = []) {
       glass: appearance.glass,
     };
     const entrance = entrancesByBuilding.get(b.id);
-    let body,
+    let body, entryView,
       height = b.h;
     if (design.model) {
       const factory = MODEL_FACTORIES[design.model];
@@ -92,6 +92,7 @@ export function createBuildingLayer(buildings, entrances = []) {
         throw new Error(`Unknown building model: ${design.model} (${b.id})`);
       const model = factory(b, profile.wall, entrance);
       body = model.body;
+      entryView = model.entryView;
       height = model.height ?? b.h;
       group.add(model.group);
       pickables.push(...model.pickables);
@@ -122,7 +123,7 @@ export function createBuildingLayer(buildings, entrances = []) {
       }
       details.decorate(b, appearance, study ? null : entrance);
     }
-    records.push({ b, body, profile, height });
+    records.push({ b, body, profile, height, entryView });
   }
   group.add(details.finish());
   return { group, records, pickables };

@@ -43,10 +43,17 @@ self.onmessage = async (e) => {
   } else if (m.type === "lift") loc.lift(m.f, m.x, m.y);
   else if (m.type === "floor") loc.setFloor(m.f);
   else if (m.type === "heading") loc.heading(m.off, m.sd);
-  else if (m.type === "fix") reply("pose", loc.fix(m.fix, m.yaw), { src: "fix" });
+  else if (m.type === "move") loc.move(m.dx, m.dy);
+  else if (m.type === "shiftFloor") loc.shiftFloor(m.d);
+  else if (m.type === "fix")
+    reply("pose", loc.fix(m.fix, m.yaw), { src: "fix" });
   else if (m.type === "query") {
     const t0 = performance.now();
     const r = loc.measure(m.q, m.yaw, m.floorHint);
-    reply("pose", r, { id: m.id, ms: performance.now() - t0 });
+    // WebXR: VIO 궤적과 맞춰 볼 사진 비교 원시 후보도 함께
+    const cands = m.xr
+      ? loc.candidates(m.q, m.floors || [m.floorHint], 3)
+      : null;
+    reply("pose", r, { id: m.id, ms: performance.now() - t0, cands });
   }
 };
