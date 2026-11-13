@@ -819,12 +819,37 @@
         </div>
       </div>
     </dialog>
+    <dialog id="admin-login-dialog" class="admin-login-dialog">
+      <button class="dialog-close" aria-label="닫기">✕</button>
+      <form id="admin-login-form" class="dialog-body">
+        <span class="eyebrow purple">ADMIN</span>
+        <h2>관리자 로그인</h2>
+        <p>Supabase Auth에 등록된 관리자 계정으로 로그인해 주세요.</p>
+        <label
+          >이메일<input
+            id="admin-email"
+            type="email"
+            autocomplete="username"
+            required
+        /></label>
+        <label
+          >비밀번호<input
+            id="admin-password"
+            type="password"
+            autocomplete="current-password"
+            required
+        /></label>
+        <p id="admin-login-error" class="admin-login-error" role="alert" hidden></p>
+        <button id="admin-login-submit" type="submit">관리자 로그인</button>
+      </form>
+    </dialog>
     <dialog id="admin-dialog" class="report-dialog admin-dialog">
       <button class="dialog-close" aria-label="닫기">✕</button>
       <div class="dialog-body">
         <span class="report-dialog-symbol" aria-hidden="true">🛠</span
         ><span class="eyebrow">관리자 검토 · 시연</span>
         <h2>신고된 구간</h2>
+        <button id="admin-logout" class="admin-logout" type="button">로그아웃</button>
         <section class="admin-section admin-section-urgent">
           <h3>🔴 검토 필요 · 3건 이상</h3>
           <p id="admin-empty-urgent">지금은 검토가 급한 구간이 없어요.</p>

@@ -4,7 +4,8 @@
 
 ## 파일
 - `migrations/20261113051005_remote_schema.sql`: 원격 DB의 `public`·`storage` 스키마를 `supabase db pull`로 가져온 기준점. **원격 migration 기록에 "적용됨"으로 등록돼 있다.** `db diff --linked` 결과 원격과 차이 없음.
-- `migrations/20261113060000_report_gps.sql`: **아직 원격에 적용되지 않음.** 현장 신고용 GPS 칸(`gps_x`, `gps_z`, `gps_accuracy`, `taken_at`)과 GPS 필수 제약조건. `main`의 프론트엔드가 이 칸들을 보내므로 적용 전에는 새 신고 저장이 실패한다. 적용: `npx supabase@2 db push`
+- `migrations/20261113060000_report_gps.sql`: 원격 적용됨. 현장 신고용 GPS 칸(`gps_x`, `gps_z`, `gps_accuracy`, `taken_at`)과 GPS 필수 제약조건.
+- `migrations/20261114024000_secure_rls.sql`: 원격 적용됨. 공개 사용자는 신고 조회·등록만 가능하고, 관리자 작업은 Supabase Auth `app_metadata.role = 'admin'` 계정만 가능하다.
 - `config.toml`: `supabase init` 기본값 + 신고 사진 버킷 설정(로컬 개발용). 버킷은 데이터라 migration에 없다.
 
 ## 테이블
@@ -18,13 +19,11 @@
 ## RLS (모든 앱 테이블 RLS 켜짐)
 | 테이블 | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
-| `road_reports` | 누구나 | 누구나 | **누구나, 조건 없음** | **누구나** |
-| `building_works` | anon·authenticated | anon·authenticated | 정책 없음(거부) | anon·authenticated |
-| `storage.objects` (`report-photos`) | 공개 버킷 URL | anon·authenticated 업로드 | 정책 없음 | 정책 없음 |
+| `road_reports` | 누구나 | 누구나(`reported`·GPS·사진 필수) | 관리자 | 관리자 |
+| `building_works` | 누구나 | 관리자 | 관리자 | 관리자 |
+| `storage.objects` (`report-photos`) | 공개 버킷 URL | 경로·확장자 제한 업로드 | 정책 없음 | 정책 없음 |
 
-⚠ **관리자 로그인이 없어서 시연용으로 열어 둔 상태다.** Publishable Key만 있으면 누구나 신고를 `confirmed`로 바꾸거나 지우고, 공사를 등록·삭제할 수 있다. 관리자 기능은 화면에서 `?admin=1` + 코드(`src/app.js` `ADMIN_DEMO_CODE`)로만 숨겨져 있다.
-
-권장 다음 단계: Supabase Auth로 관리자 계정을 만들고, `road_reports` UPDATE/DELETE와 `building_works` INSERT/DELETE를 관리자만으로 좁힌다. 일반 사용자는 INSERT(`status = 'reported'`만)와 SELECT만 허용한다.
+관리자 화면은 `?admin=1`에서 열고 Supabase Auth 이메일·비밀번호로 로그인한다. 관리자 계정은 `auth.users.raw_app_meta_data`의 `role`이 `admin`이어야 한다. 일반 사용자의 브라우저 기기 ID는 본인 인증 수단이 아니므로 익명 신고 삭제는 허용하지 않는다.
 
 ## 기타
 - 함수·트리거: `public.rls_auto_enable()` + event trigger `ensure_rls`(새 public 테이블에 RLS 자동 적용, Supabase 기본 제공).
