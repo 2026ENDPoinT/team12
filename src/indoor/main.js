@@ -14,6 +14,7 @@ import { playLift, voice } from "./lift.js";
 import { uiIcon, setDirectionIcon } from "./ui.mjs";
 import { createRoutePlaces, routePlaceLabel } from "./route-places.mjs";
 import { bindRouteSearch } from "./route-search.mjs";
+import { bindMobilePanel } from "./mobile-panels.mjs";
 
 const A = "assets/";
 const $ = (s) => document.querySelector(s);
@@ -204,11 +205,13 @@ function onPick(x, y, f) {
 }
 
 // ---------- 시트
+const sheetPanel = bindMobilePanel($("#sheet"), $("#sheet-handle"));
+const searchPanel = bindMobilePanel($(".search-panel"), $("#search-handle"));
 function setSheet(name) {
   state.sheet = name;
   for (const k of ["home", "place", "route"])
     $(`#sheet-${k}`).hidden = k !== name;
-  $("#sheet").classList.remove("collapsed");
+  sheetPanel.reset();
   $("#sheet").classList.toggle("route-mode", name === "route");
   $("#sheet").classList.toggle("place-mode", name === "place");
   $("#sheet").hidden = name === "home";
@@ -221,13 +224,8 @@ new ResizeObserver(() => {
       `${Math.ceil(sheet.getBoundingClientRect().height)}px`,
     );
 }).observe($("#sheet"));
-$("#sheet-handle").onclick = () => {
-  const collapsed = $("#sheet").classList.toggle("collapsed");
-  $("#sheet-handle").setAttribute("aria-expanded", !collapsed);
-  if (state.route) frameRoute();
-};
 function showPlace(d) {
-  const panel = $(".search-panel");
+  const panel = innerWidth < 820 ? $(".search-content") : $(".search-panel");
   const scrollTop = panel.scrollTop;
   state.pending = d;
   view.select(d);
@@ -306,6 +304,7 @@ function remember(d) {
 function openSearch(mode = "dest", focus = true) {
   if (!indoor) return;
   state.searchMode = mode;
+  searchPanel.reset();
   $("#search").hidden = false;
   document.body.classList.add("searching");
   $("#search-input").value = "";
@@ -317,6 +316,7 @@ function openSearch(mode = "dest", focus = true) {
   if (focus) setTimeout(() => $("#search-input").focus(), 50);
 }
 function closeSearch() {
+  searchPanel.reset();
   $("#search").hidden = true;
   document.body.classList.remove("searching");
   $("#search-input").blur();
@@ -341,9 +341,10 @@ document.addEventListener("keydown", (event) => {
   event.preventDefault();
   openSearch();
 });
-$("#search-input").addEventListener("input", (e) =>
-  renderResults(e.target.value),
-);
+$("#search-input").addEventListener("input", (e) => {
+  searchPanel.reset();
+  renderResults(e.target.value);
+});
 $("#search-input").addEventListener("keydown", (e) => {
   if (e.isComposing || e.keyCode === 229) return;
   if (e.key === "Enter") $("#search-results li[data-key] button")?.click();
@@ -592,12 +593,13 @@ function computeRoute() {
     .map((st) => `${floorLabel(st.f)}→${floorLabel(st.to)}`)
     .join(", ");
   const notes = [];
-  if (r.preferElev) notes.push("3개 층 이상이라 엘리베이터로 안내해요");
+  if (r.preferElev) notes.push("두 층 이상 이동해 엘리베이터로 안내해요");
   if ((state.mode === "elevator" || r.preferElev) && r.stairFloors)
     notes.push(`엘리베이터가 닿지 않는 ${stairPart} 구간만 계단을 이용해요`);
   if (notes.length) sum.append(el("span", "note", notes.join(" · ")));
   renderSteps();
   $("#sheet").scrollTop = 0;
+  $("#sheet-route").scrollTop = 0;
   view.showRoute(r, d, state.steps);
   if (!view.floorOverview && view.floor !== r.pts[0].f)
     view.setFloor(r.pts[0].f);
@@ -718,7 +720,7 @@ function focusStep(i) {
   if (view.floorOverview || st.f !== view.floor) goFloor(st.f);
   view.focus(st.at[0], st.at[1], st.f, 32);
   syncFloors();
-  if (innerWidth < 820) $("#sheet").classList.add("collapsed");
+  if (innerWidth < 820) sheetPanel.collapse();
 }
 
 // ---------- 음성 안내 버튼
