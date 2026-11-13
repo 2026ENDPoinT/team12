@@ -459,6 +459,8 @@ $("#map-reset").onclick = () => map?.reset();
 $("#map-north").onclick = () => map?.reset();
 $("#map-top").onclick = () => map?.top();
 function setPanelClosed(closed) {
+  // 길찾기 패널과 길 막힘 제보 패널은 같은 자리를 써서 하나만 엽니다.
+  if (!closed) setReportsPanel(false);
   $("#map-view").classList.toggle("panel-closed", closed);
   $("#panel-toggle").setAttribute("aria-expanded", String(!closed));
   $('[data-side="route"]').setAttribute("aria-pressed", String(!closed));
@@ -471,6 +473,32 @@ function setPanelClosed(closed) {
 }
 $("#panel-toggle").onclick = () =>
   setPanelClosed(!$("#map-view").classList.contains("panel-closed"));
+
+// ===== 길 막힘 제보 패널 (데스크톱) =====
+// 제보 목록은 데스크톱에서는 이 패널로, 모바일에서는 길찾기 패널 안 원래 자리로 옮깁니다.
+const reportsSection = $(".road-reports"),
+  reportsHome = document.createComment("road-reports");
+reportsSection.before(reportsHome);
+function placeReports() {
+  if (isDesktop.matches) $("#reports-panel-body").append(reportsSection);
+  else reportsHome.after(reportsSection);
+}
+function setReportsPanel(open) {
+  const show = open && isDesktop.matches;
+  if (show) setPanelClosed(true);
+  $("#reports-panel").hidden = !show;
+  $('[data-side="report"]').setAttribute("aria-pressed", String(show));
+}
+$("#reports-panel-close").onclick = () => setReportsPanel(false);
+$("#reports-panel-start").onclick = () => {
+  setReportsPanel(false);
+  $("#report-start").click();
+};
+placeReports();
+isDesktop.addEventListener("change", () => {
+  placeReports();
+  if (!isDesktop.matches) setReportsPanel(false);
+});
 
 // ===== 경로 방식 카드: 두 방식의 시간·거리를 함께 보여 줍니다 =====
 function updateModeOptions() {
@@ -539,7 +567,7 @@ function useCardBuildingAs(selector, other) {
   setRoutePlace(selector, cardBuildingId);
   const otherId = routePlaceId(other);
   if (otherId && otherId !== cardBuildingId) {
-    setPanelClosed(true);
+    setPanelClosed(false);
     updateRoute({ announce: true });
     return;
   }
@@ -744,8 +772,9 @@ let routeShown = false,
   desktopStarted = false;
 function renderResultPanel() {
   const desktop = isDesktop.matches;
-  $("#route-card").hidden = !routeShown;
-  const any = desktop && (routeShown || !$("#building-card").hidden);
+  // 경로 결과는 길찾기 패널 안에, 오른쪽에는 건물 정보 카드만 둡니다.
+  $("#route-card").hidden = !(desktop && routeShown);
+  const any = desktop && !$("#building-card").hidden;
   $("#result-panel").hidden = !any;
   $("#map-view").classList.toggle("has-results", any);
   $("#route-summary-bar").hidden = !(desktop && routeShown);
@@ -833,6 +862,31 @@ $$("[data-summary-mode]").forEach(
 );
 $("#summary-edit").onclick = () => setPanelClosed(false);
 $("#route-panel-close").onclick = () => setPanelClosed(true);
+// 출발·도착 칸의 지우기(✕)와 바꾸기(⇅) 버튼
+function clearRouteResult() {
+  routeShown = false;
+  currentRoute = null;
+  map?.setRoute(null);
+  updateModeOptions();
+  renderResultPanel();
+}
+$$("[data-clear]").forEach(
+  (button) =>
+    (button.onclick = () => {
+      const input = $(`#${button.dataset.clear}`);
+      input.value = "";
+      clearRouteResult();
+      input.focus();
+    }),
+);
+$("#swap-places").onclick = () => {
+  const origin = $("#origin").value,
+    destination = $("#destination").value;
+  $("#origin").value = destination;
+  $("#destination").value = origin;
+  if (routePlaceId("#origin") && routePlaceId("#destination")) updateRoute();
+  else clearRouteResult();
+};
 isDesktop.addEventListener("change", renderResultPanel);
 
 // ===== 왼쪽 아이콘 사이드바 (데스크톱) =====
@@ -847,8 +901,8 @@ side("map").onclick = () =>
   setSearchBar($("#map-view").classList.contains("search-hidden"));
 side("route").onclick = () =>
   setPanelClosed(!$("#map-view").classList.contains("panel-closed"));
-side("building").onclick = () => setSearchBar(true);
-side("report").onclick = () => $("#report-start").click();
+// 길 막힘(공사) 아이콘: 왼쪽에 길 막힘 제보 목록 패널을 열고 닫습니다.
+side("report").onclick = () => setReportsPanel($("#reports-panel").hidden);
 side("layers").onclick = () => {
   const on = !$("#map-view").classList.contains("show-legend");
   $("#map-view").classList.toggle("show-legend", on);
@@ -866,10 +920,6 @@ side("alerts").onclick = () => {
 };
 // 신고 모드와 내 위치 상태를 사이드바·지도 컨트롤 버튼에도 똑같이 보여 줍니다.
 new MutationObserver(() => {
-  side("report").setAttribute(
-    "aria-pressed",
-    $("#report-start").getAttribute("aria-pressed") || "false",
-  );
   $("#v2-locate").setAttribute(
     "aria-pressed",
     $("#gps-toggle").getAttribute("aria-pressed") || "false",
