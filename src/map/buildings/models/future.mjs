@@ -166,9 +166,10 @@ export function createFutureBuilding(building, wallColor) {
   ])
     box(walls, x, 15.9, z, 0.45, 3.8, 0.45);
   // Entry glazing and a shallow canopy face the open court.
-  box(recess, 28.3, 2, 35, 0.6, 4, 9);
-  box(glass, 27.9, 2, 35, 0.2, 3.5, 7.8);
-  box(roofMaterial, 26.8, 4.7, 35, 4.2, 0.4, 11);
+  const doorway = new THREE.Vector3(27.8, 2.5, 35);
+  box(recess, 28.3, 2, doorway.z, 0.6, 4, 9);
+  box(glass, 27.9, 2, doorway.z, 0.2, 3.5, 7.8);
+  box(roofMaterial, 26.8, 4.7, doorway.z, 4.2, 0.4, 11);
   box(roofMaterial, 37, height + 2, 8, 6, 3, 6);
   box(roofMaterial, 18, height + 1.4, 70, 7, 1.8, 4);
   const cube = new THREE.BoxGeometry(1, 1, 1);
@@ -195,5 +196,13 @@ export function createFutureBuilding(building, wallColor) {
     pickables.push(object);
   });
   applyModelFinishes({ stone: [walls], glass: [glass] });
-  return { group, body, pickables };
+  return {
+    group,
+    body,
+    pickables,
+    entryView: {
+      door: group.localToWorld(doorway),
+      outward: new THREE.Vector3(-1, 0, 0).applyQuaternion(group.quaternion),
+    },
+  };
 }
