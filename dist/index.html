@@ -881,17 +881,17 @@
         <h2>신고된 구간</h2>
         <button id="admin-logout" class="admin-logout" type="button">로그아웃</button>
         <section class="admin-section admin-section-urgent">
-          <h3>🔴 검토 필요 · 3건 이상</h3>
+          <h3><i class="admin-dot urgent" aria-hidden="true"></i>검토 필요 · 3건 이상</h3>
           <p id="admin-empty-urgent">지금은 검토가 급한 구간이 없어요.</p>
           <ul id="admin-list-urgent" class="report-list"></ul>
         </section>
-        <section class="admin-section">
-          <h3>⛔ 확정된 구간 · 우회 안내 중</h3>
+        <section class="admin-section admin-section-confirmed">
+          <h3><i class="admin-dot confirmed" aria-hidden="true"></i>확정된 구간 · 우회 안내 중</h3>
           <p id="admin-empty-confirmed">확정된 구간이 없어요.</p>
           <ul id="admin-list-confirmed" class="report-list"></ul>
         </section>
         <section class="admin-section">
-          <h3>참고용 · 3건 미만</h3>
+          <h3><i class="admin-dot minor" aria-hidden="true"></i>참고용 · 3건 미만</h3>
           <p id="admin-empty-minor">3건 미만으로 쌓인 신고가 없어요.</p>
           <ul id="admin-list-minor" class="report-list"></ul>
         </section>
@@ -902,7 +902,7 @@
           집계합니다.</small
         >
         <section class="admin-section admin-works">
-          <h3>🚧 건물 공사</h3>
+          <h3><i class="admin-dot works" aria-hidden="true"></i>건물 공사</h3>
           <form id="work-form" class="work-form">
             <label>건물<select id="work-building" required></select></label
             ><label>시작일<input type="date" id="work-start" required /></label
