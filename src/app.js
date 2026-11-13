@@ -37,6 +37,7 @@ import catalog from "./schools.json";
 import {
   CAMPUS,
   CAMPUS_GEOMETRY,
+  INDOOR_MAPS,
   BUILDINGS,
   NODES,
   EDGES,
@@ -260,6 +261,10 @@ function updateRoute({ announce = false } = {}) {
     );
     return;
   }
+  const indoorButton = $("#indoor-open");
+  indoorButton.hidden = !INDOOR_MAPS.has(destination.id);
+  indoorButton.querySelector("b").textContent = `${destination.name} 실내 지도`;
+  indoorButton.onclick = () => enterIndoor(destination.id);
   currentRoute = route;
   if (!currentRoute) {
     $("#route-result").hidden = true;
@@ -317,52 +322,43 @@ function updateRoute({ announce = false } = {}) {
     li.append(small);
     $("#route-steps").append(li);
   });
-  $("#indoor-open").hidden = destination.id !== "future";
   map?.setRoute(currentRoute, start.id, destination.id, nodes);
   if (announce)
     toast(`${start.name}에서 ${destination.name}까지 경로를 표시했어요.`);
 }
 function buildingSelect(id) {
   const place = PLACES.find((item) => item.id === id);
-  if (place)
-    showPopover(
-      place.name,
-      "출발지나 도착지로 선택할 수 있어요.",
-      place,
-      id === "future",
-    );
+  if (place) showPopover(place);
 }
 function closeBuildingPopover() {
   $("#building-popover").hidden = true;
   $(".map-canvas-wrap").classList.remove("has-building-popover");
 }
-function showPopover(title, description, place = null, indoor = false) {
+function showPopover(place) {
   const el = $("#building-popover");
   el.replaceChildren();
   const b = document.createElement("b");
-  b.textContent = title;
+  b.textContent = place.name;
   const p = document.createElement("p");
-  p.textContent = description;
+  p.textContent = "출발지나 도착지로 선택할 수 있어요.";
   el.append(b, p);
-  if (place) {
-    for (const [selector, text] of [
-      ["#origin", "출발지로"],
-      ["#destination", "도착지로"],
-    ]) {
-      const button = document.createElement("button");
-      button.textContent = text;
-      button.onclick = () => {
-        setRoutePlace(selector, place.id);
-        updateRoute();
-        closeBuildingPopover();
-      };
-      el.append(button);
-    }
-  }
-  if (indoor) {
+  for (const [selector, text] of [
+    ["#origin", "출발지로"],
+    ["#destination", "도착지로"],
+  ]) {
     const button = document.createElement("button");
-    button.textContent = "미래관 실내 지도 ↗";
-    button.onclick = () => $("#indoor-dialog").showModal();
+    button.textContent = text;
+    button.onclick = () => {
+      setRoutePlace(selector, place.id);
+      updateRoute();
+      closeBuildingPopover();
+    };
+    el.append(button);
+  }
+  if (INDOOR_MAPS.has(place.id)) {
+    const button = document.createElement("button");
+    button.textContent = `${place.name} 실내 지도 →`;
+    button.onclick = () => enterIndoor(place.id);
     el.append(button);
   }
   const close = document.createElement("button");
@@ -607,7 +603,6 @@ $("#find-school").onclick = (e) => {
     $("#campuses").scrollIntoView();
 };
 $("#intro-button").onclick = () => $("#info-dialog").showModal();
-$("#indoor-open").onclick = () => $("#indoor-dialog").showModal();
 $$(".dialog-close").forEach(
   (b) => (b.onclick = () => b.closest("dialog").close()),
 );
@@ -625,21 +620,30 @@ $$("dialog").forEach((d) =>
     }
   }),
 );
-for (const [key, selector] of [
-  ["indoorUrl", "#indoor-link"],
-  ["arUrl", "#ar-link"],
-]) {
-  const url = CAMPUS.interior[key];
-  if (url) {
-    try {
-      const parsed = new URL(url, location.href);
-      if (["https:", "http:"].includes(parsed.protocol)) {
-        $(selector).href = parsed.href;
-        $(selector).hidden = false;
-      }
-    } catch {}
+async function enterIndoor(buildingId) {
+  const indoor = INDOOR_MAPS.get(buildingId);
+  if (!indoor || document.body.classList.contains("entering-indoor")) return;
+
+  if (!map || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    location.assign(indoor.url);
+    return;
   }
+
+  closeBuildingPopover();
+  document.body.classList.add("entering-indoor");
+  $("#map-view").inert = true;
+  await map.flyIntoBuilding(buildingId, indoor.entranceId, () => {
+    document.body.classList.add("indoor-arrival");
+  });
+  location.assign(indoor.url);
 }
+
+window.addEventListener("pageshow", (event) => {
+  if (!event.persisted) return;
+  document.body.classList.remove("entering-indoor", "indoor-arrival");
+  $("#map-view").inert = false;
+  map?.restoreBuildingFlight();
+});
 function toast(message) {
   clearTimeout(toastTimer);
   $("#toast").replaceChildren(document.createTextNode(message));

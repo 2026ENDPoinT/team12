@@ -1355,100 +1355,17 @@ dialog::backdrop {
   color: #a18aaf;
   line-height: 1.9;
 }
-.indoor-banner {
-  height: 230px;
-  background: linear-gradient(120deg, #432080, #9063e7);
-  color: white;
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
+.entering-indoor::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: #eef0f6;
+  opacity: 0;
+  transition: opacity 220ms ease-in;
 }
-.indoor-banner > span {
-  font-size: 8px;
-  letter-spacing: 2px;
-  color: #d2b4ff;
-  position: absolute;
-  top: 23px;
-  left: 28px;
-}
-.indoor-banner > b {
-  font-size: 17px;
-  z-index: 1;
-  letter-spacing: -1px;
-}
-.portal {
-  width: 90px;
-  height: 115px;
-  position: relative;
-  border: 1px solid #c7a1ff;
-  border-bottom: 0;
-  border-radius: 50px 50px 0 0;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(0deg, #b688ff11, #ba90ff88);
-  box-shadow: 0 0 60px #a472ff;
-}
-.portal > i {
-  position: absolute;
-  border: 1px solid #a477dc;
-  border-bottom: 0;
-  inset: -14px;
-  border-radius: 70px 70px 0 0;
-}
-.portal > i:nth-child(2) {
-  inset: -28px;
-  border-color: #a477dc77;
-}
-.portal > i:nth-child(3) {
-  inset: -42px;
-  border-color: #a477dc44;
-}
-.portal > span {
-  font-size: 35px;
-  color: var(--lime);
-}
-.indoor-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin: 23px 0 18px;
-}
-.indoor-options > div {
-  border: 1px solid #e6dbee;
-  background: #faf6ff;
-  padding: 16px;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-.indoor-options b {
-  font-size: 11px;
-  color: #7950a2;
-}
-.indoor-options span {
-  font-size: 10px;
-  color: #a089af;
-}
-.indoor-options small {
-  font-size: 9px;
-  color: #b5a0c1;
-  background: #f1e9f9;
-  border-radius: 5px;
-  padding: 6px 8px;
-  width: fit-content;
-}
-.indoor-options a {
-  font-size: 11px;
-  color: var(--violet);
-}
-.dialog-note {
-  font-size: 9px !important;
-  color: #b5a2c0 !important;
+.indoor-arrival::after {
+  opacity: 1;
 }
 .brand-color {
   border: 1px solid #e8ddf1;
@@ -1889,12 +1806,6 @@ select:focus-visible {
   }
   .dialog-body h2 {
     font-size: 25px;
-  }
-  .indoor-options {
-    grid-template-columns: 1fr;
-  }
-  .indoor-banner {
-    height: 210px;
   }
 }
 
