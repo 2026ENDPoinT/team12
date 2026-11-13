@@ -1634,3 +1634,19 @@ button.ar-status::after {
   border-radius: 999px;
   padding: 10px 32px;
 }
+
+/* 휴대폰: 패널·검색창 위에서 두 손가락으로 벌려도 페이지가 확대되지 않게 합니다(실내 지도는 자체 처리). */
+html,
+body {
+  touch-action: pan-x pan-y;
+}
+
+/* 휴대폰: 검색창을 화면 맨 위(안전 영역 + 12px)로 올리고, 층 버튼과 12px 띄워 겹치지 않게 합니다. */
+@media (max-width: 819px) {
+  :root {
+    --ui-top: calc(var(--safe-t) + 12px);
+  }
+  .floor-controls {
+    top: calc(var(--ui-top) + 62px + 12px);
+  }
+}

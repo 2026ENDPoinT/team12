@@ -8632,3 +8632,41 @@ body:has(#map-view.map-night) .shortcut-dialog {
     display: none;
   }
 }
+
+/* 휴대폰 첫 화면 학교 카드: 글씨를 키우고, 위쪽 상태 표시와 오른쪽 화살표를 같은 안쪽 여백(22px)에 맞춥니다. */
+@media (max-width: 760px) {
+  #campuses .school-card {
+    min-height: 108px;
+    gap: 14px;
+    padding: 30px 22px 22px 20px;
+  }
+  #campuses .school-logo {
+    width: 46px;
+    height: 46px;
+    font-size: 20px;
+  }
+  #campuses .school-card.featured .school-logo {
+    font-size: 15px;
+  }
+  #campuses .school-copy b {
+    font-size: 16px;
+    letter-spacing: -0.5px;
+  }
+  #campuses .school-copy small {
+    margin-top: 6px;
+    font-size: 12px;
+  }
+  #campuses .school-state {
+    top: 14px;
+    right: 22px;
+    font-size: 10px;
+  }
+  #campuses .school-state i {
+    width: 5px;
+    height: 5px;
+  }
+  #campuses .school-arrow {
+    font-size: 18px;
+    line-height: 1;
+  }
+}
