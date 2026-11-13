@@ -315,6 +315,12 @@
           지금 위치에서 제보하기
         </button>
       </aside>
+      <div id="mobile-route-top" class="mobile-route-top">
+        <button id="mobile-route-back" aria-label="길찾기 닫기">
+          <svg class="icon" aria-hidden="true"><use href="#i-arrow" /></svg>
+        </button>
+        <div class="mobile-route-fields"></div>
+      </div>
       <div class="map-topbar">
         <button id="back-home" aria-label="학교 검색으로 돌아가기">←</button
         ><span class="map-mini-brand">사이.</span
@@ -704,6 +710,13 @@
               <button id="v2-plus" aria-label="지도 확대">＋</button
               ><button id="v2-minus" aria-label="지도 축소">−</button>
             </div>
+            <button id="v2-report" aria-label="길 막힘 제보" aria-pressed="false">
+              <svg class="icon"><use href="#i-alert" /></svg>
+            </button>
+            <button id="v2-admin" aria-label="관리자 검토" hidden>
+              <svg class="icon"><use href="#i-bell" /></svg
+              ><span id="v2-admin-count" class="map-sidebar-badge" hidden>0</span>
+            </button>
             <button
               id="v2-locate"
               aria-label="내 위치로 이동"
