@@ -89,10 +89,12 @@ test("missing or disconnected nodes return no route; already there returns zero"
 });
 test("derived walking edges do not cut across building interiors", () => {
   // 건물을 가로지를 수 있는 간선은 팀이 조사한 건물 관통(building_passage)과
-  // 팀이 현장에서 확인해 그린 계단(예: 100주년기념관 아래 계단)뿐입니다. docs/decisions.md 참고.
+  // 팀이 현장에서 확인해 그린 계단·인도(예: 100주년기념관 아래 계단, 건물을 뚫고 지나가는 통로)뿐입니다.
+  // docs/decisions.md 참고.
   const surveyed = ({ type, source_kind }) =>
     type === "building_passage" ||
-    (type === "stairs" && source_kind === "team_input");
+    ((type === "stairs" || type === "sidewalk") &&
+      source_kind === "team_input");
   for (const edge of EDGES.filter((edge) => !surveyed(edge))) {
     const a = NODES[edge.a],
       b = NODES[edge.b];
