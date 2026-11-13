@@ -48,7 +48,6 @@ function el(tag, cls, text) {
 
 // ---------- 시작
 async function init() {
-  const bar = $("#load-bar");
   const [M, E] = await Promise.all([
     fetch(A + "mirae.json").then((r) => {
       if (!r.ok) throw new Error(`층 데이터 ${r.status}`);
@@ -56,17 +55,11 @@ async function init() {
     }),
     fetch(A + "entrances.json").then((r) => r.json()),
   ]);
-  bar.style.width = "15%";
   indoor = createIndoor(M);
   entrances = E.entrances;
   view = createView($("#view"), indoor, { onPick });
   buildFloors();
-  await view.load(
-    A + "mirae.glb",
-    (p) => (bar.style.width = `${15 + p * 85}%`),
-  );
-  $("#loading").classList.add("done");
-  setTimeout(() => ($("#loading").hidden = true), 450);
+  await view.load(A + "mirae.glb");
 
   // 캠퍼스 지도에서 넘어온 경우: ?from=futureDoor (캠퍼스 노드) 또는 출입구 id, 또는 f:id (호실)
   const from = params.get("from");
@@ -93,6 +86,9 @@ async function init() {
   } else openSearch("dest", false);
   if (params.has("demo")) startDemo();
   updateVoiceButtons();
+  $("#loading-status").textContent = "미래관 실내 지도 준비가 완료됐어요";
+  $("#loading").classList.add("done");
+  setTimeout(() => ($("#loading").hidden = true), 450);
 }
 
 function entranceStart(e) {
@@ -123,7 +119,17 @@ function setStart(s) {
 }
 
 // ---------- 층 버튼
+const overviewButton = $("#floor-overview");
+function setFloorOverview(open) {
+  view.setFloorOverview(open);
+  document.body.classList.toggle("floor-overview-open", open);
+  overviewButton.setAttribute("aria-pressed", String(open));
+  overviewButton.lastElementChild.textContent = open ? "현재 층" : "전체 층";
+}
+overviewButton.onclick = () => setFloorOverview(!view.floorOverview);
+
 function buildFloors() {
+  overviewButton.hidden = false;
   const nav = $("#floors");
   nav.replaceChildren();
   for (const n of [...indoor.floors].sort((a, b) => b - a)) {
@@ -136,9 +142,11 @@ function buildFloors() {
   }
 }
 function goFloor(n) {
+  if (view.floorOverview) setFloorOverview(false);
   if (n === view.floor) return;
   const up = n > view.floor;
   view.setFloor(n, false, true);
+  view.frame({ resetOrientation: false, animate: true });
   view.setMe(state.start);
   syncFloors();
   // 층이 바뀌었음을 크게 알려 줌
@@ -148,6 +156,7 @@ function goFloor(n) {
   void b.offsetWidth;
   b.classList.add("show");
 }
+$("#view-reset").onclick = () => view?.frame({ animate: true });
 function syncFloors() {
   const rf = new Set(state.route ? state.route.pts.map((p) => p.f) : []);
   for (const b of $$("#floors button")) {
@@ -207,8 +216,10 @@ function showPlace(d) {
     .join(" · ");
   setSheet("place");
   const p = d.center || d.doors[0];
-  if (d.f !== view.floor) goFloor(d.f);
-  view.focus(p[0], p[1], d.f, 48);
+  if (!view.floorOverview) {
+    if (d.f !== view.floor) goFloor(d.f);
+    view.focus(p[0], p[1], d.f, 48);
+  }
   syncFloors();
 }
 $("#place-close").onclick = () => {
@@ -265,6 +276,7 @@ function remember(d) {
 // ---------- 검색
 function openSearch(mode = "dest", focus = true) {
   if (!indoor) return;
+  setFloorOverview(true);
   state.searchMode = mode;
   $("#search").hidden = false;
   document.body.classList.add("searching");
@@ -532,7 +544,7 @@ function computeRoute() {
   renderSteps();
   $("#sheet").scrollTop = 0;
   view.showRoute(r, d, state.steps);
-  if (view.floor !== r.pts[0].f) view.setFloor(r.pts[0].f);
+  if (!view.floorOverview && view.floor !== r.pts[0].f) view.setFloor(r.pts[0].f);
   view.setMe(state.start);
   frameRoute();
   syncFloors();
@@ -545,6 +557,7 @@ function sheetCover() {
       : $("#sheet").offsetHeight;
 }
 function frameRoute() {
+  if (view.floorOverview) return;
   const P = state.route.pts.filter((p) => p.f === view.floor);
   const use = P.length ? P : state.route.pts;
   let x0 = Infinity,
@@ -646,7 +659,7 @@ function focusStep(i) {
   for (const li of $$("#route-steps li"))
     li.classList.toggle("on", +li.dataset.i === i);
   view.highlightStep(i);
-  if (st.f !== view.floor) goFloor(st.f);
+  if (view.floorOverview || st.f !== view.floor) goFloor(st.f);
   view.focus(st.at[0], st.at[1], st.f, 32);
   syncFloors();
   if (innerWidth < 820) $("#sheet").classList.add("collapsed");
@@ -708,7 +721,8 @@ $("#walk-open").onclick = async () => {
   $("#walk").hidden = false;
   document.body.classList.add("walking");
   view.resize();
-  for (const s of ["#sheet", ".topbar", "#floors"]) $(s).hidden = true;
+  if (view.floorOverview) setFloorOverview(false);
+  for (const s of ["#sheet", ".topbar", "#floor-controls"]) $(s).hidden = true;
   view.setFirstPerson(true);
   syncWalkButtons();
   requestAnimationFrame(walkStep);
@@ -725,7 +739,7 @@ function endWalk() {
   $("#walk").hidden = true;
   document.body.classList.remove("walking");
   view.resize();
-  for (const s of ["#sheet", ".topbar", "#floors"]) $(s).hidden = false;
+  for (const s of ["#sheet", ".topbar", "#floor-controls"]) $(s).hidden = false;
   view.setFirstPerson(false);
   if (state.route) {
     const f = state.route.pts[state.route.pts.length - 1].f;
@@ -913,8 +927,10 @@ async function startDemo() {
 init().catch((e) => {
   console.error(e);
   const L = $("#loading");
-  L.querySelector("b").textContent = `불러오지 못했어요: ${e.message || e}`;
-  const b = el("button", "primary-btn", "다시 시도");
-  b.onclick = () => location.reload();
-  L.append(b);
+  L.hidden = false;
+  L.classList.remove("done");
+  $("#loading-status").textContent = "미래관 도면을 불러오지 못했어요";
+  $("#loading-error-detail").textContent = String(e.message || e);
+  $("#loading-error").hidden = false;
+  $("#loading-retry").onclick = () => location.reload();
 });
