@@ -536,7 +536,9 @@ export function createIndoor(M) {
       let d = dest.get(key);
       if (!d) {
         const numbered = /^[0-9B]/.test(id);
-        const extra = names[id] && f.n === +id[0] ? names[id] : "";
+        // 호실 번호 첫 글자가 층(B는 지하 1층 = 0)과 맞을 때만 이름을 붙임
+        const idFloor = id[0] === "B" ? 0 : +id[0];
+        const extra = names[id] && f.n === idFloor ? names[id] : "";
         const nm = extra || (name !== id && name !== "실" ? name : "");
         d = {
           key,
