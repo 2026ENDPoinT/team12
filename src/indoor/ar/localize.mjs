@@ -113,9 +113,37 @@ export const blurSigma = (fx) => fx * Math.tan(STEP * D2R) * 0.45;
 /** 기준 사진 하나와 질의를 모든 가로 위치에서 비교해 가장 좋은 NCC와 위치를 돌려줍니다.
  * index: Uint8Array (N×EL_N×AZ_N), k: 사진 번호, q: 질의, oLo/oHi: 비교할 가로 위치 범위 */
 export function matchOne(index, k, q, oLo = 0, oHi = OFFSETS - 1) {
-  const base = k * EL_N * AZ_N;
+  const scores = nccScores(index, k, q, oLo, oHi);
   let best = -2,
     bo = -1;
+  for (let o = oLo; o <= oHi; o++)
+    if (scores[o] > best) {
+      best = scores[o];
+      bo = o;
+    }
+  return { ncc: best, o: refine(scores, bo), scores };
+}
+// 좌우 이웃 점수로 소수점 위치 보정
+function refine(scores, bo) {
+  let sub = bo;
+  if (
+    bo > 0 &&
+    bo < OFFSETS - 1 &&
+    scores[bo - 1] > -2 &&
+    scores[bo + 1] > -2
+  ) {
+    const a = scores[bo - 1],
+      b = scores[bo],
+      c = scores[bo + 1],
+      den = a - 2 * b + c;
+    if (den < 0)
+      sub = bo + Math.max(-0.5, Math.min(0.5, (0.5 * (a - c)) / den));
+  }
+  return sub;
+}
+/** 기준 사진 k와 질의의 가로 위치별 NCC (비교 못 한 위치는 -2) */
+export function nccScores(index, k, q, oLo = 0, oHi = OFFSETS - 1) {
+  const base = k * EL_N * AZ_N;
   const scores = new Float32Array(OFFSETS).fill(-2);
   for (let o = oLo; o <= oHi; o++) {
     let n = 0,
@@ -143,29 +171,9 @@ export function matchOne(index, k, q, oLo = 0, oHi = OFFSETS - 1) {
     const vx = sxx - (sx * sx) / n,
       vy = syy - (sy * sy) / n;
     if (vx < 1e-3 || vy < 1e-3) continue;
-    const ncc = (sxy - (sx * sy) / n) / Math.sqrt(vx * vy);
-    scores[o] = ncc;
-    if (ncc > best) {
-      best = ncc;
-      bo = o;
-    }
+    scores[o] = (sxy - (sx * sy) / n) / Math.sqrt(vx * vy);
   }
-  // 좌우 이웃 점수로 소수점 위치 보정
-  let sub = bo;
-  if (
-    bo > 0 &&
-    bo < OFFSETS - 1 &&
-    scores[bo - 1] > -2 &&
-    scores[bo + 1] > -2
-  ) {
-    const a = scores[bo - 1],
-      b = scores[bo],
-      c = scores[bo + 1],
-      den = a - 2 * b + c;
-    if (den < 0)
-      sub = bo + Math.max(-0.5, Math.min(0.5, (0.5 * (a - c)) / den));
-  }
-  return { ncc: best, o: sub };
+  return scores;
 }
 
 // 가로 위치 o → 카메라 정면의 건물 기준 방위(도)
