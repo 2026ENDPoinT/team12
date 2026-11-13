@@ -6555,3 +6555,34 @@ body {
     background: rgba(255, 255, 255, 0.85);
   }
 }
+
+/* 모바일 글씨·패널을 데스크톱처럼 90%로 조금 줄입니다(사용자 요청). 위치·여백도 같은 비율로 줄어 정렬은 그대로입니다. */
+@media (max-width: 760px) {
+  .map-topbar,
+  .mobile-route-top,
+  .route-summary-bar,
+  .v2-map-controls,
+  .building-results,
+  .result-panel,
+  .route-panel,
+  .reports-panel,
+  .map-overlay-heading,
+  .gps-status,
+  .report-picker {
+    zoom: 0.9;
+  }
+}
+@media (max-width: 760px) {
+  /* 더 구체적인 선택자에 남은 zoom: 1도 90%로 */
+  .map-view.panel-closed .route-panel,
+  .map-view.panel-closed .map-overlay-heading {
+    zoom: 0.9;
+  }
+  /* 아이폰은 입력칸 글자가 16px보다 작으면 누를 때 화면을 확대하므로,
+     90%로 줄인 뒤에도 실제 16px이 되게 맞춥니다(16 ÷ 0.9). */
+  .building-search input,
+  .mobile-route-fields #origin,
+  .mobile-route-fields #destination {
+    font-size: 17.8px;
+  }
+}
