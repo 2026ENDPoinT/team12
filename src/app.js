@@ -1587,7 +1587,7 @@ function routeView() {
       "gate",
       "future",
     );
-    document.title = "사이 · 길을 아는 건, 우리니까.";
+    document.title = "사이";
     if (location.hash === "#campuses")
       requestAnimationFrame(() => $("#campuses").scrollIntoView());
   }
