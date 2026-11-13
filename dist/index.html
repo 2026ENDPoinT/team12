@@ -368,16 +368,18 @@
             </svg>
           </button>
           <div class="navigation-bottom">
-            <span class="navigation-bottom-grip" aria-hidden="true"></span>
-            <div class="navigation-journey"><span class="navigation-origin-dot"></span><span id="navigation-origin"></span><span aria-hidden="true">→</span><span class="navigation-destination-dot"></span><span id="navigation-destination"></span></div>
-            <div class="navigation-arrival">
-              <b id="navigation-minutes"></b>
-              <strong id="navigation-distance"></strong>
-              <span id="navigation-eta"></span>
+            <div class="navigation-summary">
+              <div class="navigation-arrival">
+                <b id="navigation-minutes"></b>
+                <strong id="navigation-distance"></strong>
+              </div>
+              <div class="navigation-journey"><span class="navigation-origin-dot"></span><span id="navigation-origin"></span><span aria-hidden="true">→</span><span class="navigation-destination-dot"></span><span id="navigation-destination"></span></div>
             </div>
-            <p id="navigation-status" role="status"></p>
-            <progress id="navigation-progress" max="1" value="0" aria-label="경로 진행률"></progress>
-            <button id="navigation-stop" type="button">길안내 종료</button>
+            <p class="navigation-meta"><span id="navigation-eta"></span><span id="navigation-status" role="status"></span></p>
+            <div class="navigation-progress-track">
+              <progress id="navigation-progress" max="1" value="0" aria-label="경로 진행률"></progress>
+              <span class="navigation-progress-knob" aria-hidden="true"><span><svg viewBox="0 0 24 24"><path d="M5 4.5 20 12 5 19.5 8.2 12Z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></span>
+            </div>
           </div>
         </section>
         <aside class="route-panel">

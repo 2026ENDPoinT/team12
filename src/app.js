@@ -977,6 +977,7 @@ function renderMobileNavigation(guide = null) {
   $("#navigation-distance").textContent = `${Math.round(remaining)}m`;
   $("#navigation-eta").textContent = `${new Date(Date.now() + minutes * 60000).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" })} 도착`;
   $("#navigation-progress").value = progress;
+  $(".navigation-progress-track").style.setProperty("--progress", String(Math.min(1, Math.max(0, progress))));
   const direction = guide?.next.direction;
   $("#navigation-direction").textContent = guidancePending ? "위치 확인 중" : INSTRUCTION[direction] || "경로를 따라 이동";
   $("#navigation-arrow").textContent = direction === "left" ? "↰" : direction === "right" ? "↱" : direction === "arrive" ? "⚑" : "↑";
@@ -1092,7 +1093,6 @@ function startGuidance() {
   if (guidancePending) toast("현재 위치가 확인되면 길안내를 시작할게요.");
 }
 $("#route-card-start").onclick = startGuidance;
-$("#navigation-stop").onclick = () => endGuidance();
 $("#navigation-compass").onclick = () => {
   if (!guidanceActive) return;
   if (!guidanceFollowing) {

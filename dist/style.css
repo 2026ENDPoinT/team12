@@ -7738,8 +7738,7 @@ body {
     touch-action: none;
     cursor: ns-resize;
   }
-  #route-sheet-handle span,
-  .navigation-bottom-grip {
+  #route-sheet-handle span {
     display: block;
     width: 40px;
     height: 4px;
@@ -7812,15 +7811,26 @@ body {
     color: #f4f7f8;
     box-shadow: 0 12px 30px rgba(21,33,43,.18);
   }
-  .navigation-journey {
+  /* 첫 줄: 왼쪽 남은 시간·거리, 오른쪽 출발 → 도착 */
+  .navigation-summary {
     display: flex;
     align-items: center;
-    gap: 7px;
-    margin-bottom: 10px;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .navigation-journey {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
     color: var(--v2-muted);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
   }
+  /* 좁으면 출발지부터 줄여 도착지 이름을 지킵니다. */
+  #navigation-origin { flex: 0 3 auto; }
+  #navigation-destination { flex: 0 1 auto; }
   .navigation-journey > span:not([class]) {
     min-width: 0;
     overflow: hidden;
@@ -7873,46 +7883,75 @@ body {
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 12px 21px calc(28px + env(safe-area-inset-bottom, 0px));
+    padding: 16px 21px calc(24px + env(safe-area-inset-bottom, 0px));
     border: 1px solid var(--v2-stroke);
     border-radius: 28px 28px 0 0;
     background: var(--v2-sheet);
     backdrop-filter: var(--v2-glass-filter);
     color: var(--v2-ink);
   }
-  .navigation-bottom-grip { margin: 0 auto 14px; background: rgba(255,255,255,.85); }
-  .navigation-arrival { display: flex; align-items: center; gap: 8px; }
+  .navigation-arrival { display: flex; flex: none; align-items: baseline; gap: 8px; }
   #navigation-minutes { font-size: 23px; }
   #navigation-distance { font-size: 17px; }
-  #navigation-eta { color: var(--v2-muted); font-size: 12px; }
-  #navigation-status {
+  .navigation-meta {
     margin: 4px 0 0;
+    overflow: hidden;
     color: var(--v2-muted);
     font-size: 13px;
     line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  #navigation-stop {
-    display: block;
+  #navigation-eta:not(:empty) + #navigation-status:not(:empty)::before { content: " · "; }
+  /* 진행률 막대 위 현재 위치: 흰 원 + 보라 화살표, 진행 방향으로 옅은 빛줄기 */
+  .navigation-progress-track { --progress: 0; position: relative; margin-top: 16px; }
+  .navigation-progress-knob {
+    position: absolute;
+    top: 50%;
+    left: calc(15px + (100% - 30px) * var(--progress));
+    width: 30px;
+    height: 30px;
+    transform: translate(-50%, -50%);
+    transition: left .4s ease;
+    pointer-events: none;
+  }
+  .navigation-progress-knob::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 46px;
+    height: 46px;
+    background: linear-gradient(90deg, rgba(121, 80, 255, .32), rgba(121, 80, 255, 0));
+    clip-path: polygon(0 50%, 100% 0, 100% 100%);
+    /* 도착 직전에는 빛줄기가 시트 밖으로 나가지 않게 서서히 감춥니다. */
+    opacity: clamp(0, calc((1 - var(--progress)) * 12), 1);
+    transform: translateY(-50%);
+    transition: opacity .4s ease;
+  }
+  .navigation-progress-knob > span {
+    position: relative;
+    display: grid;
+    place-items: center;
     width: 100%;
-    min-height: 44px;
-    margin-top: 12px;
-    padding: 8px 16px;
-    border: 0;
-    border-radius: 999px;
-    /* 야간 팔레트의 밝은 보라는 흰 글씨 대비가 낮아 낮 보라색을 고정합니다. */
-    background: #7950ff;
-    color: #fff;
-    font: inherit;
-    font-weight: 700;
+    height: 100%;
+    box-sizing: border-box;
+    border: 3px solid #7950ff;
+    border-radius: 50%;
+    background: #fff;
+    color: #7950ff;
+    box-shadow: 0 4px 12px rgba(48, 26, 140, .18);
   }
-  #navigation-progress { appearance: none; width: 100%; height: 6px; margin-top: 16px; border: 0; border-radius: 99px; overflow: hidden; background: rgba(255,255,255,.6); accent-color: var(--violet); }
+  .navigation-progress-knob svg { width: 14px; height: 14px; }
+  @media (prefers-reduced-motion: reduce) { .navigation-progress-knob { transition: none; } }
+  #navigation-progress { appearance: none; display: block; width: 100%; height: 10px; margin: 0; border: 0; border-radius: 99px; overflow: hidden; background: rgba(255,255,255,.6); accent-color: var(--violet); }
   #navigation-progress::-webkit-progress-bar { background: rgba(255,255,255,.6); }
   #navigation-progress::-webkit-progress-value { background: var(--violet); border-radius: 99px; }
   #navigation-progress::-moz-progress-bar { background: var(--violet); border-radius: 99px; }
   #navigation-recenter {
     position: fixed;
     z-index: 35;
-    bottom: calc(212px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(140px + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -7939,7 +7978,7 @@ body {
     backdrop-filter: var(--v2-glass-filter);
     color: var(--v2-ink);
   }
-  #navigation-compass { right: 16px; bottom: calc(212px + env(safe-area-inset-bottom, 0px)); }
+  #navigation-compass { right: 16px; bottom: calc(140px + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* Night palette for campus controls and map overlays. */

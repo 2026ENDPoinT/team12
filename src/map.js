@@ -424,6 +424,14 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     THIRD_PERSON_ZOOM = 6,
     THIRD_PERSON_AHEAD = 18;
   const navigationTarget = new THREE.Vector3();
+  // 길안내 중 테크뇽은 건물 안(실내 GPS)이나 건물 뒤에 있어도 보이도록 1번 레이어로 옮겨
+  // 지도를 그린 뒤 깊이만 지우고 한 번 더 그립니다. 조명도 그 레이어에서 비추게 합니다.
+  const OVERLAY_LAYER = 1;
+  sky.layers.enable(OVERLAY_LAYER);
+  sun.layers.enable(OVERLAY_LAYER);
+  function setMascotOverlay(on) {
+    userTechnyong?.object.traverse((o) => o.layers.set(on ? OVERLAY_LAYER : 0));
+  }
   let navigationTargetSet = false,
     navigationMovedAt = -Infinity;
   let userTechnyong = null,
@@ -640,6 +648,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
       userTechnyong.object.position.y = 2.3;
       userTechnyong.object.rotation.y = Math.PI;
       userLocationGroup.add(userTechnyong.object);
+      setMascotOverlay(navigationMode);
     }
     userTechnyong.object.visible = true;
     const accuracy = THREE.MathUtils.clamp(position.accuracy || 12, 3, 100);
@@ -1327,6 +1336,17 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
       );
     pondDetails.update(reduceMotion ? 0 : t / 1000);
     renderer.render(scene, camera);
+    if (navigationMode && userLocationGroup.visible && userTechnyong) {
+      const background = scene.background;
+      scene.background = null;
+      camera.layers.set(OVERLAY_LAYER);
+      renderer.autoClear = false;
+      renderer.clearDepth();
+      renderer.render(scene, camera);
+      renderer.autoClear = true;
+      camera.layers.set(0);
+      scene.background = background;
+    }
     declutterLabels(t);
     labels.render(scene, camera);
     profiler?.end(profileStart);
@@ -1367,6 +1387,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
       navigationMovedAt = -Infinity;
       // 길안내 중 내 위치 표시는 테크뇽이 맡습니다.
       userBase.visible = !enabled;
+      setMascotOverlay(enabled);
       if (userTechnyong) {
         userTechnyong.object.visible = true;
         if (!enabled) {
