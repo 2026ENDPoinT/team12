@@ -7091,3 +7091,66 @@ body {
     box-shadow: 0 18px 48px rgba(21, 33, 43, 0.2);
   }
 }
+
+/* 관리자 메뉴: 로그인 뒤 편집기 / 관리자 검토 고르기 */
+.admin-menu-dialog .dialog-body {
+  display: grid;
+  gap: 14px;
+}
+.admin-menu-actions {
+  display: grid;
+  gap: 8px;
+}
+.admin-menu-actions button {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0.75px solid var(--v2-stroke);
+  border-radius: 16px;
+  background: #fff;
+  color: var(--v2-ink);
+  text-align: left;
+}
+.admin-menu-actions button:hover {
+  background: rgba(213, 255, 118, 0.3);
+}
+.admin-menu-actions .icon {
+  width: 40px;
+  height: 40px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--lime);
+}
+.admin-menu-actions b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+}
+.admin-menu-actions em {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 20px;
+  text-align: center;
+}
+.admin-menu-actions small {
+  display: block;
+  color: var(--v2-muted);
+  font-size: 12px;
+}
+.admin-menu-dialog .admin-logout {
+  justify-self: start;
+  padding: 7px 12px;
+  border: 0.75px solid var(--v2-stroke);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--v2-muted);
+  font-size: 12px;
+}

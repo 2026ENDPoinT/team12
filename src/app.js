@@ -53,7 +53,7 @@ import {
 } from "./data.mjs";
 import { createCampusMap } from "./map.js";
 import { buildingInfo } from "./building-info.mjs";
-import { setupEditMode } from "./edit-mode.js";
+import { setupEditMode, EDIT_MODE } from "./edit-mode.js";
 import { gpsToCampus } from "./geo.mjs";
 import { gisSummary } from "./gis.mjs";
 import { routePoints, guidanceAt, INSTRUCTION } from "./guidance.mjs";
@@ -1074,11 +1074,8 @@ side("settings").onclick = () => {
   $("#map-view").classList.toggle("show-instructions", on);
   side("settings").setAttribute("aria-pressed", String(on));
 };
-side("alerts").onclick = () => {
-  if ($("#admin-toggle").hidden)
-    toast("관리자 검토는 관리자 기기에서만 열 수 있어요.");
-  else $("#admin-toggle").click();
-};
+// 관리자·편집기 버튼: 관리자 계정으로 로그인하면 편집기 / 관리자 검토를 고르는 메뉴를 엽니다.
+side("alerts").onclick = () => openAdminEntry();
 // 신고 모드와 내 위치 상태를 사이드바·지도 컨트롤 버튼에도 똑같이 보여 줍니다.
 new MutationObserver(() => {
   $("#v2-locate").setAttribute(
@@ -1166,14 +1163,7 @@ $("#mobile-route-back").onclick = () => setPanelClosed(true);
 $("#v2-report").onclick = () =>
   setReportsPanel($("#reports-panel").hidden);
 $("#v2-admin").onclick = () => $("#admin-toggle").click();
-function syncAdminButton() {
-  $("#v2-admin").hidden = $("#admin-toggle").hidden;
-}
-syncAdminButton();
-new MutationObserver(syncAdminButton).observe($("#admin-toggle"), {
-  attributes: true,
-  attributeFilter: ["hidden"],
-});
+
 
 
 // ===== GPS 현재 위치 추적 =====
@@ -1965,9 +1955,56 @@ function openAdminPanel() {
   renderWorkList();
   $("#admin-dialog").showModal();
 }
+// ===== 관리자·편집기 진입 (사이드바·모바일 버튼) =====
+// 관리자 계정으로 로그인한 뒤 편집기(?edit)와 관리자 검토 중 하나를 고릅니다.
+// 권한은 Supabase Auth(관리자 역할)가 확인합니다.
+let afterAdminLogin = openAdminPanel;
+function openAdminMenu() {
+  $("#admin-menu-editor-title").textContent = EDIT_MODE
+    ? "편집기 닫기"
+    : "편집기 열기";
+  const count = $("#admin-alert-count").textContent;
+  $("#admin-menu-count").textContent = count;
+  $("#admin-menu-count").hidden = !Number(count);
+  $("#admin-menu-dialog").showModal();
+}
+async function openAdminEntry() {
+  try {
+    if (await getAdminSession()) return openAdminMenu();
+  } catch {
+    toast("관리자 로그인 상태를 확인하지 못했어요.");
+    return;
+  }
+  afterAdminLogin = openAdminMenu;
+  $("#admin-login-error").hidden = true;
+  $("#admin-login-dialog").showModal();
+}
+$("#v2-admin").onclick = () => openAdminEntry();
+$("#admin-menu-editor").onclick = () => {
+  // 편집기는 주소의 ?edit로 켜고 끕니다(지금 보던 화면 주소는 그대로).
+  const url = new URL(location.href);
+  if (EDIT_MODE) url.searchParams.delete("edit");
+  else url.searchParams.set("edit", "1");
+  location.assign(url.href);
+};
+$("#admin-menu-review").onclick = () => {
+  $("#admin-menu-dialog").close();
+  openAdminPanel();
+};
+$("#admin-menu-logout").onclick = async () => {
+  try {
+    await signOutAdmin();
+  } catch {
+    toast("로그아웃하지 못했어요. 다시 시도해 주세요.");
+    return;
+  }
+  $("#admin-menu-dialog").close();
+  toast("관리자 계정에서 로그아웃했어요.");
+};
 $("#admin-toggle").onclick = async () => {
   try {
     if (await getAdminSession()) return openAdminPanel();
+    afterAdminLogin = openAdminPanel;
   } catch {
     toast("관리자 로그인 상태를 확인하지 못했어요.");
     return;
@@ -1992,7 +2029,7 @@ $("#admin-login-form").onsubmit = async (event) => {
   }
   $("#admin-password").value = "";
   $("#admin-login-dialog").close();
-  openAdminPanel();
+  afterAdminLogin();
 };
 $("#admin-logout").onclick = async () => {
   try {
