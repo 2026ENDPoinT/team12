@@ -475,18 +475,16 @@ function computeRoute() {
         ),
       );
   // 계단 없이 골랐지만 엘리베이터가 닿지 않는 층이 있어 계단을 쓰는 경우 알림
-  if (state.mode === "elevator" && r.stairFloors) {
-    const parts = state.steps
-      .filter((st) => st.kind === "stair")
-      .map((st) => `${floorLabel(st.f)}→${floorLabel(st.to)}`);
-    sum.append(
-      el(
-        "span",
-        "note",
-        `엘리베이터가 닿지 않는 층이 있어 ${parts.join(", ")} 구간만 계단을 이용해요`,
-      ),
-    );
-  }
+  // 엘리베이터 우선 안내·피할 수 없는 계단 구간 알림(한 줄로)
+  const stairPart = state.steps
+    .filter((st) => st.kind === "stair")
+    .map((st) => `${floorLabel(st.f)}→${floorLabel(st.to)}`)
+    .join(", ");
+  const notes = [];
+  if (r.preferElev) notes.push("3개 층 이상이라 엘리베이터로 안내해요");
+  if ((state.mode === "elevator" || r.preferElev) && r.stairFloors)
+    notes.push(`엘리베이터가 닿지 않는 ${stairPart} 구간만 계단을 이용해요`);
+  if (notes.length) sum.append(el("span", "note", notes.join(" · ")));
   renderSteps();
   $("#sheet").scrollTop = 0;
   view.showRoute(r, d, state.steps);

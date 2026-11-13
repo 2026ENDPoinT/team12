@@ -7,6 +7,8 @@ const ROOM_COST = 4; // 목적지가 아닌 방 안을 지나갈 때 거리 가�
 const STAIR_EXTRA = 4; // 계단 한 번에 더하는 비용(m)
 // 계단 없이 모드: 엘리베이터가 닿지 않는 층(B1 등)만 계단을 쓰도록 계단 한 개 층마다 큰 비용
 const STAIR_AVOID = 2000;
+// 빠른 길에서 계단으로 이만큼 이상 오르내리면 엘리베이터 경로로 바꿈
+const ELEV_PREFER_FLOORS = 3;
 const ELEV_WAIT = 40; // 엘리베이터 대기·탑승 비용(m 환산, 약 30초)
 const ELEV_PER_FLOOR = 3;
 
@@ -643,7 +645,15 @@ export function createIndoor(M) {
         return { f: d.f, x: s[0], y: s[1], door: p };
       })
       .filter(Boolean);
-    return route(start, targets, { ...opts, allowRooms: [d.id] });
+    const o = { ...opts, allowRooms: [d.id] };
+    const r = route(start, targets, o);
+    // 빠른 길이라도 계단으로 3개 층 이상 오르내리면 엘리베이터 경로를 우선합니다.
+    if (r && (opts.mode || "stairs") === "stairs" && r.stairFloors >= ELEV_PREFER_FLOORS) {
+      const e = route(start, targets, { ...o, mode: "elevator" });
+      if (e && e.stairFloors < r.stairFloors)
+        return { ...e, mode: "stairs", preferElev: true };
+    }
+    return r;
   }
 
   return {

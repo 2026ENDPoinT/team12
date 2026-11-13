@@ -84,9 +84,10 @@ test("step-free mode falls back to the fewest stairs (313 → B104)", () => {
   assert.equal(r.stairFloors, 1);
   const kinds = r.vertical.map((l) => `${l.kind}${l.from}>${l.to}`);
   assert.deepEqual(kinds, ["elev3>1", "stair1>0"]);
-  // 빠른 길은 그대로 계단
+  // 빠른 길도 계단 3개 층 이상이면 엘리베이터 우선 → 같은 경로
   const fast = I.routeTo(from, I.findDest("0:B104"), { mode: "stairs" });
-  assert.ok(fast.stairFloors >= 3);
+  assert.ok(fast.preferElev);
+  assert.equal(fast.stairFloors, 1);
   // 모든 목적지에 계단 없이 경로가 나오고, 계단은 꼭 필요한 B1 구간만
   for (const d of I.destinations) {
     const x = I.routeTo(from, d, { mode: "elevator" });
@@ -257,4 +258,20 @@ test("route stops in front of the destination door, outside the room", () => {
       .rooms.filter((rm) => rm.id === d.id);
     assert.ok(!room.some((rm) => inPoly(rm.poly, e.x, e.y)), `${d.key} inside`);
   }
+});
+
+test("fast route keeps stairs for 1–2 floors, prefers elevator for 3+", () => {
+  for (const d of I.destinations) {
+    for (const f of [0, 1, 2, 3]) {
+      const src = I.destinations.find((x) => x.f === f && x.numbered);
+      if (!src) continue;
+      const from = { f, x: src.doors[0][0], y: src.doors[0][1] };
+      const r = I.routeTo(from, d, { mode: "stairs" });
+      assert.ok(r, `${src.key}→${d.key}`);
+      assert.ok(r.stairFloors < 3, `${src.key}→${d.key} stairs ${r.stairFloors}`);
+    }
+  }
+  // 1개 층은 계단 그대로
+  const r = I.routeTo(start, I.findDest("2:216"), { mode: "stairs" });
+  assert.ok(!r.preferElev && r.stairFloors === 1);
 });
