@@ -81,6 +81,7 @@
       </header>
 
       <nav id="floors" class="floors" aria-label="층 선택"></nav>
+      <div id="floor-badge" class="floor-badge" aria-hidden="true"></div>
       <div class="map-tools">
         <button
           id="recenter"
@@ -160,14 +161,24 @@
               <span class="dot goal"></span>
               <button id="route-to" class="end-btn" type="button"></button>
             </div>
-            <button
-              id="route-close"
-              class="round-btn small flat"
-              type="button"
-              aria-label="경로 닫기"
-            >
-              <svg class="icon"><use href="#i-close" /></svg>
-            </button>
+            <div class="route-side">
+              <button
+                id="route-close"
+                class="round-btn small flat"
+                type="button"
+                aria-label="경로 닫기"
+              >
+                <svg class="icon"><use href="#i-close" /></svg>
+              </button>
+              <button
+                id="route-swap"
+                class="round-btn small flat"
+                type="button"
+                aria-label="출발·도착 바꾸기"
+              >
+                <svg class="icon"><use href="#i-swap" /></svg>
+              </button>
+            </div>
           </div>
           <div class="seg" role="radiogroup" aria-label="이동 방식">
             <button
@@ -188,7 +199,12 @@
               계단 없이
             </button>
           </div>
-          <div id="route-summary" class="route-summary"></div>
+          <div class="route-summary-row">
+            <div id="route-summary" class="route-summary"></div>
+            <button id="route-share" class="link-btn" type="button">
+              공유
+            </button>
+          </div>
           <div class="actions">
             <button id="ar-open" class="primary-btn" type="button">
               <svg class="icon"><use href="#i-ar" /></svg>AR 길안내
@@ -236,6 +252,47 @@
       </figure>
       <div class="walk-bottom">
         <div class="walk-progress"><i id="walk-bar"></i></div>
+        <div class="walk-ctrl">
+          <button
+            id="walk-prev"
+            class="round-btn small"
+            type="button"
+            aria-label="이전 단계"
+          >
+            ⏮
+          </button>
+          <button
+            id="walk-play"
+            class="round-btn"
+            type="button"
+            aria-label="일시정지"
+          >
+            ❚❚
+          </button>
+          <button
+            id="walk-next"
+            class="round-btn small"
+            type="button"
+            aria-label="다음 단계"
+          >
+            ⏭
+          </button>
+          <button
+            id="walk-speed"
+            class="round-btn small"
+            type="button"
+            aria-label="속도"
+          >
+            1×
+          </button>
+          <button
+            class="round-btn small voice-btn"
+            type="button"
+            aria-label="음성 안내"
+          >
+            🔈
+          </button>
+        </div>
         <button id="walk-close" class="primary-btn dark" type="button">
           미리 걷기 끝내기
         </button>
@@ -277,6 +334,13 @@
             <button id="ar-close" class="primary-btn dark" type="button">
               AR 끝내기
             </button>
+            <button
+              class="round-btn small voice-btn"
+              type="button"
+              aria-label="음성 안내"
+            >
+              🔈
+            </button>
           </div>
         </div>
       </div>
@@ -303,6 +367,23 @@
         </button>
       </div>
     </section>
+
+    <!-- 엘리베이터 탑승 화면 -->
+    <div id="lift" class="lift" hidden role="status" aria-live="polite">
+      <div class="lift-box">
+        <div class="lift-panel">
+          <span class="lift-arrow">▲</span><b class="lift-floor">1F</b>
+        </div>
+        <div class="lift-cab">
+          <div class="lift-doors"><i></i><i></i></div>
+        </div>
+        <p class="lift-msg"></p>
+        <small class="lift-sub"></small>
+        <button class="lift-skip ghost-btn" type="button" hidden>
+          내렸어요
+        </button>
+      </div>
+    </div>
 
     <div id="toast" class="toast" role="status" hidden></div>
     <script src="indoor.js" defer></script>

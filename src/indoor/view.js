@@ -176,12 +176,40 @@ export function createView(el, indoor, { onPick } = {}) {
     dirty = true;
   }
 
-  function setFloor(n, reframe = false) {
+  // 층 바꾸기: animate면 카메라가 층 높이만큼 부드럽게 오르내립니다.
+  // 카메라 이동 트윈: 층 전환·단계 보기·경로 맞춤이 모두 같은 방식으로 부드럽게 움직입니다.
+  let floorAnim = null;
+  function flyTo(cam1, tgt1, dur = 550) {
+    floorAnim = {
+      t0: performance.now(),
+      dur,
+      cam0: cam.position.clone(),
+      tgt0: ctl.target.clone(),
+      cam1,
+      tgt1,
+    };
+    dirty = true;
+  }
+  ctl.addEventListener("start", () => (floorAnim = null)); // 사용자가 만지면 바로 멈춤
+  function setFloor(n, reframe = false, animate = false) {
     const prevZ = FL(floor).z;
     floor = n;
     const dz = FL(n).z - prevZ;
-    cam.position.y += dz;
-    ctl.target.y += dz;
+    if (animate && dz && !reframe) {
+      const up = new THREE.Vector3(0, dz, 0);
+      flyTo(
+        (floorAnim ? floorAnim.cam1 : cam.position).clone().add(up),
+        (floorAnim ? floorAnim.tgt1 : ctl.target).clone().add(up),
+        520,
+      );
+    } else {
+      cam.position.y += dz;
+      ctl.target.y += dz;
+      if (floorAnim) {
+        floorAnim.cam1.y += dz;
+        floorAnim.tgt1.y += dz;
+      }
+    }
     if (reframe) frame();
     applyVisibility();
     updateLabels();
@@ -250,19 +278,15 @@ export function createView(el, indoor, { onPick } = {}) {
     const shift =
       (((padBottomPx - padTopPx) / H) * dist * Math.tan(vf)) /
       Math.max(0.5, -dir.y);
-    ctl.target.copy(c).addScaledVector(fwd, -shift);
-    cam.position.copy(ctl.target).addScaledVector(dir, dist);
-    ctl.update();
-    dirty = true;
+    const tgt = c.clone().addScaledVector(fwd, -shift);
+    flyTo(tgt.clone().addScaledVector(dir, dist), tgt);
   }
   function focus(x, y, f, dist = 45) {
     if (f !== floor) setFloor(f);
     const z = FL(f).z;
     const off = cam.position.clone().sub(ctl.target).setLength(dist);
-    ctl.target.copy(T(x, y, z));
-    cam.position.copy(ctl.target).add(off);
-    ctl.update();
-    dirty = true;
+    const tgt = T(x, y, z);
+    flyTo(tgt.clone().add(off), tgt);
   }
 
   // ---- 탭으로 방 고르기
@@ -395,7 +419,7 @@ export function createView(el, indoor, { onPick } = {}) {
     }
     dirty = true;
   }
-  function showRoute(route, dest) {
+  function showRoute(route, dest, steps = []) {
     clearRoute();
     selectedKey = dest?.key || null;
     // 층별 연속 구간으로 나눠 그림
@@ -497,8 +521,30 @@ export function createView(el, indoor, { onPick } = {}) {
         routeGroup.add(o);
       }
     }
+    // 안내 단계 번호 표시 (목록과 지도를 맞춰 보기)
+    stepDots = [];
+    steps.forEach((st, i) => {
+      if (st.kind === "start" || st.kind === "arrive" || !st.at) return;
+      const div = document.createElement("div");
+      div.className =
+        "step-dot" +
+        (st.kind === "stair" || st.kind === "elev" ? " vertical" : "");
+      div.textContent = i;
+      const o = new CSS2DObject(div);
+      o.position.copy(T(st.at[0], st.at[1], FL(st.f).z + 0.3));
+      o.userData.f = st.f;
+      o.userData.step = i;
+      routeGroup.add(o);
+      stepDots.push(o);
+    });
     applyVisibility();
     updateLabels();
+  }
+  let stepDots = [];
+  function highlightStep(i) {
+    for (const o of stepDots)
+      o.element.classList.toggle("on", o.userData.step === i);
+    dirty = true;
   }
   function select(d) {
     selectedKey = d ? d.key : null;
@@ -611,6 +657,14 @@ export function createView(el, indoor, { onPick } = {}) {
       lr.render(scene, fp);
       return;
     }
+    if (floorAnim) {
+      const k = Math.min(1, (now - floorAnim.t0) / floorAnim.dur),
+        e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      cam.position.lerpVectors(floorAnim.cam0, floorAnim.cam1, e);
+      ctl.target.lerpVectors(floorAnim.tgt0, floorAnim.tgt1, e);
+      if (k >= 1) floorAnim = null;
+      dirty = true;
+    }
     if (ctl.update()) dirty = true;
     if (!dirty) return;
     dirty = false;
@@ -632,6 +686,7 @@ export function createView(el, indoor, { onPick } = {}) {
     fit,
     focus,
     showRoute,
+    highlightStep,
     clearRoute,
     select,
     setMe,

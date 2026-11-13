@@ -417,10 +417,6 @@ a {
   row-gap: 6px;
   align-items: center;
 }
-.route-ends #route-close {
-  grid-row: 1 / 3;
-  grid-column: 2;
-}
 .end {
   display: flex;
   align-items: center;
@@ -990,4 +986,281 @@ a {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ===== v2: 안내 목록·지도 번호·층 전환·미리 걷기·엘리베이터 ===== */
+.route-ends {
+  grid-template-columns: 1fr auto;
+}
+.route-side {
+  grid-row: 1 / 3;
+  grid-column: 2;
+  display: grid;
+  gap: 6px;
+}
+.route-summary-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.route-summary-row .route-summary {
+  flex: 1;
+}
+.link-btn {
+  margin-top: 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--deep);
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #f3f0fb;
+}
+.route-summary .chip {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--ink);
+}
+.route-summary .chip.elev {
+  background: #e4dcff;
+  color: var(--deep);
+}
+.steps .ico {
+  position: relative;
+}
+.steps .ico .num {
+  position: absolute;
+  right: -5px;
+  top: -5px;
+  min-width: 17px;
+  height: 17px;
+  border-radius: 9px;
+  background: var(--deep);
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  border: 2px solid #fff;
+}
+.steps li.on {
+  background: #f6f3ff;
+  margin: 0 -18px;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+.step-dot {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background: #fff;
+  color: var(--deep);
+  border: 2px solid var(--violet);
+  font-size: 11px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  padding: 0 5px;
+  pointer-events: none;
+  box-shadow: 0 2px 6px #24203533;
+  transition: transform 0.2s;
+}
+.step-dot.vertical {
+  background: var(--lime);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.step-dot.on {
+  background: var(--violet);
+  color: #fff;
+  transform: scale(1.35);
+}
+.floor-badge {
+  position: absolute;
+  z-index: 11;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  font-size: 40px;
+  font-weight: 900;
+  color: #fff;
+  background: #5330d2d9;
+  padding: 10px 26px;
+  border-radius: 20px;
+  opacity: 0;
+  pointer-events: none;
+}
+.floor-badge.show {
+  animation: badge 1.1s ease-out;
+}
+@keyframes badge {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -30%);
+  }
+  20%,
+  60% {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -70%);
+  }
+}
+.walk-ctrl {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+.walk-ctrl .round-btn {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.walk-ctrl #walk-play {
+  width: 56px;
+  height: 56px;
+  background: var(--violet);
+  color: #fff;
+  font-size: 18px;
+}
+.voice-btn.on {
+  background: var(--lime);
+}
+.ar-btns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ar-btns .primary-btn {
+  flex: 1;
+}
+
+/* 엘리베이터 */
+.lift {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  background: #1b1630b3;
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.lift.show {
+  opacity: 1;
+}
+.lift-box {
+  width: min(84vw, 320px);
+  background: #fff;
+  border-radius: 26px;
+  padding: 22px 20px 20px;
+  text-align: center;
+  box-shadow: 0 20px 60px #0008;
+}
+.lift-panel {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #15121f;
+  color: #ffb547;
+  border-radius: 12px;
+  padding: 8px 18px;
+  font-family: "Courier New", monospace;
+  box-shadow: inset 0 0 12px #000;
+}
+.lift-arrow {
+  font-size: 20px;
+  opacity: 0.35;
+}
+.lift.moving .lift-arrow {
+  animation: liftblink 0.6s infinite;
+}
+.lift-floor {
+  font-size: 34px;
+  font-weight: 900;
+  min-width: 58px;
+  display: inline-block;
+}
+.lift-floor.flip {
+  animation: flip 0.35s ease-out;
+}
+@keyframes flip {
+  from {
+    transform: translateY(var(--dy, -14px));
+    opacity: 0;
+  }
+}
+@keyframes liftblink {
+  50% {
+    opacity: 1;
+  }
+}
+.lift-cab {
+  margin: 16px auto 12px;
+  width: 150px;
+  height: 170px;
+  border-radius: 10px 10px 4px 4px;
+  background: linear-gradient(#f6f3ff, #ddd5f5);
+  border: 6px solid #c9c2da;
+  position: relative;
+  overflow: hidden;
+}
+.lift.moving .lift-cab {
+  animation: hum 0.25s infinite alternate;
+}
+@keyframes hum {
+  to {
+    transform: translateY(1px);
+  }
+}
+.lift-doors i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  background: linear-gradient(90deg, #b8b1c9, #d9d3e6 50%, #b8b1c9);
+  transition: transform 0.65s cubic-bezier(0.5, 0, 0.3, 1);
+}
+.lift-doors i:first-child {
+  left: 0;
+  transform: translateX(-100%);
+  border-right: 1px solid #8f88a3;
+}
+.lift-doors i:last-child {
+  right: 0;
+  transform: translateX(100%);
+  border-left: 1px solid #8f88a3;
+}
+.lift.closed .lift-doors i {
+  transform: none;
+}
+.lift-msg {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+.lift-sub {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.lift-skip {
+  margin-top: 14px;
+  width: 100%;
+}
+.lift.arrived .lift-panel {
+  color: var(--lime);
+}
+.walk-ctrl #walk-play {
+  border: 3px solid #fff;
+  box-shadow: 0 4px 16px #24203566;
 }

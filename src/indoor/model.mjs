@@ -116,7 +116,9 @@ export function createIndoor(M) {
     M.gy1 - (Math.floor(c / CW) * K + K / 2) * M.cell,
   ];
   const cwalk = {},
-    croom = {};
+    croom = {},
+    cwall = {};
+  const WALL_COST = [1, 1.7, 1.2, 1]; // 벽까지 0·1·2·3+칸
   for (const n of floors) {
     const a = new Uint8Array(NPF),
       rm = new Int16Array(NPF).fill(-1);
@@ -136,6 +138,32 @@ export function createIndoor(M) {
     }
     cwalk[n] = a;
     croom[n] = rm;
+    // 벽까지 거리(칸): 복도 가운데로 걷도록 벽 옆 칸에 비용을 더합니다.
+    const wd = new Uint8Array(NPF).fill(255);
+    const q = [];
+    for (let c = 0; c < NPF; c++)
+      if (!a[c]) {
+        wd[c] = 0;
+        q.push(c);
+      }
+    for (let h = 0; h < q.length; h++) {
+      const c = q[h],
+        i = c % CW,
+        j = (c / CW) | 0;
+      if (wd[c] >= 3) continue;
+      for (let dj = -1; dj <= 1; dj++)
+        for (let di = -1; di <= 1; di++) {
+          const ni = i + di,
+            nj = j + dj;
+          if (ni < 0 || nj < 0 || ni >= CW || nj >= CH) continue;
+          const nc = nj * CW + ni;
+          if (wd[nc] > wd[c] + 1) {
+            wd[nc] = wd[c] + 1;
+            q.push(nc);
+          }
+        }
+    }
+    cwall[n] = wd;
   }
   function csnap(n, x, y) {
     const i0 = Math.floor((x - M.gx0) / M.cell / K),
@@ -176,6 +204,15 @@ export function createIndoor(M) {
         ramp: r,
       });
   }
+  function cabCenter(f, p) {
+    let best = null;
+    for (const r of FL(f).rooms)
+      if (r.cat === "elev") {
+        const d = Math.hypot(r.c[0] - p[0], r.c[1] - p[1]);
+        if (!best || d < best[0]) best = [d, r.c];
+      }
+    return best && best[0] < 5 ? best[1] : p;
+  }
   // 같은 위치(3m 이내)의 엘리베이터 문을 층별로 묶어 승강로로 봅니다.
   const elevDoors = [];
   for (const f of M.floors)
@@ -211,6 +248,9 @@ export function createIndoor(M) {
             cost: ELEV_WAIT + ELEV_PER_FLOOR * (B.f - A.f),
             pa: A.p,
             pb: B.p,
+            // 엘리베이터 칸 가운데: 탈 때(문→칸)·내릴 때(칸→문) 바라보는 방향 계산용
+            qa: cabCenter(A.f, A.p),
+            qb: cabCenter(B.f, B.p),
           });
       }
   });
@@ -300,7 +340,9 @@ export function createIndoor(M) {
           if (di && dj && !(a[j * CW + ni] && a[nj * CW + i])) continue;
           const r = rm[nc];
           const pen =
-            r >= 0 && !avoidRoomsExcept.has(FL(n).rooms[r].id) ? ROOM_COST : 1;
+            (r >= 0 && !avoidRoomsExcept.has(FL(n).rooms[r].id)
+              ? ROOM_COST
+              : 1) * WALL_COST[Math.min(3, cwall[n][nc])];
           const v = fIdx * NPF + nc,
             nd = d + Math.hypot(di, dj) * step * pen;
           if (nd < D[v]) {
@@ -364,6 +406,7 @@ export function createIndoor(M) {
     // 3D 점 목록(렌더링·진행률 계산용)
     const pts = [];
     for (const leg of legs) {
+      leg.i0 = pts.length; // 이 구간이 pts에서 시작하는 위치
       if (leg.kind === "walk") {
         const z = FL(leg.f).z;
         for (const [x, y] of leg.pts)
@@ -399,6 +442,7 @@ export function createIndoor(M) {
           kind: "elev",
         });
       }
+      leg.i1 = pts.length - 1;
     }
     let len = 0;
     for (let i = 1; i < pts.length; i++)
@@ -409,20 +453,21 @@ export function createIndoor(M) {
   }
 
   // 같은 층 걷기 구간: 시야가 트인 점만 남기는 줄당기기
+  // 선분 좌우로 0.25m 여유가 있어야 '트였다'고 봅니다(모서리를 스치지 않게).
   function clear(n, a, b) {
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]),
-      steps = Math.ceil(L / 0.1);
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (L < 1e-6) return true;
+    const steps = Math.ceil(L / 0.1),
+      nx = (-(b[1] - a[1]) / L) * 0.25,
+      ny = ((b[0] - a[0]) / L) * 0.25;
     for (let s = 1; s < steps; s++) {
       const t = s / steps,
         x = a[0] + (b[0] - a[0]) * t,
         y = a[1] + (b[1] - a[1]) * t;
-      // 벽에서 한 칸 떨어진 길만 허용해서 모서리를 스치지 않게 합니다.
       if (
         !walk(n, x, y) ||
-        !walk(n, x + 0.2, y) ||
-        !walk(n, x - 0.2, y) ||
-        !walk(n, x, y + 0.2) ||
-        !walk(n, x, y - 0.2)
+        !walk(n, x + nx, y + ny) ||
+        !walk(n, x - nx, y - ny)
       )
         return false;
     }
@@ -433,12 +478,38 @@ export function createIndoor(M) {
     const out = [pts[0]];
     let i = 0;
     while (i < pts.length - 1) {
-      let j = Math.min(pts.length - 1, i + 60);
+      let j = pts.length - 1;
+      // 멀리 있는 점부터 시도 (긴 직선 우선)
       while (j > i + 1 && !clear(n, pts[i], pts[j])) j--;
       out.push(pts[j]);
       i = j;
     }
-    return out;
+    return rdp(n, out, 0.35);
+  }
+  // 남은 계단 모양 꺾임 정리 (Ramer–Douglas–Peucker, 벽을 넘지 않을 때만)
+  function rdp(n, pts, eps) {
+    if (pts.length < 3) return pts;
+    const a = pts[0],
+      b = pts[pts.length - 1];
+    let best = -1,
+      bd = 0;
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-9;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const d =
+        Math.abs(
+          (b[0] - a[0]) * (a[1] - pts[i][1]) -
+            (a[0] - pts[i][0]) * (b[1] - a[1]),
+        ) / L;
+      if (d > bd) {
+        bd = d;
+        best = i;
+      }
+    }
+    if (bd <= eps && clear(n, a, b)) return [a, b];
+    if (best < 0) return pts;
+    const l = rdp(n, pts.slice(0, best + 1), eps),
+      r = rdp(n, pts.slice(best), eps);
+    return [...l.slice(0, -1), ...r];
   }
 
   // ---- 목적지 목록
