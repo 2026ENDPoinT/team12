@@ -76,16 +76,18 @@ export const FACADE_FAMILIES = {
 };
 
 const familiesByName = {
+  테니스장관리동: "service",
+  "서울테크노파크 어린이집": "warm",
+  동아리실: "warm",
   청운관: "academic",
   창학관: "warm",
-  하이테크관: "ribbon",
+  건축설계관: "ribbon",
   중앙도서관: "curtain",
   "중앙도서관 별관": "academic",
   체육관: "service",
   어의관: "academic",
   혜성관: "academic",
   다빈치관: "ribbon",
-  동아리실: "warm",
   국제관: "academic",
   성림학사: "residence",
   학생회관: "warm",
@@ -99,19 +101,13 @@ const familiesByName = {
   도예관: "warm",
   파워플랜트: "service",
   불암학사: "residence",
-  "서울테크노파크 어린이집": "warm",
   창업보육센터: "ribbon",
   제2파워플랜트: "service",
-  SeoulTech인재원: "academic",
+  창명학사: "residence",
+  수림학사: "residence",
   제2창업보육센터: "ribbon",
   "서울과학기술대 어린이집": "warm",
-  폐기물처리장: "service",
-  테니스장관리동: "service",
-  "전문대학원(36호관)": "academic",
   학군단: "academic",
-  제2매점: "warm",
-  교수회관: "academic",
-  건축설계관: "ribbon",
 };
 
 export function buildingAppearance(building) {

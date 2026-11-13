@@ -9,6 +9,7 @@ const officialBuildingNames = {
   "way-470633094": "파워플랜트",
   "way-382499364": "창업보육센터",
   "vw-56": "학군단",
+  "way-579071107": "창명학사",
 };
 for (const building of geometry.buildings)
   building.name = officialBuildingNames[building.id] || building.name;
