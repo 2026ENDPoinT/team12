@@ -5154,3 +5154,193 @@ body.exploring .header {
     background: rgba(213, 255, 118, 0.35);
   }
 }
+
+/* ===== 홈 · 학교 검색(#campuses)을 지도 화면 v2 디자인으로 (사용자 요청) =====
+   글래스 카드 · 잉크색 글자 · 라임 강조. 배치는 그대로 두고 모양만 바꿉니다. */
+#campuses {
+  --v2-ink: #15212b;
+  --v2-muted: #5a6872;
+  --v2-accent-text: #4c7a00;
+  --v2-tile: rgba(255, 255, 255, 0.45);
+  --v2-stroke: rgba(255, 255, 255, 0.6);
+  --v2-glass-bg: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.62) 0%,
+    rgba(255, 255, 255, 0.28) 100%
+  );
+  --v2-glass-filter: blur(22px) saturate(180%);
+  --v2-glass-shadow:
+    inset 0 0.75px 0 rgba(255, 255, 255, 0.85),
+    0 14px 40px rgba(21, 33, 43, 0.1);
+  color: var(--v2-ink);
+}
+#campuses .eyebrow.purple {
+  color: var(--v2-accent-text);
+}
+#campuses .section-heading h2 {
+  color: var(--v2-ink);
+}
+#campuses .section-heading h2 > span {
+  color: var(--v2-accent-text);
+}
+#campuses .section-heading > p,
+#campuses #school-count,
+#campuses .catalog-note {
+  color: var(--v2-muted);
+}
+
+/* 학교 검색창: 지도 화면 위쪽 바와 같은 유리 알약 + 라임 버튼 */
+#campuses #school-search-form {
+  border: 0.75px solid var(--v2-stroke);
+  border-radius: 999px;
+  background: var(--v2-glass-bg);
+  backdrop-filter: var(--v2-glass-filter);
+  -webkit-backdrop-filter: var(--v2-glass-filter);
+  box-shadow: var(--v2-glass-shadow);
+}
+#campuses #school-search-form:focus-within {
+  border-color: var(--v2-stroke);
+  box-shadow:
+    var(--v2-glass-shadow),
+    0 0 0 4px rgba(213, 255, 118, 0.45);
+}
+#campuses #school-search-form > .icon {
+  color: var(--v2-muted);
+}
+#campuses #school-search-form input {
+  color: var(--v2-ink);
+}
+#campuses #school-search-form input::placeholder {
+  color: var(--v2-muted);
+}
+#campuses #school-search-form kbd {
+  border: 0.75px solid rgba(21, 33, 43, 0.15);
+  border-radius: 6px;
+  background: var(--v2-tile);
+  color: var(--v2-muted);
+}
+#campuses #school-search-form .primary {
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--v2-ink);
+  box-shadow: none;
+}
+#campuses #school-search-form .primary:hover {
+  filter: brightness(0.97);
+}
+
+/* 지역 칩: 유리 알약, 선택은 잉크 바탕 + 라임 글자(지도 화면 길찾기 버튼과 같은 눌림 모양) */
+#campuses .region-filters button {
+  border: 0.75px solid var(--v2-stroke);
+  background: var(--v2-glass-bg);
+  backdrop-filter: var(--v2-glass-filter);
+  -webkit-backdrop-filter: var(--v2-glass-filter);
+  color: var(--v2-ink);
+}
+#campuses .region-filters .active {
+  border-color: var(--v2-ink);
+  background: var(--v2-ink);
+  color: var(--lime);
+}
+
+/* 학교 카드: 유리 카드 · 라임 로고 칸 */
+#campuses .school-card {
+  border: 0.75px solid var(--v2-stroke);
+  border-radius: 24px;
+  background: var(--v2-glass-bg);
+  backdrop-filter: var(--v2-glass-filter);
+  -webkit-backdrop-filter: var(--v2-glass-filter);
+  box-shadow: var(--v2-glass-shadow);
+  color: var(--v2-ink);
+}
+#campuses .school-card:hover {
+  border-color: rgba(76, 122, 0, 0.35);
+  box-shadow:
+    inset 0 0.75px 0 rgba(255, 255, 255, 0.85),
+    0 18px 44px rgba(21, 33, 43, 0.14);
+}
+#campuses .school-card.featured {
+  border: 1.5px solid var(--v2-accent-text);
+  background: linear-gradient(
+    135deg,
+    rgba(213, 255, 118, 0.38) 0%,
+    rgba(255, 255, 255, 0.3) 100%
+  );
+}
+#campuses .school-logo {
+  border-radius: 14px;
+  background: var(--v2-tile);
+  color: var(--v2-muted);
+}
+#campuses .school-card.featured .school-logo {
+  background: var(--lime);
+  color: var(--v2-ink);
+}
+#campuses .school-copy b {
+  color: var(--v2-ink);
+}
+#campuses .school-copy small,
+#campuses .school-arrow {
+  color: var(--v2-muted);
+}
+#campuses .school-card.featured .school-arrow {
+  color: var(--v2-ink);
+}
+#campuses .school-state {
+  color: var(--v2-accent-text);
+}
+#campuses .school-state i {
+  background: var(--v2-accent-text);
+}
+#campuses .school-state.soon {
+  color: var(--v2-muted);
+}
+#campuses .school-state.soon i {
+  background: var(--v2-muted);
+}
+#campuses .show-all {
+  border: 0.75px solid var(--v2-stroke);
+  border-radius: 999px;
+  background: var(--v2-glass-bg);
+  backdrop-filter: var(--v2-glass-filter);
+  -webkit-backdrop-filter: var(--v2-glass-filter);
+  color: var(--v2-ink);
+}
+
+/* 위쪽 머리글 메뉴도 잉크색으로 */
+.header nav a,
+.header nav button {
+  color: #15212b;
+}
+.header .brand-sub {
+  color: #5a6872;
+}
+
+/* 서비스 소개 창을 지도 화면 v2 디자인(유리 · 잉크 · 라임)으로 */
+.info-dialog {
+  border: 0.75px solid rgba(255, 255, 255, 0.6);
+  border-radius: 28px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.6) 100%);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  box-shadow: inset 0 0.75px 0 rgba(255, 255, 255, 0.85), 0 24px 60px rgba(21, 33, 43, 0.2);
+  color: #15212b;
+}
+.info-dialog .eyebrow.purple {
+  color: #4c7a00;
+}
+.info-dialog h2 {
+  color: #15212b;
+}
+.info-dialog p {
+  color: #5a6872;
+}
+.info-dialog .brand-color {
+  border: 0.75px solid rgba(255, 255, 255, 0.6);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.45);
+}
+.info-dialog .dialog-close {
+  border-radius: 50%;
+  color: #15212b;
+}
