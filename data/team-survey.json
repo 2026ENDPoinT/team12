@@ -2597,6 +2597,23 @@
         "source_kind": "team_input",
         "verification_status": "candidate"
       }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [127.0814235, 37.6301929],
+          [127.0814144, 37.6301271]
+        ]
+      },
+      "properties": {
+        "id": "path-47",
+        "campus_id": "SEOULTECH",
+        "feature_type": "sidewalk",
+        "source_kind": "team_input",
+        "verification_status": "candidate"
+      }
     }
   ]
 }
