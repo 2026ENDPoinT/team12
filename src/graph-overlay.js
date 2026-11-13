@@ -107,7 +107,7 @@ export function createGraphOverlay({ THREE, scene, CSS2DObject }) {
     const element = document.createElement("span");
     element.textContent = text;
     element.style.cssText =
-      `font:500 11px/1.2 system-ui,sans-serif;color:#fff;background:${color};` +
+      `font:500 11px/1.2 var(--font-ui);color:#fff;background:${color};` +
       "padding:2px 6px;border-radius:4px;white-space:nowrap;pointer-events:none;" +
       "transform:translateY(-14px)";
     const object = new CSS2DObject(element);
