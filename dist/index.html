@@ -301,6 +301,7 @@
           ><button data-summary-mode="stepfree">계단 피하기</button>
         </div>
         <button id="summary-edit">수정</button>
+        <button id="summary-close" aria-label="경로 지우기">✕</button>
       </div>
       <aside
         id="reports-panel"
@@ -360,8 +361,8 @@
       <div class="explorer">
         <section class="mobile-navigation" aria-label="길안내" hidden>
           <div class="navigation-banner">
-            <div class="navigation-journey"><button id="navigation-back" aria-label="경로 미리보기로 돌아가기">←</button><span class="navigation-origin-dot"></span><span id="navigation-origin"></span><span>→</span><span class="navigation-destination-dot"></span><span id="navigation-destination"></span></div>
-            <div class="navigation-instruction"><div class="navigation-turn"><span id="navigation-arrow" aria-hidden="true">↑</span><b id="navigation-turn-distance">—</b></div><div><h2 id="navigation-direction">위치 확인 중</h2><p id="navigation-detail" role="status">현재 위치를 확인하고 있어요.</p></div></div>
+            <div class="navigation-journey navigation-journey-top"><button id="navigation-back" aria-label="경로 미리보기로 돌아가기">←</button><span class="navigation-origin-dot"></span><span class="navigation-origin-name"></span><span aria-hidden="true">→</span><span class="navigation-destination-dot"></span><span class="navigation-destination-name"></span></div>
+            <div class="navigation-instruction"><button id="navigation-back-mobile" aria-label="경로 미리보기로 돌아가기">←</button><div class="navigation-turn"><span id="navigation-arrow" aria-hidden="true">↑</span><b id="navigation-turn-distance">—</b></div><div><h2 id="navigation-direction">위치 확인 중</h2><p id="navigation-detail" role="status">현재 위치를 확인하고 있어요.</p></div></div>
           </div>
           <button id="navigation-recenter" hidden><svg class="icon" aria-hidden="true"><use href="#i-locate" /></svg>내 위치로</button>
           <button id="navigation-compass" aria-label="진행 방향 따라가기" aria-pressed="false">
@@ -374,14 +375,19 @@
           <button id="navigation-zoom-in" aria-label="지도 확대">＋</button>
           <button id="navigation-zoom-out" aria-label="지도 축소">−</button>
           <div class="navigation-bottom">
-            <span class="navigation-bottom-grip" aria-hidden="true"></span>
-            <div class="navigation-arrival">
-              <b id="navigation-minutes"></b>
-              <strong id="navigation-distance"></strong>
-              <span id="navigation-eta"></span>
+            <div class="navigation-summary">
+              <div class="navigation-arrival">
+                <b id="navigation-minutes"></b>
+                <strong id="navigation-distance"></strong>
+                <span id="navigation-eta" class="navigation-eta-text"></span>
+              </div>
+              <div class="navigation-journey navigation-journey-bottom"><span class="navigation-origin-dot"></span><span class="navigation-origin-name"></span><span aria-hidden="true">→</span><span class="navigation-destination-dot"></span><span class="navigation-destination-name"></span></div>
             </div>
-            <p id="navigation-status" role="status"></p>
-            <progress id="navigation-progress" max="1" value="0" aria-label="경로 진행률"></progress>
+            <p class="navigation-meta"><span class="navigation-meta-eta navigation-eta-text"></span><span id="navigation-status" role="status"></span></p>
+            <div class="navigation-progress-track">
+              <progress id="navigation-progress" max="1" value="0" aria-label="경로 진행률"></progress>
+              <span class="navigation-progress-knob" aria-hidden="true"><span><svg viewBox="0 0 24 24"><path d="M5 4.5 20 12 5 19.5 8.2 12Z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span></span>
+            </div>
             <button id="navigation-stop" type="button">길안내 종료</button>
           </div>
         </section>

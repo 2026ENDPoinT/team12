@@ -972,14 +972,17 @@ function renderMobileNavigation(guide = null) {
   guide ??= guidanceActive && gpsPosition
     ? guidanceAt(routePoints(currentRoute.path, currentRouteNodes), gpsPosition)
     : null;
-  $("#navigation-origin").textContent = guidanceOriginName || "현재 위치";
-  $("#navigation-destination").textContent = $("#destination").value;
+  // 출발 → 도착과 도착 시각은 데스크톱(위 카드)·모바일(아래 시트)용으로 두 벌입니다.
+  $$(".navigation-origin-name").forEach((el) => (el.textContent = guidanceOriginName || "현재 위치"));
+  $$(".navigation-destination-name").forEach((el) => (el.textContent = $("#destination").value));
   const remaining = guide?.remaining ?? currentRoute.meters;
   const { minutes, progress } = guidanceSummary(remaining, guidanceTotalMeters || currentRoute.meters);
   $("#navigation-minutes").textContent = `${minutes}분`;
   $("#navigation-distance").textContent = `${Math.round(remaining)}m`;
-  $("#navigation-eta").textContent = `${new Date(Date.now() + minutes * 60000).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" })} 도착`;
+  const eta = `${new Date(Date.now() + minutes * 60000).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" })} 도착`;
+  $$(".navigation-eta-text").forEach((el) => (el.textContent = eta));
   $("#navigation-progress").value = progress;
+  $(".navigation-progress-track").style.setProperty("--progress", String(Math.min(1, Math.max(0, progress))));
   const direction = guide?.next.direction;
   $("#navigation-direction").textContent = guidancePending ? "위치 확인 중" : INSTRUCTION[direction] || "경로를 따라 이동";
   $("#navigation-arrow").textContent = direction === "left" ? "↰" : direction === "right" ? "↱" : direction === "arrive" ? "⚑" : "↑";
@@ -1121,6 +1124,7 @@ $("#navigation-back").onclick = () => {
   setPanelClosed(false);
 };
 $("#navigation-route").onclick = () => $("#navigation-back").click();
+$("#navigation-back-mobile").onclick = () => $("#navigation-back").click();
 $("#navigation-recenter").onclick = () => {
   if (!gpsPosition || !guidanceActive) return;
   guidanceFollowing = true;
@@ -1134,6 +1138,11 @@ $$("[data-summary-mode]").forEach(
       $(`.mode-tabs [data-mode="${b.dataset.summaryMode}"]`).click()),
 );
 $("#summary-edit").onclick = () => setPanelClosed(false);
+// 경로 요약의 ✕는 경로를 지우고 기본 지도(검색 바)로 돌아갑니다.
+$("#summary-close").onclick = () => {
+  endRouteSearch();
+  setPanelClosed(true);
+};
 // 모바일 경로 시트의 ✕는 길찾기를 끝내고(경로 지움) 지도로 돌아갑니다. 데스크톱은 패널만 닫습니다.
 $("#route-panel-close").onclick = () => {
   if (!isDesktop.matches) endRouteSearch();
