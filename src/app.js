@@ -1733,7 +1733,7 @@ $("#shortcut-start").onclick = startShortcutPicking;
 $("#shortcut-picker-close").onclick = () => {
   const returnToReview = reviewingShortcut;
   stopShortcutPicking();
-  if (returnToReview && adminAuthenticated) openAdminPanel();
+  if (returnToReview && adminAuthenticated) openAdminPanel("shortcuts");
 };
 shortcutDialog.addEventListener("cancel", (event) => {
   if (shortcutSubmit.disabled) event.preventDefault();
@@ -1794,6 +1794,9 @@ async function loadShortcuts() {
 function renderShortcutReviews() {
   const list = $("#shortcut-admin-list");
   const rows = shortcutRows.filter((row) => row.status !== "rejected");
+  const pending = rows.filter((row) => row.status === "pending").length;
+  $("#admin-shortcut-count").textContent = pending;
+  $("#admin-shortcut-count").hidden = pending === 0;
   $("#shortcut-admin-status").textContent = rows.length ? "" : "검토할 지름길 제보가 없어요.";
   list.replaceChildren();
   for (const row of rows) {
@@ -2468,9 +2471,23 @@ function renderAdminAlert() {
 }
 // 관리자 화면은 ?admin=1에서만 노출하고, 실제 권한은 Supabase Auth + RLS가 검사합니다.
 $("#admin-toggle").hidden = !new URLSearchParams(location.search).has("admin");
-function openAdminPanel() {
+function setAdminTab(tab) {
+  $$("[data-admin-tab]").forEach((button) => {
+    const active = button.dataset.adminTab === tab;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  $$("[data-admin-panel]").forEach((panel) =>
+    panel.classList.toggle("is-active", panel.dataset.adminPanel === tab),
+  );
+}
+$$('[data-admin-tab]').forEach(
+  (button) => (button.onclick = () => setAdminTab(button.dataset.adminTab)),
+);
+function openAdminPanel(tab = "reports") {
   renderAdminPanel();
   renderWorkList();
+  setAdminTab(tab);
   $("#admin-dialog").showModal();
   loadShortcuts();
 }

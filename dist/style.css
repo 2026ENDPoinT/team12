@@ -7371,6 +7371,10 @@ body {
 .admin-dot.works {
   background: var(--violet);
 }
+.admin-dot.shortcut {
+  background: #7950ff;
+  box-shadow: 0 0 0 3px rgba(121, 80, 255, 0.16);
+}
 #admin-dialog .admin-section > p {
   margin: 0;
   color: var(--v2-muted);
@@ -7654,7 +7658,43 @@ body {
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
-#admin-dialog .admin-panel-content > small {
+#admin-dialog .admin-tabs {
+  display: none;
+}
+#admin-dialog .admin-tab-panel {
+  display: contents;
+}
+#admin-dialog .admin-shortcuts .report-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+#admin-dialog .shortcut-review {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 0.75px solid rgba(121, 80, 255, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+}
+#admin-dialog .shortcut-review > b {
+  color: var(--violet);
+  font-size: 13px;
+}
+#admin-dialog .shortcut-review > p {
+  margin: 0;
+  color: var(--v2-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+#admin-dialog .shortcut-review > small {
+  color: var(--v2-muted);
+  font-size: 12px;
+}
+#admin-dialog .admin-panel-content > small,
+#admin-dialog .admin-tab-panel > small {
   color: var(--v2-muted);
   font-size: 12px;
   line-height: 1.6;
@@ -7723,6 +7763,78 @@ body {
   background-repeat: no-repeat;
   background-position: right 13px center;
   background-size: 20px;
+}
+@media (min-width: 761px) {
+  #admin-dialog {
+    width: min(920px, 94vw);
+  }
+  #admin-dialog .admin-tabs {
+    position: sticky;
+    z-index: 4;
+    top: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    padding: 5px;
+    border: 0.75px solid rgba(255, 255, 255, 0.85);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(18px);
+  }
+  #admin-dialog .admin-tabs button {
+    min-height: 46px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--v2-muted);
+    font-size: 14px;
+    font-weight: 800;
+  }
+  #admin-dialog .admin-tabs button:is(:hover, :focus-visible) {
+    background: rgba(213, 255, 118, 0.28);
+    color: var(--v2-ink);
+  }
+  #admin-dialog .admin-tabs button.is-active {
+    background: var(--v2-ink);
+    color: #fff;
+  }
+  #admin-dialog .admin-tabs button span {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    margin-left: 5px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--lime);
+    color: var(--v2-ink);
+    font-size: 11px;
+    line-height: 1;
+  }
+  #admin-dialog .shortcut-review .admin-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  #admin-dialog .shortcut-review .admin-actions:has(> :nth-child(2):last-child) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  #admin-dialog .shortcut-review .admin-actions button {
+    min-width: 0;
+    padding-inline: 10px;
+    white-space: nowrap;
+  }
+  #admin-dialog .admin-tab-panel {
+    display: none;
+  }
+  #admin-dialog .admin-tab-panel.is-active {
+    display: grid;
+    gap: 16px;
+  }
+  #admin-dialog .admin-tab-panel > small {
+    color: var(--v2-muted);
+    font-size: 12px;
+    line-height: 1.6;
+  }
 }
 @media (max-width: 760px) {
   #admin-dialog .dialog-body {
