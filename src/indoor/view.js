@@ -454,49 +454,24 @@ export function createView(el, indoor, { onPick } = {}) {
     });
     return mergeGeometries(norm);
   }
-  function chevrons(pts, every = 2.2) {
-    const geo = new THREE.BufferGeometry();
-    const v = [];
-    let acc = every / 2;
-    for (let i = 1; i < pts.length; i++) {
-      const a = pts[i - 1],
-        b = pts[i],
-        L = Math.hypot(b[0] - a[0], b[1] - a[1]);
-      if (L < 0.01) continue;
-      const ux = (b[0] - a[0]) / L,
-        uy = (b[1] - a[1]) / L;
-      while (acc < L) {
-        const t = acc / L,
-          x = a[0] + (b[0] - a[0]) * t,
-          y = a[1] + (b[1] - a[1]) * t,
-          z = a[2] + (b[2] - a[2]) * t + 0.02;
-        const s = 0.28;
-        const tip = [x + ux * s, y + uy * s],
-          l = [x - ux * s * 0.6 - uy * s, y - uy * s * 0.6 + ux * s],
-          r = [x - ux * s * 0.6 + uy * s, y - uy * s * 0.6 - ux * s];
-        v.push(tip[0], z, -tip[1], l[0], z, -l[1], r[0], z, -r[1]);
-        acc += every;
-      }
-      acc -= L;
-    }
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(v, 3));
-    return geo;
-  }
+  // 지도 보기 경로 선: 위에서 안내하는 화면이라 벽·보에 가려지지 않게
   const matMain = new THREE.MeshBasicMaterial({
     toneMapped: false,
     color: VIOLET,
     side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
+    depthTest: false,
   });
-  const matGhost = new THREE.MeshBasicMaterial({
+  // 지도 보기 경로 테두리: 벽 아래 경로도 보이게 가려지지 않음(기존 반투명 띠 자리)
+  const matMapHalo = new THREE.MeshBasicMaterial({
     toneMapped: false,
     color: VIOLET,
     transparent: true,
-    opacity: 0.28,
+    opacity: 0.2,
     depthTest: false,
+    depthWrite: false,
     side: THREE.DoubleSide,
   });
+  const MAP_MARK = 4; // 지도 보기 출발·도착 표시 크기(미리 걷기 표시의 배율)
   const matChev = new THREE.MeshBasicMaterial({
     toneMapped: false,
     color: 0xffffff,
@@ -602,19 +577,17 @@ export function createView(el, indoor, { onPick } = {}) {
     }
     for (const r of runs) {
       if (r.pts.length < 2) continue;
-      for (const [mat, order] of [
-        [matGhost, 1],
-        [matMain, 2],
+      // 지도 보기: 미리 걷기와 같은 모양(얇은 선 + 은은한 테두리 + 작은 '>')을 멀리서 보이게 크게
+      for (const [geo, mat, order] of [
+        [ribbon(r.pts, 1.3), matMapHalo, 1],
+        [ribbon(r.pts, 0.36), matMain, 2],
+        [chevronsV(r.pts, 3.2, 0.34, 0.09), matChev, 3],
       ]) {
-        const m = new THREE.Mesh(ribbon(r.pts, 0.9), mat);
+        const m = new THREE.Mesh(geo, mat);
         m.renderOrder = order;
         m.userData = { f: r.f, mode: "map" };
         routeGroup.add(m);
       }
-      const c = new THREE.Mesh(chevrons(r.pts), matChev);
-      c.renderOrder = 3;
-      c.userData = { f: r.f, mode: "map" };
-      routeGroup.add(c);
       // 걸어 보기: 얇은 선 + 은은한 테두리 + 작은 '>' 화살표 (눈높이에서 복도를 덮지 않게)
       const walkPts = r.pts.map((p) => [p[0], p[1], p[2] - 0.05]);
       for (const [geo, mat, order] of [
@@ -630,11 +603,14 @@ export function createView(el, indoor, { onPick } = {}) {
     }
     const s = route.pts[0],
       e = route.pts[route.pts.length - 1];
-    const start = makeStart();
+    // 지도 보기 출발·도착: 미리 걷기와 같은 모양을 지도 크기로
+    const start = makeWalkStart(true);
+    start.scale.setScalar(MAP_MARK);
     start.position.copy(T(s.x, s.y, s.z + 0.1));
     start.userData = { f: s.f, mode: "map" };
     routeGroup.add(start);
-    const pin = makePin();
+    const pin = makeWalkPin(true);
+    pin.scale.setScalar(MAP_MARK);
     pin.position.copy(T(e.x, e.y, e.z));
     pin.userData = { f: e.f, mode: "map" };
     routeGroup.add(pin);
@@ -736,33 +712,8 @@ export function createView(el, indoor, { onPick } = {}) {
   }
 
   // ---- 표시물
-  function makeStart() {
-    const g = new THREE.Group();
-    const ring = new THREE.Mesh(
-      new THREE.CircleGeometry(0.75, 28),
-      new THREE.MeshBasicMaterial({
-        toneMapped: false,
-        color: VIOLET,
-        depthTest: false,
-      }),
-    );
-    const dot = new THREE.Mesh(
-      new THREE.CircleGeometry(0.48, 28),
-      new THREE.MeshBasicMaterial({
-        toneMapped: false,
-        color: 0xffffff,
-        depthTest: false,
-      }),
-    );
-    ring.rotation.x = dot.rotation.x = -Math.PI / 2;
-    dot.position.y = 0.01;
-    ring.renderOrder = 4;
-    dot.renderOrder = 5;
-    g.add(ring, dot);
-    return g;
-  }
   // 걸어 보기 출발: 바닥의 작은 고리
-  function makeWalkStart() {
+  function makeWalkStart(onTop = false) {
     const g = new THREE.Group();
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.2, 0.28, 40),
@@ -770,6 +721,7 @@ export function createView(el, indoor, { onPick } = {}) {
         toneMapped: false,
         color: VIOLET,
         side: THREE.DoubleSide,
+        depthTest: !onTop, // 지도에서는 벽에 가려지지 않게
       }),
     );
     const dot = new THREE.Mesh(
@@ -778,14 +730,16 @@ export function createView(el, indoor, { onPick } = {}) {
         toneMapped: false,
         color: VIOLET,
         side: THREE.DoubleSide,
+        depthTest: !onTop, // 지도에서는 벽에 가려지지 않게
       }),
     );
     ring.rotation.x = dot.rotation.x = -Math.PI / 2;
+    if (onTop) ring.renderOrder = dot.renderOrder = 4;
     g.add(ring, dot);
     return g;
   }
   // 걸어 보기 도착: 바닥 고리(보라·흰) + 가는 기둥 위 작은 구슬(눈높이 아래)
-  function makeWalkPin() {
+  function makeWalkPin(onTop = false) {
     const g = new THREE.Group();
     const violet = new THREE.MeshBasicMaterial({
       toneMapped: false,
@@ -834,26 +788,13 @@ export function createView(el, indoor, { onPick } = {}) {
     );
     head.position.y = 1.15;
     g.add(fill, outer, inner, stem, head);
-    return g;
-  }
-  function makePin() {
-    const g = new THREE.Group();
-    const mat = new THREE.MeshLambertMaterial({
-      toneMapped: false,
-      color: DEEP,
-      emissive: 0x2a1580,
-    });
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.75, 20, 14), mat);
-    head.position.y = 2.6;
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.9, 20), mat);
-    cone.rotation.x = Math.PI;
-    cone.position.y = 1.5;
-    const dot = new THREE.Mesh(
-      new THREE.SphereGeometry(0.28, 14, 10),
-      new THREE.MeshBasicMaterial({ toneMapped: false, color: 0xffffff }),
-    );
-    dot.position.set(0, 2.6, 0.55);
-    g.add(head, cone, dot);
+    // 지도 보기: 벽에 가려지지 않게(바닥 고리 → 기둥 → 구슬 순서로 위에)
+    if (onTop)
+      [fill, outer, inner, stem, head].forEach((m, i) => {
+        m.material = m.material.clone();
+        m.material.depthTest = false;
+        m.renderOrder = 4 + i;
+      });
     return g;
   }
   function makeMe() {
