@@ -1,6 +1,6 @@
 import { createStreetLights, windowLights } from "./map/night-lighting.mjs";
 import { touchGestureMode, touchTurn } from "./map/touch-gesture.mjs";
-import { cameraOffsetForHeading, smoothHeading, headingDelta } from "./heading.mjs";
+import { cameraOffsetForHeading, smoothHeading } from "./heading.mjs";
 import { createNavigationBounds } from "./map/navigation-bounds.mjs";
 import { createKeyboardPan } from "./map/keyboard-pan.mjs";
 import { createMapProfiler } from "./map/performance.mjs";
@@ -419,14 +419,13 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   userLocationGroup.add(userAccuracy, userBase);
   let navigationMode = false;
   let navigationFollowing = false, navigationHeading = null, displayedHeading = null;
-  const navigationMarker = document.createElement("div");
-  navigationMarker.className = "navigation-position";
-  navigationMarker.setAttribute("aria-label", "현재 위치");
-  navigationMarker.innerHTML = '<span aria-hidden="true">▲</span>';
-  const navigationLabel = new CSS2DObject(navigationMarker);
-  navigationLabel.position.y = 4;
-  navigationLabel.visible = false;
-  userLocationGroup.add(navigationLabel);
+  // 길안내 중에는 테크뇽이 GPS 위치를 부드럽게 따라 걷고, 카메라는 뒤에서 비스듬히 따라갑니다(3인칭).
+  const THIRD_PERSON_TILT = 0.95,
+    THIRD_PERSON_ZOOM = 6,
+    THIRD_PERSON_AHEAD = 18;
+  const navigationTarget = new THREE.Vector3();
+  let navigationTargetSet = false,
+    navigationMovedAt = -Infinity;
   let userTechnyong = null,
     technyong = null,
     movingDot = null,
@@ -642,9 +641,17 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
       userTechnyong.object.rotation.y = Math.PI;
       userLocationGroup.add(userTechnyong.object);
     }
-    userTechnyong.object.visible = !navigationMode;
+    userTechnyong.object.visible = true;
     const accuracy = THREE.MathUtils.clamp(position.accuracy || 12, 3, 100);
-    userLocationGroup.position.set(position.x, 0, position.z);
+    if (navigationMode) {
+      // 새 위치로 순간이동하지 않고 animate에서 걸어가게 합니다. 멀리 튄 위치는 바로 옮깁니다.
+      const jump = Math.hypot(position.x - navigationTarget.x, position.z - navigationTarget.z);
+      if (!navigationTargetSet || jump > 80)
+        userLocationGroup.position.set(position.x, 0, position.z);
+      if (jump > 0.5) navigationMovedAt = performance.now();
+      navigationTarget.set(position.x, 0, position.z);
+      navigationTargetSet = true;
+    } else userLocationGroup.position.set(position.x, 0, position.z);
     userAccuracy.scale.set(accuracy, accuracy, 1);
     if (follow) {
       if (navigationMode) {
@@ -1273,26 +1280,39 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     keyboardPan.update(deltaSeconds);
     controls.update();
     if (!homeMode) constrainNavigation(camera, controls);
-    if (navigationMode && userLocationGroup.visible && navigationHeading !== null) {
-      const weight = reduceMotion ? 1 : 1 - Math.exp(-10 * Math.min(.1, deltaSeconds));
-      displayedHeading = smoothHeading(displayedHeading, navigationHeading, weight);
-      if (navigationFollowing) {
-        const offset = camera.position.clone().sub(controls.target);
-        const bearing = Math.atan2(-offset.x, offset.z) * 180 / Math.PI;
-        const nextHeading = smoothHeading(bearing, navigationHeading, weight);
-        const phi = new THREE.Spherical().setFromVector3(offset).phi;
-        const desired = cameraOffsetForHeading(nextHeading, offset.length(), phi + (.45 - phi) * weight);
-        const ahead = navigationHeading * Math.PI / 180;
-        const target = userLocationGroup.position.clone().add(new THREE.Vector3(Math.sin(ahead) * 35, 0, -Math.cos(ahead) * 35));
-        controls.target.lerp(target, weight);
-        camera.position.copy(controls.target).add(new THREE.Vector3(desired.x, desired.y, desired.z));
-        camera.zoom += (Math.max(4.2, camera.zoom) - camera.zoom) * weight;
-        camera.updateProjectionMatrix();
-        controls.update();
+    if (navigationMode && userLocationGroup.visible) {
+      const step = Math.min(.1, deltaSeconds);
+      const weight = reduceMotion ? 1 : 1 - Math.exp(-10 * step);
+      if (navigationTargetSet)
+        userLocationGroup.position.lerp(navigationTarget, reduceMotion ? 1 : 1 - Math.exp(-4 * step));
+      if (navigationHeading !== null) {
+        displayedHeading = smoothHeading(displayedHeading, navigationHeading, weight);
+        // 나침반 방위(0=북, 시계방향)를 테크뇽이 바라보는 방향으로 바꿉니다.
+        if (userTechnyong)
+          userTechnyong.object.rotation.y = Math.PI - displayedHeading * Math.PI / 180;
+        if (navigationFollowing) {
+          const offset = camera.position.clone().sub(controls.target);
+          const bearing = Math.atan2(-offset.x, offset.z) * 180 / Math.PI;
+          const nextHeading = smoothHeading(bearing, navigationHeading, weight);
+          const phi = new THREE.Spherical().setFromVector3(offset).phi;
+          const desired = cameraOffsetForHeading(nextHeading, offset.length(), phi + (THIRD_PERSON_TILT - phi) * weight);
+          const ahead = navigationHeading * Math.PI / 180;
+          const target = userLocationGroup.position.clone().add(new THREE.Vector3(Math.sin(ahead) * THIRD_PERSON_AHEAD, 0, -Math.cos(ahead) * THIRD_PERSON_AHEAD));
+          controls.target.lerp(target, weight);
+          camera.position.copy(controls.target).add(new THREE.Vector3(desired.x, desired.y, desired.z));
+          camera.zoom += (Math.max(THIRD_PERSON_ZOOM, camera.zoom) - camera.zoom) * weight;
+          camera.updateProjectionMatrix();
+          controls.update();
+        }
+      } else if (navigationFollowing) {
+        controls.target.lerp(userLocationGroup.position, weight);
       }
-      const view = camera.position.clone().sub(controls.target);
-      const cameraHeading = Math.atan2(-view.x, view.z) * 180 / Math.PI;
-      navigationMarker.firstElementChild.style.transform = `rotate(${headingDelta(cameraHeading, displayedHeading)}deg)`;
+      if (userTechnyong) {
+        const walking = !reduceMotion &&
+          (performance.now() - navigationMovedAt < 2500 ||
+            userLocationGroup.position.distanceTo(navigationTarget) > 0.4);
+        userTechnyong.update(t / 1000, { moving: walking, dt: step || 1 / 60 });
+      }
     }
     campusTrees.updateDetail(
       (renderer.domElement.clientHeight * camera.zoom) /
@@ -1343,9 +1363,17 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
         navigationHeading = displayedHeading = null;
       }
       navigationMode = enabled;
-      navigationLabel.visible = enabled;
+      navigationTargetSet = false;
+      navigationMovedAt = -Infinity;
+      // 길안내 중 내 위치 표시는 테크뇽이 맡습니다.
       userBase.visible = !enabled;
-      if (userTechnyong) userTechnyong.object.visible = !enabled;
+      if (userTechnyong) {
+        userTechnyong.object.visible = true;
+        if (!enabled) {
+          userTechnyong.object.rotation.y = Math.PI;
+          userTechnyong.update(0, { moving: false, dt: 1 });
+        }
+      }
     },
     setNavigationHeading(heading, following) {
       if (!Number.isFinite(heading)) return;
