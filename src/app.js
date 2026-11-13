@@ -1,6 +1,6 @@
 import { normalizeSearch, suggestMatches } from "./search-suggestions.mjs";
 import { shortestPath } from "./routing.mjs";
-import { routeBetween } from "./route-target.mjs";
+import { routeBetween, routeStartEntries } from "./route-target.mjs";
 import { attachGps } from "./gps-start.mjs";
 import {
   edgeId,
@@ -233,7 +233,7 @@ function routeOn(g, routeMode = mode) {
     destination,
     nodes: routeGraph.nodes,
     route: routeBetween(
-      start.entries,
+      routeStartEntries(start, routeMode, routeGraph.nodes),
       destination.entries,
       routeMode,
       routeGraph.nodes,
@@ -1049,6 +1049,19 @@ side("route").onclick = () =>
   setPanelClosed(!$("#map-view").classList.contains("panel-closed"));
 // 길 막힘(공사) 아이콘: 왼쪽에 길 막힘 제보 목록 패널을 열고 닫습니다.
 side("report").onclick = () => setReportsPanel($("#reports-panel").hidden);
+function setEntranceLayer(visible) {
+  map?.setEntrancesVisible(visible);
+  side("entrances").setAttribute("aria-pressed", String(visible));
+  $("#entrance-toggle").setAttribute("aria-pressed", String(visible));
+}
+side("entrances").onclick = () =>
+  setEntranceLayer(
+    side("entrances").getAttribute("aria-pressed") !== "true",
+  );
+$("#entrance-toggle").onclick = () =>
+  setEntranceLayer(
+    $("#entrance-toggle").getAttribute("aria-pressed") !== "true",
+  );
 side("layers").onclick = () => {
   const on = !$("#map-view").classList.contains("show-legend");
   $("#map-view").classList.toggle("show-legend", on);

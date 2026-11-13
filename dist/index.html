@@ -265,6 +265,14 @@
         >
           <svg class="icon"><use href="#i-layers" /></svg>
         </button>
+        <button
+          data-side="entrances"
+          aria-label="출입구 표시"
+          aria-pressed="true"
+          title="출입구 표시"
+        >
+          <svg class="icon"><use href="#i-pin" /></svg>
+        </button>
         <span class="map-sidebar-spacer" aria-hidden="true"></span>
         <button data-side="alerts" aria-label="관리자 검토 알림" title="관리자 검토">
           <svg class="icon"><use href="#i-bell" /></svg
@@ -586,6 +594,15 @@
             >
               <span class="gps-icon" aria-hidden="true">◎</span>
               <span>내 위치로</span>
+            </button>
+            <button
+              id="entrance-toggle"
+              class="gps-toggle entrance-toggle"
+              aria-label="출입구 표시"
+              aria-pressed="true"
+            >
+              <span class="gps-icon" aria-hidden="true">◉</span>
+              <span>출입구</span>
             </button>
             <button id="report-start" class="report-start" aria-pressed="false">
               ⚠ 공사 구간 신고

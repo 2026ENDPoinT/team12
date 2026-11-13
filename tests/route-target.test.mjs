@@ -10,7 +10,7 @@ import {
   placeEntries,
 } from "../src/data.mjs";
 import { mergeSurvey } from "../src/survey.mjs";
-import { routeBetween } from "../src/route-target.mjs";
+import { routeBetween, routeStartEntries } from "../src/route-target.mjs";
 import { shortestPath } from "../src/routing.mjs";
 import { toLngLat } from "../src/geo.mjs";
 import { SAMPLE_DOORS } from "./fixtures.mjs";
@@ -91,6 +91,26 @@ test("several start doors work the same way in reverse", () => {
     );
   assert.ok(Math.abs(backward.meters - forward.meters) < 1e-6);
   assert.equal(backward.from, forward.to);
+});
+
+test("미래관 출발문은 최단 경로와 계단 피하기에서 각각 고정된다", () => {
+  const place = PLACES.find(({ id }) => id === "future");
+  assert.deepEqual(routeStartEntries(place, "shortest", NODES), [
+    "ent-future-2",
+  ]);
+  assert.deepEqual(routeStartEntries(place, "stepfree", NODES), [
+    "ent-future-1",
+  ]);
+
+  const accessible = routeBetween(
+    routeStartEntries(place, "stepfree", NODES),
+    [MAIN_GATE.entry],
+    "stepfree",
+    NODES,
+    EDGES,
+  );
+  assert.equal(accessible.from, "ent-future-1");
+  assert.equal(accessible.stairs, false);
 });
 
 test("one start and one target behave exactly like shortestPath", () => {

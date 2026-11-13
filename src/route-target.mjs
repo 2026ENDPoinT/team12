@@ -6,6 +6,16 @@ import { shortestPath } from "./routing.mjs";
 const START = "__start__",
   GOAL = "__goal__";
 
+// 미래관 출발은 현장에서 확인한 문을 모드별로 사용합니다.
+const PREFERRED_START_ENTRANCE = {
+  future: { shortest: "ent-future-2", stepfree: "ent-future-1" },
+};
+
+export function routeStartEntries(place, mode, nodes) {
+  const preferred = PREFERRED_START_ENTRANCE[place.id]?.[mode];
+  return preferred && nodes[preferred] ? [preferred] : place.entries;
+}
+
 /**
  * starts, targets: 노드 id 배열(하나여도 배열). 반환 형식은 shortestPath와 같고,
  * 실제로 쓴 문을 from(출발 노드), to(도착 노드)로 함께 돌려줍니다. 경로가 없으면 null.

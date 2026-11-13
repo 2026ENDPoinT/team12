@@ -319,7 +319,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     entranceDotGeometry = new THREE.SphereGeometry(1.75, 12, 8),
     entranceRingGeometry = new THREE.RingGeometry(2.2, 3.1, 20);
   // 등록된 출입구(team-survey.json)를 초록 점으로 그립니다. 편집기로 바꾸면 다시 그립니다.
-  let mappedEntrances = ENTRANCES;
+  let mappedEntrances = ENTRANCES,
+    entrancesVisible = true;
   function setEntrances(list) {
     mappedEntrances = list;
     for (const child of [...entranceGroup.children])
@@ -344,6 +345,10 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     marker.position.set(entrance.x, 8, entrance.z);
     stem.renderOrder = dot.renderOrder = ring.renderOrder = 4;
     entranceGroup.add(stem, dot, ring, marker);
+  }
+  function setEntrancesVisible(visible) {
+    entrancesVisible = visible;
+    entranceGroup.visible = !homeMode && visible;
   }
   for (const entrance of ENTRANCES) addEntranceMarker(entrance);
   entranceGroup.visible = false;
@@ -622,7 +627,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     controls.mouseButtons.LEFT = value ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN;
     controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
     keyboardPan.clear();
-    entranceGroup.visible = !value;
+    entranceGroup.visible = !value && entrancesVisible;
     for (const { id, label } of labelObjects) {
       label.visible =
         !value || ["future", "davinci", "library", "gate"].includes(id);
@@ -1242,6 +1247,7 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     setEditPreview: (spec) => graphOverlay.setPreview(spec),
     setEditHandler,
     setEntrances,
+    setEntrancesVisible,
     focusTop,
     setRoute,
     setReports,
