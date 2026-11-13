@@ -54,11 +54,6 @@ export async function insertReportRow({
   if (error) throw error;
 }
 
-export async function deleteReportRow(id) {
-  const { error } = await supabase.from("road_reports").delete().eq("id", id);
-  if (error) throw error;
-}
-
 // 관리자 확정: 같은 구간의 모든 신고를 confirmed로 바꿉니다 (행은 지우지 않고 기록으로 남김).
 export async function confirmReportRows(ids) {
   const { data, error } = await supabase

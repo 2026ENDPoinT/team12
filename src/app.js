@@ -17,7 +17,7 @@ import {
 import {
   fetchReportRows,
   insertReportRow,
-  deleteReportRow,
+  getDeviceId,
   confirmReportRows,
   deleteReportRows,
   uploadReportPhoto,
@@ -647,12 +647,18 @@ function openRoadReport(selection) {
   if (!existing && (!selection?.point || !selection?.edgeId)) return;
   selectedReport = existing || selection;
   $("#report-location").textContent = reportLocation(selectedReport);
-  $("#report-title").textContent = existing
-    ? "이 도로 구간에 내 신고가 있어요."
-    : "선택한 도로 구간이 공사 중인가요?";
+  const mine = existing && isMyReport(existing),
+    locked = existing && confirmedEdges.includes(existing.edgeId);
+  $("#report-title").textContent = !existing
+    ? "선택한 도로 구간이 공사 중인가요?"
+    : mine
+      ? "이 구간에 내 신고가 있어요."
+      : "이 구간의 신고";
   $("#report-reasons").hidden = !!existing;
   $("#new-report-actions").hidden = !!existing;
   $("#existing-report-actions").hidden = !existing;
+  // 내 신고이고 아직 관리자가 확정하지 않았을 때만 삭제할 수 있습니다.
+  $("#report-remove").hidden = !(mine && !locked);
   $("#report-photo-field").hidden = !!existing;
   if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
   photoPreviewUrl = null;
@@ -667,7 +673,12 @@ function openRoadReport(selection) {
   $("#report-existing-photo").hidden = !existingPhotoUrl;
   if (existingPhotoUrl) $("#report-existing-photo").src = existingPhotoUrl;
   $("#report-dialog .report-scope").textContent = existing
-    ? `${reasonLabel(existing)} · ${reportStatusLabel(existing)} · 선택한 도로 구간에 저장된 신고입니다. 삭제하면 집계에서 빠집니다.`
+    ? `${reasonLabel(existing)} · ${reportStatusLabel(existing)} · ` +
+      (locked
+        ? "관리자가 확정한 신고라 삭제할 수 없어요. 공사가 끝나면 관리자가 해제합니다."
+        : mine
+          ? "내가 올린 신고예요. 삭제하면 집계에서 빠집니다."
+          : "다른 사람이 올린 신고예요.")
     : `같은 구간에 신고가 ${REPORT_THRESHOLD}건 이상 모이면 지도에 주의(노란색)로 표시되고 관리자에게 검토 알림이 갑니다. 관리자가 확인해 확정하면 통행 막힘(빨간색)으로 바뀌며 우회 경로를 안내합니다.`;
   $("#report-dialog").showModal();
 }
@@ -757,9 +768,18 @@ $("#report-yes").onclick = async () => {
   $("#report-dialog").close();
   await loadReports();
 };
+// 이 기기에서 올린 신고인지(기기 ID 비교). 기기 ID가 없는 예전 신고는 내 신고로 보지 않습니다.
+function isMyReport(report) {
+  return !!report.deviceId && report.deviceId === getDeviceId();
+}
 $("#report-remove").onclick = async () => {
+  if (
+    !isMyReport(selectedReport) ||
+    confirmedEdges.includes(selectedReport.edgeId)
+  )
+    return;
   try {
-    await deleteReportRow(selectedReport.id);
+    await deleteReportRows([selectedReport.id]);
   } catch {
     toast("삭제에 실패했어요. 다시 시도해주세요.");
     return;
@@ -989,10 +1009,10 @@ loadWorks();
 
 // 다른 사람(사용자↔관리자)이 바꾼 내용을 가져옵니다. 10초마다, 그리고 탭으로 돌아올 때 다시 읽습니다.
 // 신고 창이 열려 있거나 위치를 고르는 중에는 선택이 지워지지 않게 건너뜁니다.
+// 관리자 창은 열어 둔 채 기다리는 화면이라 열려 있어도 갱신합니다.
 // ponytail: 10초 폴링. 즉시 반영이 필요하면 Supabase Realtime 구독으로 바꾸세요.
 function refreshShared() {
-  if (document.hidden || reporting || document.querySelector("dialog[open]"))
-    return;
+  if (document.hidden || reporting || $("#report-dialog").open) return;
   loadReports();
   loadWorks();
 }
