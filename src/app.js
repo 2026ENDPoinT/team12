@@ -1,3 +1,4 @@
+import { normalizeSearch, suggestMatches } from "./search-suggestions.mjs";
 import { shortestPath } from "./routing.mjs";
 import { routeBetween } from "./route-target.mjs";
 import { attachGps } from "./gps-start.mjs";
@@ -38,6 +39,7 @@ import catalog from "./schools.json";
 import {
   CAMPUS,
   CAMPUS_GEOMETRY,
+  INDOOR_MAPS,
   BUILDINGS,
   NODES,
   EDGES,
@@ -90,20 +92,23 @@ for (const [key, value] of Object.entries(GIS_SUMMARY)) {
 }
 $(".map-data-status").textContent =
   `건물 ${GIS_SUMMARY.buildings} · 등록 출입구 ${GIS_SUMMARY.entrances}`;
-const normalize = (s) => s.toLowerCase().replace(/\s/g, "");
+const normalize = normalizeSearch;
 const schoolData = [
   catalog.find((s) => s[0] === CAMPUS.name),
   ...catalog.filter((s) => s[0] !== CAMPUS.name),
 ];
 function renderSchools() {
   const q = normalize($("#school-search").value),
-    all = schoolData.filter(
-      (s) =>
-        (region === "전체" || s[3] === region) &&
-        normalize(s.join(" ")).includes(q),
-    );
+    regional = schoolData.filter((s) => region === "전체" || s[3] === region),
+    matches = regional.filter((s) => normalize(s.join(" ")).includes(q)),
+    suggested = q && !matches.length
+      ? suggestMatches(q, regional, (s) => [s[0]])
+      : [],
+    all = matches.length ? matches : suggested;
   const displayed = q || showAll ? all : all.slice(0, 6);
-  $("#school-count").textContent = `${all.length}개 캠퍼스`;
+  $("#school-count").textContent = suggested.length
+    ? `추천 캠퍼스 ${suggested.length}곳`
+    : `${all.length}개 캠퍼스`;
   $("#show-all").hidden = !!q || all.length <= 6;
   $("#show-all").firstChild.textContent = showAll
     ? "학교 접기 "
@@ -165,17 +170,9 @@ $("#show-all").onclick = () => {
   renderSchools();
 };
 const placesById = new Map(PLACES.map((place) => [place.id, place])),
-  placesByName = new Map(PLACES.map((place) => [place.name, place])),
-  gpsOption = document.createElement("option"),
-  gpsOptions = [gpsOption];
-gpsOption.value = "내 현재 위치";
-gpsOption.disabled = true;
-$("#route-places").append(gpsOption);
-for (const place of PLACES) {
-  const option = document.createElement("option");
-  option.value = place.name;
-  $("#route-places").append(option);
-}
+  placesByName = new Map(PLACES.map((place) => [place.name, place]));
+const locationPlace = { id: "gps", name: "내 현재 위치" };
+const closePlaceSuggestions = new Map();
 function routePlaceId(selector) {
   const value = $(selector).value.trim();
   return value === "내 현재 위치" ? "gps" : placesByName.get(value)?.id;
@@ -184,6 +181,7 @@ function setRoutePlace(selector, id) {
   $(selector).value =
     id === "gps" ? "내 현재 위치" : placesById.get(id)?.name || "";
   $(selector).removeAttribute("aria-invalid");
+  closePlaceSuggestions.get(selector)?.();
 }
 setRoutePlace("#origin", activeStart);
 setRoutePlace("#destination", activeDestination);
@@ -258,10 +256,14 @@ function updateRoute({ announce = false } = {}) {
   if (!start || !destination) {
     routeShown = false;
     renderResultPanel();
-    if (!$("#origin").value.trim() && !$("#destination").value.trim()) return;
     const gpsWaiting =
       routePlaceId("#origin") === "gps" ||
       routePlaceId("#destination") === "gps";
+    // 아직 비어 있는 칸이 있을 뿐이면(한쪽만 고른 상태) 안내 없이 기다립니다.
+    const typedUnknown = ["#origin", "#destination"].some(
+      (selector) => $(selector).value.trim() && !routePlaceId(selector),
+    );
+    if (!gpsWaiting && !typedUnknown) return;
     toast(
       gpsWaiting
         ? "현재 위치를 먼저 확인해주세요."
@@ -269,6 +271,10 @@ function updateRoute({ announce = false } = {}) {
     );
     return;
   }
+  const indoorButton = $("#indoor-open");
+  indoorButton.hidden = !INDOOR_MAPS.has(destination.id);
+  indoorButton.querySelector("b").textContent = `${destination.name} 실내 지도`;
+  indoorButton.onclick = () => enterIndoor(destination.id);
   currentRoute = route;
   if (!currentRoute) {
     updateModeOptions();
@@ -329,7 +335,6 @@ function updateRoute({ announce = false } = {}) {
     li.append(small);
     $("#route-steps").append(li);
   });
-  $("#indoor-open").hidden = destination.id !== "future";
   updateModeOptions();
   renderRouteCard(start, destination, nodes);
   map?.setRoute(currentRoute, start.id, destination.id, nodes);
@@ -343,45 +348,37 @@ function buildingSelect(id) {
     showBuildingCard(id);
     return;
   }
-  if (place)
-    showPopover(
-      place.name,
-      "출발지나 도착지로 선택할 수 있어요.",
-      place,
-      id === "future",
-    );
+  if (place) showPopover(place);
 }
 function closeBuildingPopover() {
   $("#building-popover").hidden = true;
   $(".map-canvas-wrap").classList.remove("has-building-popover");
 }
-function showPopover(title, description, place = null, indoor = false) {
+function showPopover(place) {
   const el = $("#building-popover");
   el.replaceChildren();
   const b = document.createElement("b");
-  b.textContent = title;
+  b.textContent = place.name;
   const p = document.createElement("p");
-  p.textContent = description;
+  p.textContent = "출발지나 도착지로 선택할 수 있어요.";
   el.append(b, p);
-  if (place) {
-    for (const [selector, text] of [
-      ["#origin", "출발지로"],
-      ["#destination", "도착지로"],
-    ]) {
-      const button = document.createElement("button");
-      button.textContent = text;
-      button.onclick = () => {
-        setRoutePlace(selector, place.id);
-        updateRoute();
-        closeBuildingPopover();
-      };
-      el.append(button);
-    }
-  }
-  if (indoor) {
+  for (const [selector, text] of [
+    ["#origin", "출발지로"],
+    ["#destination", "도착지로"],
+  ]) {
     const button = document.createElement("button");
-    button.textContent = "미래관 실내 지도 ↗";
-    button.onclick = () => $("#indoor-dialog").showModal();
+    button.textContent = text;
+    button.onclick = () => {
+      setRoutePlace(selector, place.id);
+      updateRoute();
+      closeBuildingPopover();
+    };
+    el.append(button);
+  }
+  if (INDOOR_MAPS.has(place.id)) {
+    const button = document.createElement("button");
+    button.textContent = `${place.name} 실내 지도 →`;
+    button.onclick = () => enterIndoor(place.id);
     el.append(button);
   }
   const close = document.createElement("button");
@@ -427,16 +424,101 @@ if (!map) {
 }
 for (const selector of ["#origin", "#destination"]) {
   const input = $(selector);
-  input.oninput = () => input.removeAttribute("aria-invalid");
-  input.onchange = () => {
-    if (!routePlaceId(selector)) {
-      input.setAttribute("aria-invalid", "true");
-      toast("검색 결과에 있는 장소를 선택해주세요.");
-      return;
-    }
+  const list = $(`${selector}-suggestions`);
+  const hint = $(`${selector}-suggestion-hint`);
+  const panel = list.parentElement;
+  let choices = [];
+  let active = -1;
+
+  function closeSuggestions() {
+    choices = [];
+    active = -1;
+    panel.hidden = true;
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("aria-activedescendant");
+  }
+  closePlaceSuggestions.set(selector, closeSuggestions);
+
+  function choose(place) {
+    setRoutePlace(selector, place.id);
     updateRoute();
     closeBuildingPopover();
-  };
+  }
+
+  function renderSuggestions() {
+    closeSuggestions();
+    const q = normalize(input.value);
+    const places = gpsStartNode ? [locationPlace, ...PLACES] : PLACES;
+    if (q && places.some((place) => place.name === input.value.trim())) return;
+
+    const matches = places.filter((place) => normalize(place.name).includes(q));
+    choices = matches.length
+      ? matches.slice(0, 6)
+      : suggestMatches(q, places, (place) => [place.name]);
+    if (!choices.length) return;
+
+    hint.textContent = matches.length ? "검색 결과" : "추천 장소";
+    list.replaceChildren(...choices.map((place, index) => {
+      const option = document.createElement("li");
+      option.id = `${list.id}-${index}`;
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", "false");
+      option.textContent = place.name;
+      option.onpointerdown = (event) => {
+        if (event.pointerType === "mouse") event.preventDefault();
+      };
+      option.onclick = () => choose(place);
+      return option;
+    }));
+    panel.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+  }
+
+  input.addEventListener("input", () => {
+    input.removeAttribute("aria-invalid");
+    renderSuggestions();
+  });
+  input.addEventListener("focus", renderSuggestions);
+  document.addEventListener("focusin", (event) => {
+    if (event.target !== input) closeSuggestions();
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (event.target !== input && !list.contains(event.target)) closeSuggestions();
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === "Escape" && !panel.hidden) {
+      event.preventDefault();
+      closeSuggestions();
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (active >= 0) choose(choices[active]);
+      else if (routePlaceId(selector)) updateRoute();
+      else if (choices.length) choose(choices[0]);
+      else updateRoute({ announce: true });
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (panel.hidden) renderSuggestions();
+      if (!choices.length) return;
+      event.preventDefault();
+      if (active >= 0) list.children[active].setAttribute("aria-selected", "false");
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      active = active < 0
+        ? (step > 0 ? 0 : choices.length - 1)
+        : (active + step + choices.length) % choices.length;
+      const option = list.children[active];
+      option.setAttribute("aria-selected", "true");
+      input.setAttribute("aria-activedescendant", option.id);
+      option.scrollIntoView({ block: "nearest" });
+    }
+  });
+  input.addEventListener("change", () => {
+    if (routePlaceId(selector)) {
+      updateRoute();
+      closeBuildingPopover();
+    } else if (!choices.length && input.value.trim()) {
+      input.setAttribute("aria-invalid", "true");
+    }
+  });
 }
 $("#find-route").onclick = () => {
   updateRoute({ announce: true });
@@ -544,7 +626,7 @@ function showBuildingCard(id) {
   $("#building-card-floors").textContent = info.floors || "—";
   $("#building-card-entrances").textContent = `${place.entries?.length || 0}곳`;
   $("#building-card-hours").textContent = info.hours || "—";
-  const indoor = id === "future";
+  const indoor = INDOOR_MAPS.has(id);
   $("#building-card-indoor").disabled = !indoor;
   $("#building-card-indoor").title = indoor
     ? ""
@@ -581,29 +663,10 @@ $("#building-card-origin").onclick = () =>
   useCardBuildingAs("#origin", "#destination");
 $("#building-card-dest").onclick = () =>
   useCardBuildingAs("#destination", "#origin");
-// 실내 탐색: 로딩 화면을 잠깐 보여 준 뒤 미래관 실내 지도(indoor/)로 들어갑니다.
-// 실내 지도는 미래관 정문 출입구(from=futureDoor)에서 시작합니다.
-let indoorTimer = null;
-function openIndoorLoading(name) {
-  $("#indoor-loading-tag").textContent = `${name} · 실내`;
-  $("#indoor-loading").hidden = false;
-  $("#indoor-loading-back").focus();
-  const url = CAMPUS.interior?.indoorUrl;
-  if (!url) return;
-  clearTimeout(indoorTimer);
-  indoorTimer = setTimeout(
-    () => location.assign(new URL(url, location.href).href),
-    700,
-  );
-}
+// 실내 탐색: 팀의 3D 진입 전환(enterIndoor)으로 건물 안까지 날아간 뒤 실내 지도를 엽니다.
 $("#building-card-indoor").onclick = () => {
-  if (cardBuildingId !== "future") return;
-  openIndoorLoading(placesById.get("future").name);
-};
-$("#indoor-loading-back").onclick = () => {
-  clearTimeout(indoorTimer);
-  $("#indoor-loading").hidden = true;
-  $("#building-card-indoor").focus();
+  if (cardBuildingId && INDOOR_MAPS.has(cardBuildingId))
+    enterIndoor(cardBuildingId);
 };
 
 // ===== 건물 검색 (위쪽 바) =====
@@ -962,10 +1025,6 @@ function stopGps({ keepStatus = false } = {}) {
   gpsWatchId = null;
   gpsPosition = null;
   gpsStartNode = null;
-  for (const option of gpsOptions) {
-    option.disabled = true;
-    option.textContent = "내 현재 위치 · GPS 필요";
-  }
   let changed = false;
   if (routePlaceId("#origin") === "gps") {
     setRoutePlace("#origin", "gate");
@@ -1006,7 +1065,6 @@ $("#gps-toggle").onclick = () => {
       gpsPosition = { ...point, accuracy: coords.accuracy };
       if (!nearest || nearest.distance > 350) {
         gpsStartNode = null;
-        gpsOptions.forEach((option) => (option.disabled = true));
         map?.setUserLocation(null);
         setGpsStatus(
           `현재 위치가 서울과기대 지도 범위 밖이에요. 캠퍼스에 들어오면 자동으로 표시됩니다.`,
@@ -1015,10 +1073,6 @@ $("#gps-toggle").onclick = () => {
         return;
       }
       gpsStartNode = nearest.id;
-      for (const option of gpsOptions) {
-        option.disabled = false;
-        option.textContent = "내 현재 위치";
-      }
       map?.setUserLocation(gpsPosition, { follow: true });
       setGpsStatus(
         `현재 위치 추적 중 · 정확도 약 ${Math.round(coords.accuracy)}m`,
@@ -1116,7 +1170,6 @@ $("#find-school").onclick = (e) => {
     $("#campuses").scrollIntoView();
 };
 $("#intro-button").onclick = () => $("#info-dialog").showModal();
-$("#indoor-open").onclick = () => $("#indoor-dialog").showModal();
 $$(".dialog-close").forEach(
   (b) => (b.onclick = () => b.closest("dialog").close()),
 );
@@ -1134,21 +1187,30 @@ $$("dialog").forEach((d) =>
     }
   }),
 );
-for (const [key, selector] of [
-  ["indoorUrl", "#indoor-link"],
-  ["arUrl", "#ar-link"],
-]) {
-  const url = CAMPUS.interior[key];
-  if (url) {
-    try {
-      const parsed = new URL(url, location.href);
-      if (["https:", "http:"].includes(parsed.protocol)) {
-        $(selector).href = parsed.href;
-        $(selector).hidden = false;
-      }
-    } catch {}
+async function enterIndoor(buildingId) {
+  const indoor = INDOOR_MAPS.get(buildingId);
+  if (!indoor || document.body.classList.contains("entering-indoor")) return;
+
+  if (!map || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    location.assign(indoor.url);
+    return;
   }
+
+  closeBuildingPopover();
+  document.body.classList.add("entering-indoor");
+  $("#map-view").inert = true;
+  await map.flyIntoBuilding(buildingId, indoor.entranceId, () => {
+    document.body.classList.add("indoor-arrival");
+  });
+  location.assign(indoor.url);
 }
+
+window.addEventListener("pageshow", (event) => {
+  if (!event.persisted) return;
+  document.body.classList.remove("entering-indoor", "indoor-arrival");
+  $("#map-view").inert = false;
+  map?.restoreBuildingFlight();
+});
 function toast(message) {
   clearTimeout(toastTimer);
   $("#toast").replaceChildren(document.createTextNode(message));

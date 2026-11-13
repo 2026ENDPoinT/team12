@@ -356,13 +356,20 @@
             ><input
               id="origin"
               type="search"
-              list="route-places"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded="false"
+              aria-controls="origin-suggestions"
               placeholder="건물 이름 검색"
               aria-label="출발지 검색"
               autocomplete="off"
               enterkeyhint="search"
               spellcheck="false"
             />
+            <div class="place-suggestion-panel" hidden>
+              <p id="origin-suggestion-hint" class="place-suggestion-hint" role="status"></p>
+              <ul id="origin-suggestions" class="place-suggestions" role="listbox" aria-label="장소 검색 결과"></ul>
+            </div>
             <div class="journey-connector"></div>
             <label class="destination-label" for="destination">
               <svg class="icon"><use href="#i-pin" /></svg><span>도착지</span>
@@ -370,14 +377,20 @@
             <input
               id="destination"
               type="search"
-              list="route-places"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded="false"
+              aria-controls="destination-suggestions"
               placeholder="건물 이름 검색"
               aria-label="도착지 검색"
               autocomplete="off"
               enterkeyhint="search"
               spellcheck="false"
             />
-            <datalist id="route-places"></datalist>
+            <div class="place-suggestion-panel" hidden>
+              <p id="destination-suggestion-hint" class="place-suggestion-hint" role="status"></p>
+              <ul id="destination-suggestions" class="place-suggestions" role="listbox" aria-label="장소 검색 결과"></ul>
+            </div>
             <button
               type="button"
               class="field-clear"
@@ -471,12 +484,12 @@
             <p id="route-summary"></p>
             <ol id="route-steps" class="route-steps"></ol>
           </div>
-          <button id="indoor-open" class="indoor-card">
+          <button id="indoor-open" class="indoor-card" hidden>
             <span class="indoor-icon">✦</span
             ><span
-              ><small>그다음은, 건물 안으로</small><b>미래관 실내 둘러보기</b
-              ><em>호실 검색 · AR 길안내</em></span
-            ><span>↗</span>
+              ><small>그다음은, 건물 안으로</small><b>실내 지도</b
+              ><em>호실 검색</em></span
+            ><span>→</span>
           </button>
           <section class="road-reports">
             <div class="reports-heading">
@@ -685,28 +698,6 @@
           </div>
         </div>
       </div>
-      <div
-        id="indoor-loading"
-        class="indoor-loading"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="indoor-loading-title"
-        hidden
-      >
-        <button id="indoor-loading-back" class="indoor-loading-back">
-          ← 지도로 돌아가기
-        </button>
-        <div class="indoor-loading-card">
-          <span class="indoor-spinner" aria-hidden="true"></span
-          ><span class="indoor-loading-tag" id="indoor-loading-tag"
-            >미래관 · 실내</span
-          >
-          <h2 id="indoor-loading-title">실내 지도를 불러오는 중이에요</h2>
-          <p>층별 도면과 강의실 정보를 준비하고 있어요.</p>
-          <div class="indoor-progress" aria-hidden="true"><i></i></div>
-          <small>데모 준비 중 · 실내 탐색 화면은 나중에 연결돼요.</small>
-        </div>
-      </div>
     </section>
     <dialog id="report-dialog" class="report-dialog">
       <button class="dialog-close" aria-label="닫기">✕</button>
@@ -825,38 +816,6 @@
           <p id="work-empty">등록된 공사가 없어요.</p>
           <ul id="work-list" class="report-list"></ul>
         </section>
-      </div>
-    </dialog>
-    <dialog id="indoor-dialog" class="indoor-dialog">
-      <button class="dialog-close" aria-label="닫기">✕</button>
-      <div class="indoor-banner">
-        <span>OUTSIDE → INSIDE</span>
-        <div class="portal"><i></i><i></i><i></i><span>✦</span></div>
-        <b>미래관, 그 안의 사이.</b>
-      </div>
-      <div class="dialog-body">
-        <span class="purple eyebrow">NEXT CHAPTER</span>
-        <h2>문을 지나, 안으로.</h2>
-        <p>
-          외부 경로는 미래관 1층 로비 출입구까지 이어져요.<br />이제 건물
-          안에서도 호실 문 앞까지 안내해요.
-        </p>
-        <div class="indoor-options">
-          <div>
-            <b>실내 지도 · 호실 검색</b
-            ><span>층별 3D 도면에서 호실을 찾고 경로 보기</span
-            ><small>지하 1층 ~ 3층 · 계단 없는 길 안내</small
-            ><a id="indoor-link" hidden>실내 지도 열기 →</a>
-          </div>
-          <div>
-            <b>AR 실내 안내</b><span>카메라 화면 위에 경로를 겹치기</span
-            ><small>촬영한 미래관 사진으로 위치 인식</small
-            ><a id="ar-link" hidden>AR 데모 보기 →</a>
-          </div>
-        </div>
-        <p class="dialog-note">
-          AR 길안내는 실내 지도에서 도착 호실을 고른 뒤 시작할 수 있어요.
-        </p>
       </div>
     </dialog>
     <dialog id="info-dialog" class="info-dialog">

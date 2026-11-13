@@ -236,7 +236,7 @@ function kindOf(r, g, b, horizontal, prefix) {
 let shared = null;
 function materials(renderer) {
   if (shared) return shared;
-  const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const aniso = Math.min(4, renderer.capabilities.getMaxAnisotropy());
   const tex = {};
   const mats = {};
   for (const [k, d] of Object.entries(KINDS)) {
@@ -327,13 +327,14 @@ export function texturize(mesh, renderer, extra = {}) {
   const a = new THREE.Vector3(),
     b = new THREE.Vector3(),
     c = new THREE.Vector3(),
-    nrm = new THREE.Vector3();
+    nrm = new THREE.Vector3(),
+    tmp = new THREE.Vector3();
   const tris = names.map(() => []);
   for (let t = 0; t < nTri; t++) {
     a.fromBufferAttribute(P, 3 * t);
     b.fromBufferAttribute(P, 3 * t + 1);
     c.fromBufferAttribute(P, 3 * t + 2);
-    nrm.subVectors(c, b).cross(b.clone().sub(a)).normalize();
+    nrm.subVectors(c, b).cross(tmp.subVectors(b, a)).normalize();
     const hz = Math.abs(nrm.y) > 0.7;
     const r = Math.round(C.getX(3 * t) * 255),
       g = Math.round(C.getY(3 * t) * 255),
@@ -357,7 +358,7 @@ export function texturize(mesh, renderer, extra = {}) {
       a.fromBufferAttribute(P, 3 * t);
       b.fromBufferAttribute(P, 3 * t + 1);
       c.fromBufferAttribute(P, 3 * t + 2);
-      nrm.subVectors(c, b).cross(b.clone().sub(a)).normalize();
+      nrm.subVectors(c, b).cross(tmp.subVectors(b, a)).normalize();
       const ax = Math.abs(nrm.x),
         ay = Math.abs(nrm.y),
         az = Math.abs(nrm.z);

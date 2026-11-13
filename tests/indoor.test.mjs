@@ -461,3 +461,106 @@ test("입자 필터: 소실점 방향 기준을 받으면 방향이 그쪽으로
   const e = loc.estimate(60);
   assert.ok(Math.abs(e.off - 40) < 4, `off ${e.off}`);
 });
+
+// ---- WebXR(VIO) 방식
+import {
+  poseFromXR,
+  intrinsicsFromProjection,
+  yawOf,
+  Anchor,
+  LevelTracker,
+  worldTransform,
+  VisualAligner,
+} from "../src/indoor/ar/xr-math.mjs";
+
+// XR 카메라 자세(열 우선 4×4): 수평으로 방위 yaw(동쪽 0, 반시계)를 보고 pitch만큼 숙임, 위치 (x, h, z)
+function xrMatrix(yawDeg, pitchDeg, x, h, z) {
+  const y = (yawDeg * Math.PI) / 180,
+    p = (pitchDeg * Math.PI) / 180;
+  // 센서 세계 앞 방향 f=(cos y cos p, sin y cos p, sin p) → XR (fx, fz_up, -fy)
+  const f = [Math.cos(y) * Math.cos(p), Math.sin(p), -Math.sin(y) * Math.cos(p)];
+  const r = [Math.sin(y), 0, Math.cos(y)]; // 오른쪽(수평)
+  const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]]; // r × f
+  const zc = [-f[0], -f[1], -f[2]]; // 카메라 -z가 앞
+  return [...r, 0, ...u, 0, ...zc, 0, x, h, z, 1];
+}
+
+test("WebXR 자세 → 센서 세계: 방위·위치·높이·중력 축이 맞음", () => {
+  for (const [yaw, pitch] of [[0, 0], [90, -10], [-135, 5]]) {
+    const P = poseFromXR(xrMatrix(yaw, pitch, 2, 1.4, -3));
+    assert.ok(Math.abs(((yawOf(P.R) - yaw + 540) % 360) - 180) < 1e-6, `yaw ${yaw}`);
+    assert.ok(Math.abs((Math.asin(P.R[8]) * 180) / Math.PI - pitch) < 1e-9, "pitch from R[8]");
+    assert.deepEqual([P.x, P.y, P.h].map((v) => +v.toFixed(6)), [2, 3, 1.4]);
+    // OpenCV y축(아래)은 세계 z가 음수 쪽
+    assert.ok(P.R[7] < 0, "camera down axis points down");
+  }
+  const K = intrinsicsFromProjection([1.6, 0, 0, 0, 0, 2.1, 0, 0, 0.02, -0.04, -1, -1, 0, 0, -0.1, 0], 220, 165);
+  assert.ok(Math.abs(K.fx - 176) < 1e-9 && Math.abs(K.fy - 173.25) < 1e-9);
+  assert.ok(Math.abs(K.cx - 107.8) < 1e-9 && Math.abs(K.cy - 79.2) < 1e-9);
+});
+
+test("WebXR 정렬: 건물 ↔ VIO 변환이 서로 맞고, 경로 묶음이 같은 곳에 놓임", () => {
+  const a = new Anchor();
+  a.update({ x: 10, y: -4 }, { x: 1, y: 2 }, 37, 1);
+  const b = a.toBuilding(1, 2);
+  assert.ok(Math.hypot(b.x - 10, b.y + 4) < 1e-9);
+  const s = a.toSensor(-3, 8),
+    back = a.toBuilding(s.x, s.y);
+  assert.ok(Math.hypot(back.x + 3, back.y - 8) < 1e-9);
+  // three: 건물 (x, z, -y) 를 묶음 변환 → VIO (센서 x, 높이, -센서 y)
+  const wt = worldTransform(a, -0.2);
+  const B = [-3, 0.2, -8];
+  const X = Math.cos(wt.rotY) * B[0] + Math.sin(wt.rotY) * B[2] + wt.px,
+    Z = -Math.sin(wt.rotY) * B[0] + Math.cos(wt.rotY) * B[2] + wt.pz;
+  assert.ok(Math.abs(X - s.x) < 1e-9 && Math.abs(Z + s.y) < 1e-9 && Math.abs(B[1] + wt.py) < 1e-9);
+  // 크게 다른 추정 한 번은 무시, 같은 곳이 두 번 나오면 받아들임
+  assert.equal(a.update({ x: 30, y: 0 }, { x: 1, y: 2 }, 37, 1), "hold");
+  assert.equal(a.update({ x: 30, y: 0 }, { x: 1, y: 2 }, 37, 1), "snap");
+  assert.ok(Math.hypot(a.toBuilding(1, 2).x - 30, a.toBuilding(1, 2).y) < 1e-9);
+});
+
+test("WebXR 층 추적: 계단으로 한 층 오르내리면 ±1, 손 높이 흔들림은 무시", () => {
+  const lv = new LevelTracker(4);
+  assert.equal(lv.update(1.4), 0);
+  for (const h of [1.3, 1.5, 1.2, 1.45]) assert.equal(lv.update(h), 0);
+  let up = 0;
+  for (let h = 1.4; h <= 5.5; h += 0.1) up += lv.update(h);
+  assert.equal(up, 1);
+  assert.ok(Math.abs(lv.floorY - 4) < 1e-9);
+  let down = 0;
+  for (let h = 5.4; h >= 1.3; h -= 0.1) down += lv.update(h);
+  assert.equal(down, -1);
+});
+
+test("WebXR 위치 추정: VIO 궤적 + 사진 후보 RANSAC 정렬로 0.5m 안, 틀린 정렬은 내지 않음", () => {
+  const seq = walkShots(1, 30);
+  const pf = new Localizer({ index: INDEX, shots: SV.shots, walk: I.walk, portals: portalsFrom(I.links), seed: 21 });
+  // VIO 세계는 건물과 41° 돌아가 있고 원점도 다름(정렬기는 모름)
+  const OFF = 41;
+  const truth = new Anchor();
+  Object.assign(truth, { off: OFF, tx: 7, ty: -3 });
+  const va = new VisualAligner();
+  const anchor = new Anchor(); // 앱처럼: 한 번 잡힌 정렬을 VIO로 이어 가고, 새 정렬로 다듬음
+  const errs = [];
+  seq.forEach((s, j) => {
+    const sp = truth.toSensor(s.x, s.y);
+    const cands = pf.candidates(stripQuery(s.k), [1], 3, new Set([s.k]));
+    va.add(j * 0.8, { x: sp.x, y: sp.y, yaw: s.yaw - OFF }, 0, cands);
+    const a = va.solve();
+    if (a) {
+      assert.equal(a.df, 1, "floor offset");
+      assert.ok(Math.abs(((((a.off - OFF) % 360) + 540) % 360) - 180) < 4, `heading ${a.off}`);
+      const A = new Anchor();
+      Object.assign(A, a);
+      anchor.update(A.toBuilding(sp.x, sp.y), sp, a.off, Math.min(1, a.n / 12));
+    }
+    if (anchor.ok) {
+      const b = anchor.toBuilding(sp.x, sp.y);
+      errs.push(Math.hypot(b.x - s.x, b.y - s.y));
+    }
+  });
+  assert.ok(errs.length >= 8, `aligned for part of the walk (${errs.length})`);
+  assert.ok(Math.max(...errs) < 1, `max error ${Math.max(...errs)}`);
+  errs.sort((a, b) => a - b);
+  assert.ok(errs[errs.length >> 1] < 0.5, `median error ${errs[errs.length >> 1]}`);
+});

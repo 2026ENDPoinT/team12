@@ -281,7 +281,8 @@ $("#search-input").addEventListener("input", (e) =>
   renderResults(e.target.value),
 );
 $("#search-input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") $("#search-results li[data-key]")?.click();
+  if (e.isComposing || e.keyCode === 229) return;
+  if (e.key === "Enter") $("#search-results li[data-key] button")?.click();
   else if (e.key === "Escape") closeSearch();
 });
 function resultItem(d) {
@@ -303,8 +304,11 @@ function resultItem(d) {
         .join(" · "),
     ),
   );
-  li.append(tag, box);
-  li.onclick = () => {
+  const button = el("button", "search-result-button");
+  button.type = "button";
+  button.append(tag, box);
+  li.append(button);
+  button.onclick = () => {
     closeSearch();
     remember(d);
     if (state.searchMode === "origin") {
@@ -319,10 +323,14 @@ function renderResults(q) {
   const ul = $("#search-results");
   ul.replaceChildren();
   if (q.trim()) {
-    const list = indoor.search(q, 40);
-    $("#search-hint").textContent = list.length
-      ? `${list.length}곳`
-      : "검색 결과가 없어요. 호실 번호나 이름 일부로 찾아보세요.";
+    const matches = indoor.search(q, 40);
+    const suggestions = matches.length ? [] : indoor.suggest(q);
+    const list = matches.length ? matches : suggestions;
+    $("#search-hint").textContent = suggestions.length
+      ? `추천 장소 ${suggestions.length}곳`
+      : matches.length
+        ? `${matches.length}곳`
+        : "검색 결과가 없어요. 호실 번호나 이름 일부로 찾아보세요.";
     for (const d of list) ul.append(resultItem(d));
     return;
   }
