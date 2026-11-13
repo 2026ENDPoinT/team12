@@ -1,5 +1,5 @@
 import { createStreetLights, windowLights } from "./map/night-lighting.mjs";
-import { touchGestureMode } from "./map/touch-gesture.mjs";
+import { touchGestureMode, touchTurn } from "./map/touch-gesture.mjs";
 import { createNavigationBounds } from "./map/navigation-bounds.mjs";
 import { createKeyboardPan } from "./map/keyboard-pan.mjs";
 import { createMapProfiler } from "./map/performance.mjs";
@@ -622,7 +622,15 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   function clearReportSelection() {
     clearGroup(reportPreviewGroup);
   }
-  function setUserLocation(position, { follow = false } = {}) {
+  let guidanceHeading = null;
+  function clearGuidanceHeading() {
+    guidanceHeading = null;
+  }
+  function setUserLocation(
+    position,
+    { follow = false, heading = null } = {},
+  ) {
+    guidanceHeading = follow && position ? heading : null;
     if (!position) {
       userLocationGroup.visible = false;
       return;
@@ -848,6 +856,13 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
         gesture.start.mid,
         gesture.start.mid,
         gesture.last.distance > 0 ? f.distance / gesture.last.distance : 1,
+      );
+    } else if (gesture.mode === "twist") {
+      moveCamera(
+        gesture.last.mid,
+        f.mid,
+        1,
+        touchTurn(gesture.last.angle, f.angle),
       );
     } else {
       tilt(f.mid.y - gesture.last.mid.y, f.mid.x - gesture.last.mid.x);
@@ -1259,6 +1274,17 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     }
     const profileStart = profiler?.begin(t);
     keyboardPan.update(deltaSeconds);
+    if (guidanceHeading !== null && !homeMode) {
+      const offset = camera.position.clone().sub(controls.target);
+      const current = Math.atan2(offset.x, offset.z);
+      const turn = touchTurn(current, -THREE.MathUtils.degToRad(guidanceHeading));
+      if (Math.abs(turn) > 0.001) {
+        const step = reduceMotion ? 1 : 1 - Math.exp(-8 * deltaSeconds);
+        camera.position
+          .copy(controls.target)
+          .add(offset.applyAxisAngle(upAxis, turn * step));
+      }
+    }
     controls.update();
     if (!homeMode) constrainNavigation(camera, controls);
     campusTrees.updateDetail(
@@ -1303,6 +1329,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     previewReportSelection,
     clearReportSelection,
     setUserLocation,
+    clearGuidanceHeading,
     setNavigationMode(enabled) {
       navigationMode = enabled;
       navigationLabel.visible = enabled;
