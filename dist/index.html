@@ -195,19 +195,38 @@
       <div class="explorer">
         <aside class="route-panel">
           <div class="mobile-route-heading">
-            <b>캠퍼스 길찾기</b><span>출발지와 도착지를 선택해주세요</span>
+            <b>캠퍼스 길찾기</b><span>건물 이름을 검색해주세요</span>
           </div>
           <div class="panel-eyebrow">LET’S FIND YOUR WAY <span>↗</span></div>
           <h2>학교 안에서,<br /><span>원하는 곳까지.</span></h2>
-          <p class="panel-description">출발지와 도착지를 선택해주세요.</p>
+          <p class="panel-description">출발지와 도착지를 검색해주세요.</p>
           <div class="journey-form">
             <label for="origin"><span class="origin-dot"></span>출발지</label
-            ><select id="origin" aria-label="출발지 선택"></select>
+            ><input
+              id="origin"
+              type="search"
+              list="route-places"
+              placeholder="건물 이름 검색"
+              aria-label="출발지 검색"
+              autocomplete="off"
+              enterkeyhint="search"
+              spellcheck="false"
+            />
             <div class="journey-connector"></div>
             <label class="destination-label" for="destination">
               <svg class="icon"><use href="#i-pin" /></svg><span>도착지</span>
             </label>
-            <select id="destination" aria-label="도착지 선택"></select>
+            <input
+              id="destination"
+              type="search"
+              list="route-places"
+              placeholder="건물 이름 검색"
+              aria-label="도착지 검색"
+              autocomplete="off"
+              enterkeyhint="search"
+              spellcheck="false"
+            />
+            <datalist id="route-places"></datalist>
           </div>
           <div class="mode-tabs" role="group" aria-label="경로 모드">
             <button class="active" data-mode="shortest" aria-pressed="true">
@@ -217,7 +236,7 @@
             </button>
           </div>
           <button id="find-route" class="primary route-submit">
-            선택한 경로 찾기 <svg class="icon"><use href="#i-arrow" /></svg>
+            경로 찾기 <svg class="icon"><use href="#i-arrow" /></svg>
           </button>
           <div
             id="no-route-message"

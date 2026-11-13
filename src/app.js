@@ -157,28 +157,34 @@ $("#show-all").onclick = () => {
   showAll = !showAll;
   renderSchools();
 };
-const gpsOptions = [];
-for (const select of [$("#origin"), $("#destination")]) {
-  const gpsOption = document.createElement("option");
-  gpsOption.value = "gps";
-  gpsOption.textContent = "내 현재 위치 · GPS 필요";
-  gpsOption.disabled = true;
-  select.append(gpsOption);
-  gpsOptions.push(gpsOption);
-  for (const place of PLACES) {
-    const option = document.createElement("option");
-    option.value = place.id;
-    option.textContent = place.name;
-    select.append(option);
-  }
+const placesById = new Map(PLACES.map((place) => [place.id, place])),
+  placesByName = new Map(PLACES.map((place) => [place.name, place])),
+  gpsOption = document.createElement("option"),
+  gpsOptions = [gpsOption];
+gpsOption.value = "내 현재 위치";
+gpsOption.disabled = true;
+$("#route-places").append(gpsOption);
+for (const place of PLACES) {
+  const option = document.createElement("option");
+  option.value = place.name;
+  $("#route-places").append(option);
 }
-$("#origin").value = activeStart;
-$("#destination").value = activeDestination;
+function routePlaceId(selector) {
+  const value = $(selector).value.trim();
+  return value === "내 현재 위치" ? "gps" : placesByName.get(value)?.id;
+}
+function setRoutePlace(selector, id) {
+  $(selector).value =
+    id === "gps" ? "내 현재 위치" : placesById.get(id)?.name || "";
+  $(selector).removeAttribute("aria-invalid");
+}
+setRoutePlace("#origin", activeStart);
+setRoutePlace("#destination", activeDestination);
 // 경로 계산에 쓰는 보행 그래프입니다. 평소에는 data.mjs의 합친 그래프이고,
 // 편집 모드에서는 편집 중인 조사 데이터를 합친 그래프로 바뀝니다.
 let graph = { nodes: NODES, edges: EDGES, entrances: SURVEY.entrances };
 function selectedPlace(selector, g = graph) {
-  const id = $(selector).value;
+  const id = routePlaceId(selector);
   if (id === "gps")
     return gpsStartNode
       ? {
@@ -214,11 +220,18 @@ function routeOn(g) {
   };
 }
 function updateRoute({ announce = false } = {}) {
-  activeStart = $("#origin").value;
-  activeDestination = $("#destination").value;
+  activeStart = routePlaceId("#origin") || activeStart;
+  activeDestination = routePlaceId("#destination") || activeDestination;
   const { start, destination, route } = routeOn(graph);
   if (!start || !destination) {
-    toast("현재 위치를 먼저 확인해주세요.");
+    const gpsWaiting =
+      routePlaceId("#origin") === "gps" ||
+      routePlaceId("#destination") === "gps";
+    toast(
+      gpsWaiting
+        ? "현재 위치를 먼저 확인해주세요."
+        : "검색 결과에서 출발지와 도착지를 선택해주세요.",
+    );
     return;
   }
   currentRoute = route;
@@ -313,7 +326,7 @@ function showPopover(title, description, place = null, indoor = false) {
       const button = document.createElement("button");
       button.textContent = text;
       button.onclick = () => {
-        $(selector).value = place.id;
+        setRoutePlace(selector, place.id);
         updateRoute();
         closeBuildingPopover();
       };
@@ -367,14 +380,19 @@ if (!map) {
     routeOn,
   });
 }
-$("#origin").onchange = () => {
-  updateRoute();
-  closeBuildingPopover();
-};
-$("#destination").onchange = () => {
-  updateRoute();
-  closeBuildingPopover();
-};
+for (const selector of ["#origin", "#destination"]) {
+  const input = $(selector);
+  input.oninput = () => input.removeAttribute("aria-invalid");
+  input.onchange = () => {
+    if (!routePlaceId(selector)) {
+      input.setAttribute("aria-invalid", "true");
+      toast("검색 결과에 있는 장소를 선택해주세요.");
+      return;
+    }
+    updateRoute();
+    closeBuildingPopover();
+  };
+}
 $("#find-route").onclick = () => {
   updateRoute({ announce: true });
   closeBuildingPopover();
@@ -426,12 +444,12 @@ function stopGps({ keepStatus = false } = {}) {
     option.textContent = "내 현재 위치 · GPS 필요";
   }
   let changed = false;
-  if ($("#origin").value === "gps") {
-    $("#origin").value = "gate";
+  if (routePlaceId("#origin") === "gps") {
+    setRoutePlace("#origin", "gate");
     changed = true;
   }
-  if ($("#destination").value === "gps") {
-    $("#destination").value = "future";
+  if (routePlaceId("#destination") === "gps") {
+    setRoutePlace("#destination", "future");
     changed = true;
   }
   if (changed) updateRoute();
@@ -483,12 +501,12 @@ $("#gps-toggle").onclick = () => {
         `현재 위치 추적 중 · 정확도 약 ${Math.round(coords.accuracy)}m`,
       );
       if (firstFix) {
-        $("#origin").value = "gps";
+        setRoutePlace("#origin", "gps");
         updateRoute();
         toast("현재 위치를 출발지로 설정했어요.");
       } else if (
-        $("#origin").value === "gps" ||
-        $("#destination").value === "gps"
+        routePlaceId("#origin") === "gps" ||
+        routePlaceId("#destination") === "gps"
       )
         updateRoute();
       firstFix = false;
