@@ -731,10 +731,14 @@ function walkStep(now) {
   const p = pointAt(r, w.cum, w.s);
   // 2m 앞을 바라보며 부드럽게 회전
   const a = pointAt(r, w.cum, Math.min(w.total, w.s + 2.2));
+  // 도착 직전에는 문을 바라보도록 돌아섭니다.
+  const door = r.target?.door;
   const want =
-    Math.hypot(a.x - p.x, a.y - p.y) > 0.3
-      ? (Math.atan2(a.y - p.y, a.x - p.x) * 180) / Math.PI
-      : (w.yaw ?? 90);
+    door && w.total - w.s < 1.2
+      ? (Math.atan2(door[1] - p.y, door[0] - p.x) * 180) / Math.PI
+      : Math.hypot(a.x - p.x, a.y - p.y) > 0.3
+        ? (Math.atan2(a.y - p.y, a.x - p.x) * 180) / Math.PI
+        : (w.yaw ?? 90);
   if (w.yaw == null) w.yaw = want;
   const d = ((((want - w.yaw) % 360) + 540) % 360) - 180;
   w.yaw += d * Math.min(1, dt * 3.2);

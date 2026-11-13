@@ -589,11 +589,49 @@ export function createIndoor(M) {
     destinations.find((d) => norm(d.id) === norm(key)) ||
     null;
 
+  // 문 앞 도착점: 문이 놓인 벽에서 방 바깥(복도) 쪽으로 STANDOFF m.
+  // 방 안이나 문틀 가운데가 아니라 문을 마주 보는 자리에서 멈춥니다.
+  const STANDOFF = 0.7;
+  function doorFront(f, p, rid) {
+    const polys = FL(f).rooms.filter((r) => r.id === rid).map((r) => r.poly);
+    if (!polys.length) return null;
+    // 문에서 가장 가까운 벽(외곽선 선분)
+    let best = null;
+    for (const poly of polys)
+      for (let i = 1; i < poly.length; i++) {
+        const a = poly[i - 1],
+          b = poly[i],
+          ex = b[0] - a[0],
+          ey = b[1] - a[1],
+          L2 = ex * ex + ey * ey;
+        if (L2 < 1e-6) continue;
+        const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ey) / L2));
+        const d = Math.hypot(a[0] + t * ex - p[0], a[1] + t * ey - p[1]);
+        if (!best || d < best[0]) {
+          const L = Math.sqrt(L2);
+          best = [d, -ey / L, ex / L];
+        }
+      }
+    if (!best || best[0] > 1) return null;
+    const inside = (x, y) => polys.some((poly) => inPoly(poly, x, y));
+    for (const sgn of [1, -1]) {
+      const nx = best[1] * sgn,
+        ny = best[2] * sgn;
+      if (inside(p[0] + nx * 0.3, p[1] + ny * 0.3)) continue; // 방 안쪽 방향
+      for (const r of [STANDOFF, 0.55, 0.9, 1.1, 0.4]) {
+        const x = p[0] + nx * r,
+          y = p[1] + ny * r;
+        if (walk(f, x, y) && !inside(x, y)) return [x, y];
+      }
+    }
+    return null;
+  }
+
   // 목적지까지 경로: 문이 여러 개면 가장 가까운 문으로
   function routeTo(start, d, opts = {}) {
     const targets = d.doors
       .map((p) => {
-        const s = nearest(d.f, p[0], p[1], 6) || p;
+        const s = doorFront(d.f, p, d.id) || nearest(d.f, p[0], p[1], 6) || p;
         return { f: d.f, x: s[0], y: s[1], door: p };
       })
       .filter(Boolean);

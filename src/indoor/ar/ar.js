@@ -508,7 +508,9 @@ export async function openAR(opts) {
     ) {
       arrived = true;
       buzz([60, 40, 60]);
-      ui.arrive.querySelector("b").textContent = `${dest.title}에 도착했어요`;
+      const side = steps[steps.length - 1].side;
+      ui.arrive.querySelector("b").textContent =
+        `${dest.title}에 도착했어요${side && side !== "정면" ? ` · 문은 ${side}` : ""}`;
       ui.arrive.hidden = false;
     }
     pose.s = pr.s;

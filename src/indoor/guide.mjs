@@ -186,8 +186,9 @@ export function buildSteps(route, dest, opts = {}) {
   let arriveSide = "";
   if (dest) {
     const hEnd = headIn(total, Math.max(0, total - BASE));
-    const c = dest.center || route.target?.door;
-    if (hEnd != null && c && Math.hypot(c[0] - end.x, c[1] - end.y) > 0.4) {
+    // 도착점은 문 바로 앞이므로 문 위치로 방향을 판단합니다.
+    const c = route.target?.door || dest.center;
+    if (hEnd != null && c && Math.hypot(c[0] - end.x, c[1] - end.y) > 0.2) {
       const tc = turnDeg(hEnd, hd([end.x, end.y], c));
       arriveSide =
         Math.abs(tc) < 35

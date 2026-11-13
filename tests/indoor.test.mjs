@@ -217,3 +217,28 @@ test("elevator ride has floor info and an exit direction", () => {
   assert.ok(exit);
   assert.match(exit.text, /엘리베이터에서 내려/);
 });
+
+test("route stops in front of the destination door, outside the room", () => {
+  const inPoly = (P, x, y) => {
+    let c = false;
+    for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+      const [xi, yi] = P[i],
+        [xj, yj] = P[j];
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)
+        c = !c;
+    }
+    return c;
+  };
+  for (const d of I.destinations) {
+    const r = I.routeTo(start, d);
+    assert.ok(r, d.key);
+    const e = r.pts.at(-1),
+      door = r.target.door;
+    const gap = Math.hypot(e.x - door[0], e.y - door[1]);
+    assert.ok(gap > 0.3 && gap < 1.3, `${d.key} gap ${gap}`);
+    const room = M.floors
+      .find((f) => f.n === d.f)
+      .rooms.filter((rm) => rm.id === d.id);
+    assert.ok(!room.some((rm) => inPoly(rm.poly, e.x, e.y)), `${d.key} inside`);
+  }
+});
