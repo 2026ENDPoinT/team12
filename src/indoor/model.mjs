@@ -1,3 +1,4 @@
+import { suggestMatches } from "../search-suggestions.mjs";
 // 미래관 실내 데이터 모델: 걸을 수 있는 격자, 목적지 목록·검색, 층을 오가는 경로 탐색.
 // 브라우저와 Node 테스트에서 함께 쓰므로 DOM·three에 의존하지 않습니다.
 // 좌표는 건물 기준 미터(x 동쪽, y 북쪽, z 위)이며 v6 도면 데이터(M)를 그대로 씁니다.
@@ -600,6 +601,9 @@ export function createIndoor(M) {
     scored.sort((a, b) => b[0] - a[0] || a[1].f - b[1].f);
     return scored.slice(0, limit).map((x) => x[1]);
   }
+  function suggest(q, limit = 5) {
+    return suggestMatches(norm(q), destinations, (d) => d.search.split("|"), limit);
+  }
   const findDest = (key) =>
     destinations.find((d) => d.key === key) ||
     destinations.find((d) => norm(d.id) === norm(key)) ||
@@ -676,6 +680,7 @@ export function createIndoor(M) {
     routeTo,
     destinations,
     search,
+    suggest,
     findDest,
   };
 }

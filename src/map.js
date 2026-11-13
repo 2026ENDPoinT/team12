@@ -7,6 +7,7 @@ import { createRoadLayer } from "./map/landscape/road-layer.mjs";
 import { createBuildingLayer } from "./map/buildings/index.mjs";
 import { createCampusTrees } from "./map/landscape/trees.mjs";
 import { createPondDetails } from "./map/landscape/pond-details.mjs";
+import { createTechnyong } from "./map/mascot/technyong.mjs";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {
@@ -27,6 +28,7 @@ import {
   reportLocation,
   clusterReports,
 } from "./reports.mjs";
+import { insideBuilding, projectToSegment } from "./geo.mjs";
 import { buildingLabel, worksPeriod } from "./buildings.mjs";
 import { createGraphOverlay } from "./graph-overlay.js";
 const VIOLET = 0x7950ff;
@@ -317,7 +319,9 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     entranceDotGeometry = new THREE.SphereGeometry(1.75, 12, 8),
     entranceRingGeometry = new THREE.RingGeometry(2.2, 3.1, 20);
   // 등록된 출입구(team-survey.json)를 초록 점으로 그립니다. 편집기로 바꾸면 다시 그립니다.
+  let mappedEntrances = ENTRANCES;
   function setEntrances(list) {
+    mappedEntrances = list;
     for (const child of [...entranceGroup.children])
       entranceGroup.remove(child);
     for (const entrance of list) addEntranceMarker(entrance);
@@ -358,7 +362,12 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   userLocationGroup.visible = false;
   scene.add(routeGroup, warningGroup, reportPreviewGroup, userLocationGroup);
   const warningLabels = [];
-  let movingDot = null,
+  // 경로를 따라 걷는 마스코트(테크뇽). 처음 경로를 그릴 때 한 번만 만들고 재사용합니다.
+  const WALKER_SCALE = 8,
+    WALKER_Y = 1.9;
+  let technyong = null,
+    movingDot = null,
+    walkerHeading = null,
     routeCurve = null,
     routeLength = 1;
   function clearGroup(group) {
@@ -424,10 +433,15 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       routeGroup.add(ring);
     }
     if (routeCurve.curves.length) {
-      movingDot = new THREE.Mesh(
-        new THREE.SphereGeometry(2.1, 8, 6),
-        new THREE.MeshBasicMaterial({ color: 0xd5ff76 }),
-      );
+      if (!technyong) {
+        technyong = createTechnyong();
+        technyong.object.scale.setScalar(WALKER_SCALE);
+      }
+      // clearGroup은 메시만 정리하므로 재사용하는 마스코트 그룹은 지워지지 않고 떼어지기만 합니다.
+      movingDot = technyong.object;
+      movingDot.position.set(origin.x, WALKER_Y, origin.z);
+      walkerHeading = null;
+      placeWalker(0, 0, 0, false);
       routeGroup.add(movingDot);
     }
     routeLength = route.meters;
@@ -648,6 +662,17 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     camera.zoom = 4;
     camera.updateProjectionMatrix();
     controls.update();
+  }
+  // 건물 검색 결과에서 고른 건물로 카메라를 옮깁니다(이름표 더블클릭과 같은 시점).
+  function focusPlace(id) {
+    const record = buildingLayer.records.find((r) => r.b.id === id);
+    if (record) focusBuilding({ ...record.b, h: record.height });
+    return Boolean(record);
+  }
+  // 건물 정보 카드로 고른 건물의 이름표를 강조합니다. null이면 강조를 지웁니다.
+  function highlightBuilding(id) {
+    for (const item of labelObjects)
+      item.label.element.classList.toggle("is-selected", item.id === id);
   }
   function zoom(factor) {
     camera.zoom = THREE.MathUtils.clamp(camera.zoom * factor, 0.5, 12);
@@ -1066,11 +1091,112 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   const profiler = createMapProfiler(renderer, campusTrees, mapStartedAt);
   let frame,
     previousFrameTime = 0;
+  // u: 경로 위 위치(0~1). 진행 방향을 바라보고, 모퉁이에서는 부드럽게 돌아섭니다.
+  function placeWalker(u, t, dt, moving) {
+    routeCurve.getPoint(u, movingDot.position);
+    movingDot.position.y = WALKER_Y;
+    const tangent = routeCurve.getTangent(Math.min(u, 0.999));
+    const target = Math.atan2(tangent.x, tangent.z);
+    if (walkerHeading === null || dt === 0) walkerHeading = target;
+    else {
+      const diff = Math.atan2(
+        Math.sin(target - walkerHeading),
+        Math.cos(target - walkerHeading),
+      );
+      walkerHeading += diff * Math.min(1, dt * 10);
+    }
+    movingDot.rotation.y = walkerHeading;
+    technyong.update(t / 1000, { moving, dt: dt || 1 });
+  }
+  let entryFlight;
+  function resolveEntryView(record, entranceId) {
+    if (!record) return null;
+    if (!entranceId && record.entryView) return record.entryView;
+
+    const building = record.b;
+    const entrance = mappedEntrances.find(
+      (item) => item.buildingId === building.id && (!entranceId || item.id === entranceId),
+    );
+    const anchor = entrance ?? NODES[building.entry];
+    if (!anchor) return null;
+
+    let wall;
+    for (const ring of [building.outline, ...building.holes]) {
+      for (let i = 0; i < ring.length; i++) {
+        const [ax, az] = ring[i];
+        const [bx, bz] = ring[(i + 1) % ring.length];
+        if (ax === bx && az === bz) continue;
+        const projection = projectToSegment(anchor, { x: ax, z: az }, { x: bx, z: bz });
+        if (wall && wall.distance <= projection.distance) continue;
+        wall = { ...projection, outward: new THREE.Vector3(az - bz, 0, bx - ax).normalize() };
+      }
+    }
+    if (!wall) return null;
+    const { point, outward } = wall;
+    if (insideBuilding({ x: point.x + outward.x * 0.25, z: point.z + outward.z * 0.25 }, building)) {
+      outward.negate();
+    }
+    return { door: new THREE.Vector3(point.x, 2.6, point.z), outward };
+  }
+
+  function flyIntoBuilding(id, entranceId, onApproach) {
+    const record = buildingLayer.records.find(({ b }) => b.id === id);
+    const entry = resolveEntryView(record, entranceId);
+    if (!entry || !host.clientHeight) return Promise.resolve();
+
+    cancelAnimationFrame(zoomAnimation);
+    keyboardPan.clear();
+    controls.enabled = false;
+    labels.domElement.style.visibility = "hidden";
+    const view = new THREE.PerspectiveCamera(42, host.clientWidth / host.clientHeight, 0.08, 3500);
+    const target = controls.target.clone();
+    const distance = (camera.top - camera.bottom) / camera.zoom /
+      (2 * Math.tan(THREE.MathUtils.degToRad(view.fov / 2)));
+    const start = camera.position.clone().sub(target).setLength(distance).add(target);
+    const approach = entry.door.clone().addScaledVector(entry.outward, 38);
+    approach.y += 13;
+    const threshold = entry.door.clone().addScaledVector(entry.outward, 0.5);
+    const aim = entry.door.clone().addScaledVector(entry.outward, -6);
+    return new Promise((resolve) => {
+      entryFlight = { view, start, target, approach, threshold, aim, onApproach, resolve };
+    });
+  }
+
+  function restoreBuildingFlight() {
+    entryFlight = null;
+    controls.enabled = true;
+    labels.domElement.style.visibility = "";
+  }
+
+  function renderBuildingFlight(t) {
+    const flight = entryFlight;
+    flight.started ??= t;
+    const elapsed = t - flight.started;
+    const approach = THREE.MathUtils.smootherstep(elapsed, 0, 950);
+    const entry = THREE.MathUtils.smootherstep(elapsed, 800, 1500);
+    flight.view.position.lerpVectors(flight.start, flight.approach, approach)
+      .lerp(flight.threshold, entry);
+    flight.view.lookAt(flight.target.clone().lerp(flight.aim, approach));
+    const entrancesVisible = entranceGroup.visible;
+    entranceGroup.visible = false;
+    renderer.render(scene, flight.view);
+    entranceGroup.visible = entrancesVisible;
+    if (elapsed >= 1280 && flight.onApproach) {
+      flight.onApproach();
+      flight.onApproach = null;
+    }
+    if (elapsed >= 1500) flight.resolve();
+  }
+
   function animate(t) {
     frame = requestAnimationFrame(animate);
     const deltaSeconds = previousFrameTime ? (t - previousFrameTime) / 1000 : 0;
     previousFrameTime = t;
     if (document.hidden || !host.getBoundingClientRect().height) return;
+    if (entryFlight) {
+      renderBuildingFlight(t);
+      return;
+    }
     const profileStart = profiler?.begin(t);
     keyboardPan.update(deltaSeconds);
     controls.update();
@@ -1079,12 +1205,13 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
       (renderer.domElement.clientHeight * camera.zoom) /
         (camera.top - camera.bottom),
     );
-    if (movingDot && routeCurve?.curves.length && !reduceMotion) {
-      movingDot.position.copy(
-        routeCurve.getPoint((t / Math.max(6000, routeLength * 18)) % 1),
+    if (movingDot && routeCurve?.curves.length)
+      placeWalker(
+        reduceMotion ? 0 : (t / Math.max(6000, routeLength * 18)) % 1,
+        t,
+        reduceMotion ? 0 : Math.min(0.1, deltaSeconds),
+        !reduceMotion,
       );
-      movingDot.position.y = 4;
-    }
     pondDetails.update(reduceMotion ? 0 : t / 1000);
     renderer.render(scene, camera);
     declutterLabels(t);
@@ -1098,6 +1225,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
   });
   return {
     moveTo,
+    flyIntoBuilding,
+    restoreBuildingFlight,
     // 편집 모드 전용: 보행 그래프 디버그 오버레이. graph가 null이면 끕니다.
     setGraphOverlay: (graph) => graphOverlay.set(graph),
     // 편집 모드 전용: 미리보기 도형(점·선)과 클릭·이동 처리기. null이면 지웁니다.
@@ -1115,6 +1244,8 @@ export function createCampusMap(host, onSelect, onRoadSelect) {
     zoom,
     reset,
     top,
+    focusPlace,
+    highlightBuilding,
     dispose() {
       cancelAnimationFrame(frame);
       profiler?.dispose();

@@ -1,3 +1,4 @@
+import { normalizeSearch, suggestMatches } from "./search-suggestions.mjs";
 import { shortestPath } from "./routing.mjs";
 import { routeBetween } from "./route-target.mjs";
 import { attachGps } from "./gps-start.mjs";
@@ -29,6 +30,7 @@ import {
 } from "./backend.mjs";
 import {
   activeWorks,
+  BUILDING_NUMBERS,
   buildingLabel,
   worksPeriod,
   today,
@@ -37,6 +39,7 @@ import catalog from "./schools.json";
 import {
   CAMPUS,
   CAMPUS_GEOMETRY,
+  INDOOR_MAPS,
   BUILDINGS,
   NODES,
   EDGES,
@@ -46,11 +49,16 @@ import {
   placeEntries,
 } from "./data.mjs";
 import { createCampusMap } from "./map.js";
+import { buildingInfo } from "./building-info.mjs";
 import { setupEditMode } from "./edit-mode.js";
 import { gpsToCampus } from "./geo.mjs";
 import { gisSummary } from "./gis.mjs";
 const $ = (s) => document.querySelector(s),
-  $$ = (s) => document.querySelectorAll(s);
+  $$ = (s) => document.querySelectorAll(s),
+  // 761px 이상은 Figma v2 데스크톱 화면(떠 있는 패널·건물 카드·건물 검색)을 씁니다.
+  isDesktop = window.matchMedia("(min-width: 761px)");
+// 데스크톱 왼쪽 사이드바의 버튼을 이름(data-side)으로 찾습니다.
+const side = (name) => $(`[data-side="${name}"]`);
 let region = "전체",
   showAll = false,
   mode = "shortest",
@@ -84,20 +92,23 @@ for (const [key, value] of Object.entries(GIS_SUMMARY)) {
 }
 $(".map-data-status").textContent =
   `건물 ${GIS_SUMMARY.buildings} · 등록 출입구 ${GIS_SUMMARY.entrances}`;
-const normalize = (s) => s.toLowerCase().replace(/\s/g, "");
+const normalize = normalizeSearch;
 const schoolData = [
   catalog.find((s) => s[0] === CAMPUS.name),
   ...catalog.filter((s) => s[0] !== CAMPUS.name),
 ];
 function renderSchools() {
   const q = normalize($("#school-search").value),
-    all = schoolData.filter(
-      (s) =>
-        (region === "전체" || s[3] === region) &&
-        normalize(s.join(" ")).includes(q),
-    );
+    regional = schoolData.filter((s) => region === "전체" || s[3] === region),
+    matches = regional.filter((s) => normalize(s.join(" ")).includes(q)),
+    suggested = q && !matches.length
+      ? suggestMatches(q, regional, (s) => [s[0]])
+      : [],
+    all = matches.length ? matches : suggested;
   const displayed = q || showAll ? all : all.slice(0, 6);
-  $("#school-count").textContent = `${all.length}개 캠퍼스`;
+  $("#school-count").textContent = suggested.length
+    ? `추천 캠퍼스 ${suggested.length}곳`
+    : `${all.length}개 캠퍼스`;
   $("#show-all").hidden = !!q || all.length <= 6;
   $("#show-all").firstChild.textContent = showAll
     ? "학교 접기 "
@@ -159,17 +170,9 @@ $("#show-all").onclick = () => {
   renderSchools();
 };
 const placesById = new Map(PLACES.map((place) => [place.id, place])),
-  placesByName = new Map(PLACES.map((place) => [place.name, place])),
-  gpsOption = document.createElement("option"),
-  gpsOptions = [gpsOption];
-gpsOption.value = "내 현재 위치";
-gpsOption.disabled = true;
-$("#route-places").append(gpsOption);
-for (const place of PLACES) {
-  const option = document.createElement("option");
-  option.value = place.name;
-  $("#route-places").append(option);
-}
+  placesByName = new Map(PLACES.map((place) => [place.name, place]));
+const locationPlace = { id: "gps", name: "내 현재 위치" };
+const closePlaceSuggestions = new Map();
 function routePlaceId(selector) {
   const value = $(selector).value.trim();
   return value === "내 현재 위치" ? "gps" : placesByName.get(value)?.id;
@@ -178,6 +181,7 @@ function setRoutePlace(selector, id) {
   $(selector).value =
     id === "gps" ? "내 현재 위치" : placesById.get(id)?.name || "";
   $(selector).removeAttribute("aria-invalid");
+  closePlaceSuggestions.get(selector)?.();
 }
 setRoutePlace("#origin", activeStart);
 setRoutePlace("#destination", activeDestination);
@@ -208,7 +212,7 @@ function selectedPlace(selector, g = graph) {
 // 건물에 출입구가 여러 개면 route-target.mjs가 가장 가까운 문을 고릅니다.
 // 현재 위치가 출발지·도착지면 가장 가까운 길 위의 점을 그래프에 더해 그 점에서 시작합니다.
 // 반환하는 nodes는 그 점까지 포함한 노드 목록이라, 경로를 그릴 때 이것을 씁니다.
-function routeOn(g) {
+function routeOn(g, routeMode = mode) {
   let start = selectedPlace("#origin", g),
     destination = selectedPlace("#destination", g);
   if (!start || !destination)
@@ -227,7 +231,7 @@ function routeOn(g) {
     route: routeBetween(
       start.entries,
       destination.entries,
-      mode,
+      routeMode,
       routeGraph.nodes,
       routeGraph.edges,
     ),
@@ -250,9 +254,16 @@ function updateRoute({ announce = false } = {}) {
   activeDestination = routePlaceId("#destination") || activeDestination;
   const { start, destination, route, nodes } = routeOn(graph);
   if (!start || !destination) {
+    routeShown = false;
+    renderResultPanel();
     const gpsWaiting =
       routePlaceId("#origin") === "gps" ||
       routePlaceId("#destination") === "gps";
+    // 아직 비어 있는 칸이 있을 뿐이면(한쪽만 고른 상태) 안내 없이 기다립니다.
+    const typedUnknown = ["#origin", "#destination"].some(
+      (selector) => $(selector).value.trim() && !routePlaceId(selector),
+    );
+    if (!gpsWaiting && !typedUnknown) return;
     toast(
       gpsWaiting
         ? "현재 위치를 먼저 확인해주세요."
@@ -260,8 +271,15 @@ function updateRoute({ announce = false } = {}) {
     );
     return;
   }
+  const indoorButton = $("#indoor-open");
+  indoorButton.hidden = !INDOOR_MAPS.has(destination.id);
+  indoorButton.querySelector("b").textContent = `${destination.name} 실내 지도`;
+  indoorButton.onclick = () => enterIndoor(destination.id);
   currentRoute = route;
   if (!currentRoute) {
+    updateModeOptions();
+    routeShown = false;
+    renderResultPanel();
     $("#route-result").hidden = true;
     $("#no-route-message").hidden = false;
     $("#no-route-message p").textContent =
@@ -317,52 +335,50 @@ function updateRoute({ announce = false } = {}) {
     li.append(small);
     $("#route-steps").append(li);
   });
-  $("#indoor-open").hidden = destination.id !== "future";
+  updateModeOptions();
+  renderRouteCard(start, destination, nodes);
   map?.setRoute(currentRoute, start.id, destination.id, nodes);
   if (announce)
     toast(`${start.name}에서 ${destination.name}까지 경로를 표시했어요.`);
 }
 function buildingSelect(id) {
   const place = PLACES.find((item) => item.id === id);
-  if (place)
-    showPopover(
-      place.name,
-      "출발지나 도착지로 선택할 수 있어요.",
-      place,
-      id === "future",
-    );
+  if (place && isDesktop.matches) {
+    closeBuildingPopover();
+    showBuildingCard(id);
+    return;
+  }
+  if (place) showPopover(place);
 }
 function closeBuildingPopover() {
   $("#building-popover").hidden = true;
   $(".map-canvas-wrap").classList.remove("has-building-popover");
 }
-function showPopover(title, description, place = null, indoor = false) {
+function showPopover(place) {
   const el = $("#building-popover");
   el.replaceChildren();
   const b = document.createElement("b");
-  b.textContent = title;
+  b.textContent = place.name;
   const p = document.createElement("p");
-  p.textContent = description;
+  p.textContent = "출발지나 도착지로 선택할 수 있어요.";
   el.append(b, p);
-  if (place) {
-    for (const [selector, text] of [
-      ["#origin", "출발지로"],
-      ["#destination", "도착지로"],
-    ]) {
-      const button = document.createElement("button");
-      button.textContent = text;
-      button.onclick = () => {
-        setRoutePlace(selector, place.id);
-        updateRoute();
-        closeBuildingPopover();
-      };
-      el.append(button);
-    }
-  }
-  if (indoor) {
+  for (const [selector, text] of [
+    ["#origin", "출발지로"],
+    ["#destination", "도착지로"],
+  ]) {
     const button = document.createElement("button");
-    button.textContent = "미래관 실내 지도 ↗";
-    button.onclick = () => $("#indoor-dialog").showModal();
+    button.textContent = text;
+    button.onclick = () => {
+      setRoutePlace(selector, place.id);
+      updateRoute();
+      closeBuildingPopover();
+    };
+    el.append(button);
+  }
+  if (INDOOR_MAPS.has(place.id)) {
+    const button = document.createElement("button");
+    button.textContent = `${place.name} 실내 지도 →`;
+    button.onclick = () => enterIndoor(place.id);
     el.append(button);
   }
   const close = document.createElement("button");
@@ -408,16 +424,101 @@ if (!map) {
 }
 for (const selector of ["#origin", "#destination"]) {
   const input = $(selector);
-  input.oninput = () => input.removeAttribute("aria-invalid");
-  input.onchange = () => {
-    if (!routePlaceId(selector)) {
-      input.setAttribute("aria-invalid", "true");
-      toast("검색 결과에 있는 장소를 선택해주세요.");
-      return;
-    }
+  const list = $(`${selector}-suggestions`);
+  const hint = $(`${selector}-suggestion-hint`);
+  const panel = list.parentElement;
+  let choices = [];
+  let active = -1;
+
+  function closeSuggestions() {
+    choices = [];
+    active = -1;
+    panel.hidden = true;
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("aria-activedescendant");
+  }
+  closePlaceSuggestions.set(selector, closeSuggestions);
+
+  function choose(place) {
+    setRoutePlace(selector, place.id);
     updateRoute();
     closeBuildingPopover();
-  };
+  }
+
+  function renderSuggestions() {
+    closeSuggestions();
+    const q = normalize(input.value);
+    const places = gpsStartNode ? [locationPlace, ...PLACES] : PLACES;
+    if (q && places.some((place) => place.name === input.value.trim())) return;
+
+    const matches = places.filter((place) => normalize(place.name).includes(q));
+    choices = matches.length
+      ? matches.slice(0, 6)
+      : suggestMatches(q, places, (place) => [place.name]);
+    if (!choices.length) return;
+
+    hint.textContent = matches.length ? "검색 결과" : "추천 장소";
+    list.replaceChildren(...choices.map((place, index) => {
+      const option = document.createElement("li");
+      option.id = `${list.id}-${index}`;
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", "false");
+      option.textContent = place.name;
+      option.onpointerdown = (event) => {
+        if (event.pointerType === "mouse") event.preventDefault();
+      };
+      option.onclick = () => choose(place);
+      return option;
+    }));
+    panel.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+  }
+
+  input.addEventListener("input", () => {
+    input.removeAttribute("aria-invalid");
+    renderSuggestions();
+  });
+  input.addEventListener("focus", renderSuggestions);
+  document.addEventListener("focusin", (event) => {
+    if (event.target !== input) closeSuggestions();
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (event.target !== input && !list.contains(event.target)) closeSuggestions();
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === "Escape" && !panel.hidden) {
+      event.preventDefault();
+      closeSuggestions();
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      if (active >= 0) choose(choices[active]);
+      else if (routePlaceId(selector)) updateRoute();
+      else if (choices.length) choose(choices[0]);
+      else updateRoute({ announce: true });
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (panel.hidden) renderSuggestions();
+      if (!choices.length) return;
+      event.preventDefault();
+      if (active >= 0) list.children[active].setAttribute("aria-selected", "false");
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      active = active < 0
+        ? (step > 0 ? 0 : choices.length - 1)
+        : (active + step + choices.length) % choices.length;
+      const option = list.children[active];
+      option.setAttribute("aria-selected", "true");
+      input.setAttribute("aria-activedescendant", option.id);
+      option.scrollIntoView({ block: "nearest" });
+    }
+  });
+  input.addEventListener("change", () => {
+    if (routePlaceId(selector)) {
+      updateRoute();
+      closeBuildingPopover();
+    } else if (!choices.length && input.value.trim()) {
+      input.setAttribute("aria-invalid", "true");
+    }
+  });
 }
 $("#find-route").onclick = () => {
   updateRoute({ announce: true });
@@ -440,12 +541,471 @@ $("#map-reset").onclick = () => map?.reset();
 $("#map-north").onclick = () => map?.reset();
 $("#map-top").onclick = () => map?.top();
 function setPanelClosed(closed) {
+  // 길찾기 패널과 길 막힘 제보 패널은 같은 자리를 써서 하나만 엽니다.
+  if (!closed) setReportsPanel(false);
   $("#map-view").classList.toggle("panel-closed", closed);
   $("#panel-toggle").setAttribute("aria-expanded", String(!closed));
-  $("#panel-toggle").textContent = closed ? "길찾기 열기" : "길찾기 접기";
+  $('[data-side="route"]').setAttribute("aria-pressed", String(!closed));
+  // 데스크톱(Figma v2)은 위쪽 바의 "길찾기" 버튼 하나로 패널을 열고 닫습니다.
+  $("#panel-toggle").textContent = isDesktop.matches
+    ? "길찾기"
+    : closed
+      ? "길찾기 열기"
+      : "길찾기 접기";
 }
 $("#panel-toggle").onclick = () =>
   setPanelClosed(!$("#map-view").classList.contains("panel-closed"));
+
+// ===== 길 막힘 제보 패널 (데스크톱) =====
+// 제보 목록은 데스크톱에서는 이 패널로, 모바일에서는 길찾기 패널 안 원래 자리로 옮깁니다.
+const reportsSection = $(".road-reports"),
+  reportsHome = document.createComment("road-reports");
+reportsSection.before(reportsHome);
+function placeReports() {
+  if (isDesktop.matches) $("#reports-panel-body").append(reportsSection);
+  else reportsHome.after(reportsSection);
+}
+function setReportsPanel(open) {
+  const show = open && isDesktop.matches;
+  if (show) setPanelClosed(true);
+  $("#reports-panel").hidden = !show;
+  $('[data-side="report"]').setAttribute("aria-pressed", String(show));
+}
+$("#reports-panel-close").onclick = () => setReportsPanel(false);
+$("#reports-panel-start").onclick = () => {
+  setReportsPanel(false);
+  $("#report-start").click();
+};
+placeReports();
+isDesktop.addEventListener("change", () => {
+  placeReports();
+  if (!isDesktop.matches) setReportsPanel(false);
+});
+
+// ===== 경로 방식 카드: 두 방식의 시간·거리를 함께 보여 줍니다 =====
+function updateModeOptions() {
+  for (const m of ["shortest", "stepfree"]) {
+    const { start, destination, route } = routeOn(graph, m);
+    const meta = $(`[data-mode-meta="${m}"]`),
+      time = $(`[data-mode-time="${m}"]`);
+    if (!start || !destination) {
+      meta.textContent = "";
+      time.textContent = "";
+    } else if (!route) {
+      meta.textContent = "연결된 길이 없어요";
+      time.textContent = "—";
+    } else {
+      meta.textContent = `${Math.round(route.meters)} m${route.stairs ? " · 계단 포함" : ""}`;
+      time.replaceChildren(String(route.minutes));
+      const unit = document.createElement("small");
+      unit.textContent = "분";
+      time.append(unit);
+    }
+  }
+}
+
+// ===== 건물 정보 카드 (데스크톱) =====
+let cardBuildingId = null;
+function placeWithEntries(id, g = graph) {
+  const place = placesById.get(id),
+    building = BUILDINGS.find((b) => b.id === id);
+  return place && building
+    ? { ...place, entries: placeEntries(building, g.entrances) }
+    : place;
+}
+function showBuildingCard(id) {
+  const place = placeWithEntries(id);
+  if (!place) return;
+  cardBuildingId = id;
+  const number = BUILDING_NUMBERS[place.name],
+    info = buildingInfo(place.name);
+  $("#building-card-name").textContent = place.name;
+  $("#building-card-sub").textContent =
+    [number ? `${number}동` : "", info.area].filter(Boolean).join(" · ") ||
+    "서울과학기술대학교";
+  $("#building-card-floors").textContent = info.floors || "—";
+  $("#building-card-entrances").textContent = `${place.entries?.length || 0}곳`;
+  $("#building-card-hours").textContent = info.hours || "—";
+  const indoor = INDOOR_MAPS.has(id);
+  $("#building-card-indoor").disabled = !indoor;
+  $("#building-card-indoor").title = indoor
+    ? ""
+    : "실내 지도는 아직 미래관만 준비돼 있어요.";
+  map?.highlightBuilding(id);
+  $("#building-card").hidden = false;
+  renderResultPanel();
+}
+function closeBuildingCard() {
+  $("#building-card").hidden = true;
+  cardBuildingId = null;
+  map?.highlightBuilding(null);
+  renderResultPanel();
+}
+$("#building-card-close").onclick = closeBuildingCard;
+// 건물 카드의 "출발지로"/"도착지로": 반대쪽 칸이 이미 있으면 바로 경로를 그리고,
+// 비어 있으면 길찾기 패널을 열어 그 칸에 바로 입력하게 합니다.
+function useCardBuildingAs(selector, other) {
+  if (!cardBuildingId) return;
+  setRoutePlace(selector, cardBuildingId);
+  const otherId = routePlaceId(other);
+  if (otherId && otherId !== cardBuildingId) {
+    setPanelClosed(false);
+    updateRoute({ announce: true });
+    return;
+  }
+  $(other).value = "";
+  updateModeOptions();
+  setPanelClosed(false);
+  // 패널이 보이게 바뀐 다음 프레임에 초점을 옮겨야 그 칸에 바로 입력됩니다.
+  requestAnimationFrame(() => $(other).focus());
+}
+$("#building-card-origin").onclick = () =>
+  useCardBuildingAs("#origin", "#destination");
+$("#building-card-dest").onclick = () =>
+  useCardBuildingAs("#destination", "#origin");
+// 실내 탐색: 팀의 3D 진입 전환(enterIndoor)으로 건물 안까지 날아간 뒤 실내 지도를 엽니다.
+$("#building-card-indoor").onclick = () => {
+  if (cardBuildingId && INDOOR_MAPS.has(cardBuildingId))
+    enterIndoor(cardBuildingId);
+};
+
+// ===== 건물 검색 (위쪽 바) =====
+const searchInput = $("#building-search"),
+  searchResults = $("#building-results"),
+  buildingPlaces = PLACES.filter((p) => BUILDINGS.some((b) => b.id === p.id)),
+  recentBuildings = [];
+let searchItems = [],
+  searchIndex = -1;
+function matchBuildings(query) {
+  const q = query.replace(/\s+/g, "").toLowerCase();
+  if (!q) return [];
+  return buildingPlaces
+    .filter((p) => {
+      const n = BUILDING_NUMBERS[p.name];
+      return (
+        p.name.replace(/\s+/g, "").toLowerCase().includes(q) ||
+        (n && String(n) === q)
+      );
+    })
+    .slice(0, 8);
+}
+function renderBuildingResults() {
+  const query = searchInput.value.trim();
+  const found = matchBuildings(query);
+  const recent = recentBuildings
+    .map((id) => placesById.get(id))
+    .filter(Boolean);
+  searchItems = query ? found : recent;
+  searchIndex = searchItems.length ? 0 : -1;
+  searchResults.replaceChildren();
+  if (query || recent.length) {
+    const heading = document.createElement("p");
+    heading.className = "building-results-heading";
+    heading.textContent = query ? "건물" : "최근 본 건물";
+    searchResults.append(heading);
+  }
+  searchItems.forEach((place, i) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.setAttribute("role", "option");
+    button.id = `building-option-${i}`;
+    button.className = "building-option";
+    const icon = document.createElement("span");
+    icon.className = "building-option-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = query ? "▦" : "↺";
+    const text = document.createElement("span");
+    const name = document.createElement("b");
+    const at = query ? place.name.indexOf(query) : -1;
+    if (at >= 0) {
+      const mark = document.createElement("mark");
+      mark.textContent = place.name.slice(at, at + query.length);
+      name.append(
+        place.name.slice(0, at),
+        mark,
+        place.name.slice(at + query.length),
+      );
+    } else name.textContent = place.name;
+    const sub = document.createElement("small");
+    const n = BUILDING_NUMBERS[place.name];
+    sub.textContent = n ? `${n}동` : "건물";
+    text.append(name, sub);
+    button.append(icon, text);
+    // 목록을 누르는 동안 검색창 blur로 목록이 먼저 닫히지 않게 합니다.
+    button.onmousedown = (e) => e.preventDefault();
+    button.onclick = () => chooseBuilding(place.id);
+    searchResults.append(button);
+  });
+  if (query && !found.length) {
+    const empty = document.createElement("p");
+    empty.className = "building-results-empty";
+    empty.textContent =
+      "찾는 건물이 없어요. 건물 이름이나 번호로 검색해 보세요.";
+    searchResults.append(empty);
+  }
+  if (searchResults.childElementCount) {
+    const hint = document.createElement("p");
+    hint.className = "building-results-hint";
+    hint.textContent = "건물만 검색돼요 · 강의실은 실내 탐색에서 찾아요";
+    searchResults.append(hint);
+  }
+  highlightResult();
+  const open = searchResults.childElementCount > 0;
+  searchResults.hidden = !open;
+  searchInput.setAttribute("aria-expanded", String(open));
+}
+function highlightResult() {
+  searchResults.querySelectorAll(".building-option").forEach((b, i) => {
+    b.classList.toggle("active", i === searchIndex);
+    b.setAttribute("aria-selected", String(i === searchIndex));
+  });
+  if (searchIndex >= 0)
+    searchInput.setAttribute(
+      "aria-activedescendant",
+      `building-option-${searchIndex}`,
+    );
+  else searchInput.removeAttribute("aria-activedescendant");
+}
+function closeBuildingResults() {
+  searchResults.hidden = true;
+  searchInput.setAttribute("aria-expanded", "false");
+}
+function chooseBuilding(id) {
+  const place = placesById.get(id);
+  if (!place) return;
+  searchInput.value = place.name;
+  closeBuildingResults();
+  const rest = recentBuildings.filter((x) => x !== id).slice(0, 4);
+  recentBuildings.splice(0, recentBuildings.length, id, ...rest);
+  closeBuildingPopover();
+  map?.focusPlace(id);
+  showBuildingCard(id);
+  // 고른 뒤에는 검색창에서 빠져나와 결과 목록이 다시 열리지 않게 합니다.
+  searchInput.blur();
+}
+searchInput.addEventListener("input", renderBuildingResults);
+searchInput.addEventListener("focus", renderBuildingResults);
+searchInput.addEventListener("blur", closeBuildingResults);
+// 한글 입력 중(조합 중)에 누른 Enter는 조합이 끝난 뒤 처리해야 마지막 글자까지 반영됩니다.
+let enterAfterComposition = false;
+searchInput.addEventListener("compositionend", () => {
+  renderBuildingResults();
+  if (!enterAfterComposition) return;
+  enterAfterComposition = false;
+  if (searchIndex >= 0) chooseBuilding(searchItems[searchIndex].id);
+});
+searchInput.addEventListener("keydown", (e) => {
+  if (e.isComposing || e.keyCode === 229) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      enterAfterComposition = true;
+    }
+    return;
+  }
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    if (!searchItems.length) return;
+    e.preventDefault();
+    const step = e.key === "ArrowDown" ? 1 : -1;
+    searchIndex =
+      (searchIndex + step + searchItems.length) % searchItems.length;
+    highlightResult();
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    if (searchIndex >= 0) chooseBuilding(searchItems[searchIndex].id);
+  } else if (e.key === "Escape") {
+    closeBuildingResults();
+    searchInput.blur();
+  }
+});
+// "/" 키로 건물 검색창에 바로 입력합니다(입력 중일 때는 제외).
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "/" || $("#map-view").hidden || !isDesktop.matches) return;
+  if (e.target.closest?.("input, textarea, select, [contenteditable]")) return;
+  e.preventDefault();
+  searchInput.focus();
+});
+isDesktop.addEventListener("change", () => {
+  setPanelClosed($("#map-view").classList.contains("panel-closed"));
+  if (!isDesktop.matches) closeBuildingCard();
+});
+
+// ===== 오른쪽 결과 카드 (데스크톱) =====
+// 건물을 고르면 건물 정보 카드, 경로를 그리면 경로 카드 하나만 보여 줍니다.
+let routeShown = false,
+  desktopStarted = false;
+function renderResultPanel() {
+  const desktop = isDesktop.matches;
+  // 경로 결과는 길찾기 패널 안에, 오른쪽에는 건물 정보 카드만 둡니다.
+  $("#route-card").hidden = !(desktop && routeShown);
+  const any = desktop && !$("#building-card").hidden;
+  $("#result-panel").hidden = !any;
+  $("#map-view").classList.toggle("has-results", any);
+  $("#route-summary-bar").hidden = !(desktop && routeShown);
+  side("route").setAttribute(
+    "aria-pressed",
+    String(routeShown || !$("#map-view").classList.contains("panel-closed")),
+  );
+}
+// 경로 카드의 안내 단계: 왼쪽 패널의 단계 목록과 같은 지점을 쓰고, 다음 지점까지 거리를 붙입니다.
+function routeCardSteps(route, nodes) {
+  const path = route.path,
+    last = path.length - 1,
+    stride = Math.max(1, Math.ceil(last / 5)),
+    at = path
+      .map((_, i) => i)
+      .filter((i) => i === 0 || i === last || i % stride === 0),
+    texts = [...$$("#route-steps li")].map((li) =>
+      li.firstChild.textContent.trim(),
+    ),
+    cumulative = [0];
+  for (let i = 1; i <= last; i++) {
+    const a = nodes[path[i - 1]],
+      b = nodes[path[i]];
+    cumulative.push(cumulative[i - 1] + Math.hypot(a.x - b.x, a.z - b.z));
+  }
+  const steps = at.map((index, i) => ({ index, text: texts[i] || "" }));
+  // 단계가 많으면 앞의 세 단계와 도착만 남깁니다.
+  const shown = steps.length > 4 ? [...steps.slice(0, 3), steps.at(-1)] : steps;
+  return shown.map((step, i) => ({
+    text: step.text,
+    meters:
+      i < shown.length - 1
+        ? Math.round(cumulative[shown[i + 1].index] - cumulative[step.index])
+        : null,
+  }));
+}
+function renderRouteCard(start, destination, nodes) {
+  routeShown = true;
+  const route = currentRoute;
+  $("#route-card-title").textContent =
+    mode === "stepfree" ? "계단 피하기" : "최단 경로";
+  $("#route-card-sub").textContent = `${start.name} → ${destination.name}`;
+  $("#route-card-minutes").textContent = route.minutes;
+  $("#route-card-distance").textContent =
+    `${Math.round(route.meters)} m · 도보`;
+  const steps = routeCardSteps(route, nodes);
+  $("#route-card-steps").replaceChildren(
+    ...steps.map((step, i) => {
+      const li = document.createElement("li"),
+        icon =
+          i === 0 ? "i-walk" : i === steps.length - 1 ? "i-flag" : "i-chevron";
+      li.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#${icon}" /></svg><span></span><small></small>`;
+      li.querySelector("span").textContent = step.text;
+      li.querySelector("small").textContent =
+        step.meters == null ? "" : `${step.meters} m`;
+      return li;
+    }),
+  );
+  $("#summary-origin").textContent = start.name;
+  $("#summary-dest").textContent = destination.name;
+  $$("[data-summary-mode]").forEach((b) =>
+    b.classList.toggle("active", b.dataset.summaryMode === mode),
+  );
+  // 경로를 보여 줄 때는 건물 카드를 닫고 경로 카드만 둡니다.
+  if (!$("#building-card").hidden) closeBuildingCard();
+  renderResultPanel();
+}
+$("#route-card-close").onclick = () => {
+  routeShown = false;
+  currentRoute = null;
+  map?.setRoute(null);
+  renderResultPanel();
+};
+$("#route-card-start").onclick = () => {
+  const startId = routePlaceId("#origin");
+  if (startId && startId !== "gps" && !map?.focusPlace(startId)) map?.reset();
+  toast(
+    "출발지에서 보라색 경로를 따라가세요. 단계별 음성 안내는 준비 중이에요.",
+  );
+};
+$$("[data-summary-mode]").forEach(
+  (b) =>
+    (b.onclick = () =>
+      $(`.mode-tabs [data-mode="${b.dataset.summaryMode}"]`).click()),
+);
+$("#summary-edit").onclick = () => setPanelClosed(false);
+$("#route-panel-close").onclick = () => setPanelClosed(true);
+// 출발·도착 칸의 지우기(✕)와 바꾸기(⇅) 버튼
+function clearRouteResult() {
+  routeShown = false;
+  currentRoute = null;
+  map?.setRoute(null);
+  updateModeOptions();
+  renderResultPanel();
+}
+$$("[data-clear]").forEach(
+  (button) =>
+    (button.onclick = () => {
+      const input = $(`#${button.dataset.clear}`);
+      input.value = "";
+      clearRouteResult();
+      input.focus();
+    }),
+);
+$("#swap-places").onclick = () => {
+  const origin = $("#origin").value,
+    destination = $("#destination").value;
+  $("#origin").value = destination;
+  $("#destination").value = origin;
+  if (routePlaceId("#origin") && routePlaceId("#destination")) updateRoute();
+  else clearRouteResult();
+};
+isDesktop.addEventListener("change", renderResultPanel);
+
+// ===== 왼쪽 아이콘 사이드바 (데스크톱) =====
+// 지도 아이콘: 위쪽 건물 검색 바를 보이고 숨깁니다(보일 때는 검색창에 바로 입력).
+function setSearchBar(visible, focus = visible) {
+  $("#map-view").classList.toggle("search-hidden", !visible);
+  side("map").setAttribute("aria-pressed", String(visible));
+  if (!visible) closeBuildingResults();
+  if (focus) requestAnimationFrame(() => $("#building-search").focus());
+}
+side("map").onclick = () =>
+  setSearchBar($("#map-view").classList.contains("search-hidden"));
+side("route").onclick = () =>
+  setPanelClosed(!$("#map-view").classList.contains("panel-closed"));
+// 길 막힘(공사) 아이콘: 왼쪽에 길 막힘 제보 목록 패널을 열고 닫습니다.
+side("report").onclick = () => setReportsPanel($("#reports-panel").hidden);
+side("layers").onclick = () => {
+  const on = !$("#map-view").classList.contains("show-legend");
+  $("#map-view").classList.toggle("show-legend", on);
+  side("layers").setAttribute("aria-pressed", String(on));
+};
+side("settings").onclick = () => {
+  const on = !$("#map-view").classList.contains("show-instructions");
+  $("#map-view").classList.toggle("show-instructions", on);
+  side("settings").setAttribute("aria-pressed", String(on));
+};
+side("alerts").onclick = () => {
+  if ($("#admin-toggle").hidden)
+    toast("관리자 검토는 관리자 기기에서만 열 수 있어요.");
+  else $("#admin-toggle").click();
+};
+// 신고 모드와 내 위치 상태를 사이드바·지도 컨트롤 버튼에도 똑같이 보여 줍니다.
+new MutationObserver(() => {
+  $("#v2-locate").setAttribute(
+    "aria-pressed",
+    $("#gps-toggle").getAttribute("aria-pressed") || "false",
+  );
+}).observe($(".map-quick-actions"), {
+  attributes: true,
+  subtree: true,
+  attributeFilter: ["aria-pressed"],
+});
+
+// ===== 지도 컨트롤 (데스크톱): 2D/3D · 확대·축소 · 내 위치 · 시점 초기화 =====
+function setDimension(top) {
+  $("#v2-2d").setAttribute("aria-pressed", String(top));
+  $("#v2-3d").setAttribute("aria-pressed", String(!top));
+  if (top) map?.top();
+  else map?.reset();
+}
+$("#v2-2d").onclick = () => setDimension(true);
+$("#v2-3d").onclick = () => setDimension(false);
+$("#v2-plus").onclick = () => map?.zoom(1.18);
+$("#v2-minus").onclick = () => map?.zoom(1 / 1.18);
+$("#v2-locate").onclick = () => $("#gps-toggle").click();
+$("#v2-reset").onclick = () => setDimension(false);
 
 // ===== GPS 현재 위치 추적 =====
 // 공개 데이터의 중심 위·경도를 로컬 미터 좌표로 변환합니다.
@@ -465,10 +1025,6 @@ function stopGps({ keepStatus = false } = {}) {
   gpsWatchId = null;
   gpsPosition = null;
   gpsStartNode = null;
-  for (const option of gpsOptions) {
-    option.disabled = true;
-    option.textContent = "내 현재 위치 · GPS 필요";
-  }
   let changed = false;
   if (routePlaceId("#origin") === "gps") {
     setRoutePlace("#origin", "gate");
@@ -509,7 +1065,6 @@ $("#gps-toggle").onclick = () => {
       gpsPosition = { ...point, accuracy: coords.accuracy };
       if (!nearest || nearest.distance > 350) {
         gpsStartNode = null;
-        gpsOptions.forEach((option) => (option.disabled = true));
         map?.setUserLocation(null);
         setGpsStatus(
           `현재 위치가 서울과기대 지도 범위 밖이에요. 캠퍼스에 들어오면 자동으로 표시됩니다.`,
@@ -518,10 +1073,6 @@ $("#gps-toggle").onclick = () => {
         return;
       }
       gpsStartNode = nearest.id;
-      for (const option of gpsOptions) {
-        option.disabled = false;
-        option.textContent = "내 현재 위치";
-      }
       map?.setUserLocation(gpsPosition, { follow: true });
       setGpsStatus(
         `현재 위치 추적 중 · 정확도 약 ${Math.round(coords.accuracy)}m`,
@@ -568,13 +1119,25 @@ function routeView() {
   document.body.classList.toggle("exploring", exploring);
   if (exploring) {
     if (!$("#map-view").dataset.opened) {
-      setPanelClosed(false);
+      // 데스크톱은 지도부터 보여 주고, 길찾기 버튼을 누르면 패널이 열립니다.
+      setPanelClosed(isDesktop.matches);
       $("#map-view").dataset.opened = "true";
     }
     map?.moveTo($("#campus-map"), false);
-    updateRoute();
+    if (isDesktop.matches && !desktopStarted) {
+      // 데스크톱 첫 화면은 경로 없이 지도만 보여 주고, 검색이나 길찾기로 시작합니다.
+      desktopStarted = true;
+      $("#origin").value = "";
+      $("#destination").value = "";
+      currentRoute = null;
+      map?.setRoute(null);
+      updateModeOptions();
+      renderResultPanel();
+    } else updateRoute();
     document.title = "서울과기대 길찾기 | 사이";
-    $("#back-home").focus({ preventScroll: true });
+    $(isDesktop.matches ? "#building-search" : "#back-home").focus({
+      preventScroll: true,
+    });
   } else {
     map?.moveTo($("#hero-map"), true);
     map?.setRoute(
@@ -607,7 +1170,6 @@ $("#find-school").onclick = (e) => {
     $("#campuses").scrollIntoView();
 };
 $("#intro-button").onclick = () => $("#info-dialog").showModal();
-$("#indoor-open").onclick = () => $("#indoor-dialog").showModal();
 $$(".dialog-close").forEach(
   (b) => (b.onclick = () => b.closest("dialog").close()),
 );
@@ -625,21 +1187,30 @@ $$("dialog").forEach((d) =>
     }
   }),
 );
-for (const [key, selector] of [
-  ["indoorUrl", "#indoor-link"],
-  ["arUrl", "#ar-link"],
-]) {
-  const url = CAMPUS.interior[key];
-  if (url) {
-    try {
-      const parsed = new URL(url, location.href);
-      if (["https:", "http:"].includes(parsed.protocol)) {
-        $(selector).href = parsed.href;
-        $(selector).hidden = false;
-      }
-    } catch {}
+async function enterIndoor(buildingId) {
+  const indoor = INDOOR_MAPS.get(buildingId);
+  if (!indoor || document.body.classList.contains("entering-indoor")) return;
+
+  if (!map || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    location.assign(indoor.url);
+    return;
   }
+
+  closeBuildingPopover();
+  document.body.classList.add("entering-indoor");
+  $("#map-view").inert = true;
+  await map.flyIntoBuilding(buildingId, indoor.entranceId, () => {
+    document.body.classList.add("indoor-arrival");
+  });
+  location.assign(indoor.url);
 }
+
+window.addEventListener("pageshow", (event) => {
+  if (!event.persisted) return;
+  document.body.classList.remove("entering-indoor", "indoor-arrival");
+  $("#map-view").inert = false;
+  map?.restoreBuildingFlight();
+});
 function toast(message) {
   clearTimeout(toastTimer);
   $("#toast").replaceChildren(document.createTextNode(message));
@@ -1191,6 +1762,8 @@ function renderAdminAlert() {
   const count = clusters.filter((c) => c.needsReview).length;
   $("#admin-alert-count").textContent = count;
   $("#admin-alert-count").hidden = count === 0;
+  $("#side-alert-count").textContent = count;
+  $("#side-alert-count").hidden = count === 0;
 }
 // 관리자 버튼은 사용자에게 숨깁니다. 주소에 ?admin=1을 붙여 열거나, 이 기기에서 한 번
 // 관리자 코드를 맞게 넣었으면 보입니다. 화면에서 감추는 것일 뿐 보안 장치는 아닙니다
