@@ -42,7 +42,7 @@ function projectOnRoute(points, point) {
       z = a.z + (b.z - a.z) * t,
       offset = Math.hypot(point.x - x, point.z - z);
     if (!best || offset < best.offset)
-      best = { along: along + length * t, offset };
+      best = { along: along + length * t, offset, segment: i - 1 };
     along += length;
   }
   return best && { ...best, total: along };
@@ -68,12 +68,15 @@ function turns(points) {
 export function guidanceAt(points, point) {
   if (points.length < 2) return null;
   const at = projectOnRoute(points, point),
-    remaining = Math.max(0, at.total - at.along);
+    remaining = Math.max(0, at.total - at.along),
+    // 지금 걷는 구간의 방위(북 0°, 시계 방향). 데스크톱은 나침반이 없어 이 방향이 화면 위가 되게 지도를 돌립니다.
+    heading = bearing(points[at.segment], points[at.segment + 1]);
   if (remaining <= 8)
-    return { remaining, next: { direction: "arrive", distance: 0 } };
+    return { remaining, heading, next: { direction: "arrive", distance: 0 } };
   const turn = turns(points).find((item) => item.along > at.along + 3);
   return {
     remaining,
+    heading,
     nextPoint: turn?.point ?? points.at(-1),
     next: turn
       ? { direction: turn.direction, distance: turn.along - at.along }

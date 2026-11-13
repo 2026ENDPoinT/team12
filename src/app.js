@@ -944,7 +944,10 @@ function renderMobileNavigation(guide = null) {
   const running = guidanceActive || guidancePending;
   $("#map-view").classList.toggle("guidance-on", running);
   $(".mobile-navigation").hidden = !running;
-  map?.setNavigationMode(running && !isDesktop.matches);
+  // 길안내 중에는 모바일·데스크톱 모두 Figma처럼 보라 화살표 위치 표시를 씁니다.
+  // 데스크톱은 나침반이 없어, 걷는 방향이 화면 위가 되게 지도를 돌려 따라갑니다(Figma GD-2).
+  map?.setNavigationMode(running);
+  map?.setNavigationView(running && isDesktop.matches);
   if (!running || !currentRoute) return;
   guide ??= guidanceActive && gpsPosition
     ? guidanceAt(routePoints(currentRoute.path, currentRouteNodes), gpsPosition)
@@ -988,6 +991,7 @@ function updateGuidanceStatus() {
   );
   if (!guide) return;
   renderMobileNavigation(guide);
+  map?.setFollowHeading(guide.heading);
   if (guide.remaining <= 8) {
     endGuidance({ silent: true });
     setGpsStatus("도착지에 도착했어요.");
@@ -1047,6 +1051,9 @@ function startGuidance() {
 $("#route-card-start").onclick = startGuidance;
 $("#navigation-stop").onclick = () => endGuidance();
 $("#navigation-layers").onclick = () => side("layers").click();
+// 데스크톱 길안내 오른쪽 아래 +/− (Figma GD-2). 누르면 따라가기가 멈추고 "내 위치로"가 나옵니다.
+$("#navigation-zoom-in").onclick = () => map?.zoom(1.18);
+$("#navigation-zoom-out").onclick = () => map?.zoom(1 / 1.18);
 $("#navigation-compass").onclick = () => {
   guidanceFollowing = false;
   map?.reset();
