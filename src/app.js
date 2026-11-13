@@ -396,9 +396,10 @@ function showPopover(place) {
   $(".map-canvas-wrap").classList.add("has-building-popover");
 }
 let map = createCampusMap($("#hero-map"), buildingSelect, openRoadReport, () => {
-  if (!guidanceActive) return;
+  if (!guidanceActive || !guidanceFollowing) return;
   guidanceFollowing = false;
-  $("#navigation-recenter").hidden = false;
+  map?.clearGuidanceHeading();
+  syncNavigationCameraButtons();
 });
 if (!map) {
   $("#hero-map").innerHTML =
@@ -965,13 +966,21 @@ function renderMobileNavigation(guide = null) {
   const landmark = point && BUILDINGS.filter((b) => b.name !== "교내 건물").reduce((best, b) =>
     !best || Math.hypot(point.x - b.x, point.z - b.z) < Math.hypot(point.x - best.x, point.z - best.z) ? b : best, null);
   $("#navigation-detail").textContent = guidancePending ? "현재 위치를 확인하고 있어요." : direction === "arrive" ? "경로를 따라 목적지까지 이동하세요" : landmark ? `${landmark.name} 인근에서 ${direction === "left" ? "왼쪽" : "오른쪽"}으로` : "표시된 경로를 따라 이동하세요";
+  syncNavigationCameraButtons();
+}
+function syncNavigationCameraButtons() {
   $("#navigation-recenter").hidden = !guidanceActive || guidanceFollowing;
+  $("#navigation-compass").setAttribute(
+    "aria-pressed",
+    String(guidanceActive && guidanceFollowing),
+  );
 }
 function endGuidance({ silent = false } = {}) {
   const wasRunning = guidanceActive || guidancePending;
   guidanceActive = guidancePending = false;
   guidanceFollowing = true;
   guidanceTotalMeters = 0;
+  map?.clearGuidanceHeading();
   map?.setRouteMascotVisible(true);
   renderGuidanceButton();
   if (wasRunning && gpsPosition)
@@ -993,6 +1002,12 @@ function updateGuidanceStatus() {
     setGpsStatus("도착지에 도착했어요.");
     toast("도착지에 도착했어요.");
     return;
+  }
+  if (!isDesktop.matches && guidanceFollowing) {
+    map?.setUserLocation(gpsPosition, {
+      follow: true,
+      heading: gpsPosition.heading ?? guide.heading,
+    });
   }
   const meters = Math.max(1, Math.round(guide.next.distance));
   setGpsStatus(
@@ -1048,9 +1063,14 @@ $("#route-card-start").onclick = startGuidance;
 $("#navigation-stop").onclick = () => endGuidance();
 $("#navigation-layers").onclick = () => side("layers").click();
 $("#navigation-compass").onclick = () => {
+  if (!guidanceActive) return;
+  if (!guidanceFollowing) {
+    $("#navigation-recenter").click();
+    return;
+  }
   guidanceFollowing = false;
-  map?.reset();
-  renderMobileNavigation();
+  map?.clearGuidanceHeading();
+  syncNavigationCameraButtons();
 };
 $("#navigation-back").onclick = () => {
   endGuidance();
@@ -1340,7 +1360,14 @@ function startGps() {
         CAMPUS_GEOMETRY.meta,
       );
       const nearest = nearestGraphNode(point);
-      gpsPosition = { ...point, accuracy: coords.accuracy };
+      gpsPosition = {
+        ...point,
+        accuracy: coords.accuracy,
+        heading:
+          coords.speed >= 0.8 && Number.isFinite(coords.heading)
+            ? coords.heading
+            : null,
+      };
       if (!nearest || nearest.distance > 350) {
         gpsStartNode = null;
         map?.setUserLocation(null);

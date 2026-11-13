@@ -32,3 +32,10 @@ test("small movement stays undecided to avoid accidental gestures", () => {
     null,
   );
 });
+
+test("twisting in place rotates even when midpoint and spacing stay fixed", () => {
+  assert.equal(
+    touchGestureMode({ ...start, angle: 3.1 }, { ...start, angle: -2.9 }),
+    "twist",
+  );
+});
