@@ -5391,6 +5391,23 @@ body.exploring .header {
 .header .brand-sub {
   color: #5a6872;
 }
+/* 로고 글자는 제목과 같은 잉크색, 점만 브랜드 보라로 둬서 페이지와 어우러지게 합니다. */
+.header .brand {
+  gap: 14px;
+}
+.header .brand-mark {
+  color: var(--v2-ink);
+  font-weight: 800;
+  letter-spacing: -2.5px;
+}
+.header .brand-dot {
+  color: var(--violet);
+}
+.header .brand-sub {
+  padding-left: 14px;
+  border-left: 1px solid rgba(21, 33, 43, 0.18);
+  line-height: 20px;
+}
 
 /* 서비스 소개 창을 지도 화면 v2 디자인(유리 · 잉크 · 라임)으로 */
 .info-dialog {
