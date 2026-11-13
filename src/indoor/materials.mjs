@@ -183,6 +183,40 @@ const TEX = {
         ],
       );
     }),
+  // 엘리베이터 문: 샴페인 골드 헤어라인(세로 결) + 가운데 세로 틈(양쪽으로 열리는 문) + 양옆 틈
+  elevDoor: () => {
+    const c = document.createElement("canvas");
+    c.width = 256;
+    c.height = 512;
+    const x = c.getContext("2d");
+    const r = rng(41);
+    const g = x.createLinearGradient(0, 0, 256, 0);
+    g.addColorStop(0, "#d2b06a");
+    g.addColorStop(0.25, "#f0d699");
+    g.addColorStop(0.5, "#e1c07c");
+    g.addColorStop(0.75, "#f6dea4");
+    g.addColorStop(1, "#d2b06a");
+    x.fillStyle = g;
+    x.fillRect(0, 0, 256, 512);
+    for (let i = 0; i < 260; i++) {
+      x.fillStyle =
+        r() < 0.5 ? "rgba(255,240,200,0.10)" : "rgba(90,60,20,0.08)";
+      x.fillRect(r() * 256, 0, 1, 512);
+    }
+    // 양옆 틈(문틀과 맞닿는 곳)
+    x.fillStyle = "rgba(60,40,15,0.55)";
+    x.fillRect(0, 0, 3, 512);
+    x.fillRect(253, 0, 3, 512);
+    // 가운데 세로 틈: 짙은 선 + 양옆 빛 받는 모서리
+    x.fillStyle = "#2a1d0c";
+    x.fillRect(126, 0, 4, 512);
+    x.fillStyle = "rgba(255,236,190,0.55)";
+    x.fillRect(123, 0, 2, 512);
+    x.fillRect(131, 0, 2, 512);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  },
   plain: (n = 128) =>
     canvas(n, (x) => {
       const r = rng(31);
@@ -208,6 +242,7 @@ const KINDS = {
   stone: { tex: "stone", m: 1.2, rough: 0.42 },
   dark: { tex: "plain", m: 1, rough: 0.15, metal: 0.2 }, // 문 유리창·짙은 판
   light: { emissive: true },
+  elevDoor: { tex: "elevDoor", fit: true, rough: 0.3, metal: 0.35 }, // 문 한 짝에 질감 한 장
   plain: { tex: "plain", m: 1.5, rough: 0.7 },
 };
 
@@ -252,10 +287,10 @@ function materials(renderer) {
     const t = (tex[d.tex] ||= TEX[d.tex]());
     const map = t.clone();
     map.needsUpdate = true;
-    map.repeat.set(1 / d.m, 1 / d.m);
+    if (!d.fit) map.repeat.set(1 / d.m, 1 / d.m);
     map.anisotropy = aniso;
     mats[k] = new THREE.MeshStandardMaterial({
-      vertexColors: true,
+      vertexColors: !d.fit,
       map,
       roughness: d.rough,
       metalness: d.metal || 0,
@@ -313,7 +348,9 @@ export function glassMaterial() {
  * 도면 메시 하나(F·C·D)에 질감 입히기: 면 종류별로 삼각형을 모아 그룹을 만들고 UV·법선을 붙입니다.
  * extra: 재질 옵션(예: D 묶음의 polygonOffset)
  */
-export function texturize(mesh, renderer, extra = {}) {
+export function texturize(mesh, renderer, extra = {}, opts = {}) {
+  // opts.elevDoors: [[x, y], ...] 이 층 엘리베이터 문 자리(건물 좌표). 근처 나무색 문짝 → 골드 문
+  const elev = opts.elevDoors || [];
   const mats = materials(renderer);
   const src = mesh.geometry.index
     ? mesh.geometry.toNonIndexed()
@@ -339,7 +376,14 @@ export function texturize(mesh, renderer, extra = {}) {
     const r = Math.round(C.getX(3 * t) * 255),
       g = Math.round(C.getY(3 * t) * 255),
       bl = Math.round(C.getZ(3 * t) * 255);
-    const k = names.indexOf(kindOf(r, g, bl, hz, prefix));
+    let kind = kindOf(r, g, bl, hz, prefix);
+    if (kind === "wood" && !hz && elev.length && r === 150 && g === 110) {
+      const cx = (a.x + b.x + c.x) / 3,
+        cy = -(a.z + b.z + c.z) / 3;
+      if (elev.some((e) => Math.hypot(e[0] - cx, e[1] - cy) < 1.6))
+        kind = "elevDoor";
+    }
+    const k = names.indexOf(kind);
     kindIdx[t] = k;
     tris[k].push(t);
   }
@@ -348,6 +392,50 @@ export function texturize(mesh, renderer, extra = {}) {
     col = new Float32Array(P.count * 3),
     nor = new Float32Array(P.count * 3),
     uv = new Float32Array(P.count * 2);
+  // 엘리베이터 문: 문마다 폭·높이를 재서 질감 한 장이 문 전체를 덮게(가운데 틈이 문 가운데)
+  const fitBox = new Map();
+  const ek = names.indexOf("elevDoor");
+  for (const t of tris[ek] || []) {
+    a.fromBufferAttribute(P, 3 * t);
+    const cx = a.x,
+      cy = -a.z;
+    const di = elev.reduce(
+      (bi, e, i) =>
+        Math.hypot(e[0] - cx, e[1] - cy) <
+        Math.hypot(elev[bi][0] - cx, elev[bi][1] - cy)
+          ? i
+          : bi,
+      0,
+    );
+    fitBox.set(t, di);
+  }
+  // 문마다 수평 x·z와 높이 범위. 더 길게 퍼진 수평 축이 문 폭 방향(두께 쪽 옆면에 속지 않게)
+  const boxes = elev.map(() => ({
+    x0: Infinity,
+    x1: -Infinity,
+    z0: Infinity,
+    z1: -Infinity,
+    y0: Infinity,
+    y1: -Infinity,
+  }));
+  for (const [t, di] of fitBox) {
+    const bx = boxes[di];
+    for (let v = 0; v < 3; v++) {
+      a.fromBufferAttribute(P, 3 * t + v);
+      bx.x0 = Math.min(bx.x0, a.x);
+      bx.x1 = Math.max(bx.x1, a.x);
+      bx.z0 = Math.min(bx.z0, a.z);
+      bx.z1 = Math.max(bx.z1, a.z);
+      bx.y0 = Math.min(bx.y0, a.y);
+      bx.y1 = Math.max(bx.y1, a.y);
+    }
+  }
+  for (const bx of boxes) {
+    const alongX = bx.x1 - bx.x0 >= bx.z1 - bx.z0;
+    bx.u0 = alongX ? bx.x0 : bx.z0;
+    bx.u1 = alongX ? bx.x1 : bx.z1;
+    bx.n = alongX ? "z" : "x"; // 문 법선 축(u는 그에 수직인 축)
+  }
   const geo = new THREE.BufferGeometry();
   const matList = [];
   let w = 0;
@@ -369,9 +457,21 @@ export function texturize(mesh, renderer, extra = {}) {
           pz = P.getZ(i);
         pos.set([px, py, pz], w * 3);
         col.set([C.getX(i), C.getY(i), C.getZ(i)], w * 3);
-        nor.set([nrm.x, nrm.y, nrm.z], w * 3);
+        // 엘리베이터 문은 금속 반사가 바른 쪽을 비추도록 삼각형 감김 방향 그대로의 법선
+        if (k === ek) nor.set([-nrm.x, -nrm.y, -nrm.z], w * 3);
+        else nor.set([nrm.x, nrm.y, nrm.z], w * 3);
         // 면 방향 투영(미터): 바닥·천장은 위에서, 벽은 벽면 가로·높이
-        if (ay >= ax && ay >= az) uv.set([px, -pz], w * 2);
+        if (k === ek && fitBox.has(t)) {
+          const bx = boxes[fitBox.get(t)];
+          const u = bx.n === "x" ? pz : px;
+          uv.set(
+            [
+              (u - bx.u0) / Math.max(1e-6, bx.u1 - bx.u0),
+              (py - bx.y0) / Math.max(1e-6, bx.y1 - bx.y0),
+            ],
+            w * 2,
+          );
+        } else if (ay >= ax && ay >= az) uv.set([px, -pz], w * 2);
         else if (ax >= az) uv.set([-pz, py], w * 2);
         else uv.set([px, py], w * 2);
         w++;

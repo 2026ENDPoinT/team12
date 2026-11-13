@@ -1,28 +1,83 @@
 {
-  "campusTransform": {
-    "rotationDeg": 99.5,
-    "tx": 197.883,
-    "tz": 332.912,
-    "method": "실내 도면(1~3층 걷기 격자·방 외곽선)을 data/seoultech.json 미래관 외곽선에 회전·이동 탐색으로 맞춤, 겹침 점수 0.93",
-    "formula": "캠퍼스 X = cos·x + sin·y + tx, Z = sin·x − cos·y + tz (x 동, y 북 / X 동, Z 남)"
+ "campusTransform": {
+  "rotationDeg": 99.5,
+  "tx": 197.883,
+  "tz": 332.912,
+  "method": "실내 도면(1~3층 걷기 격자·방 외곽선)을 data/seoultech.json 미래관 외곽선에 회전·이동 탐색으로 맞춤, 겹침 점수 0.93",
+  "formula": "캠퍼스 X = cos·x + sin·y + tx, Z = sin·x − cos·y + tz (x 동, y 북 / X 동, Z 남)"
+ },
+ "entrances": [
+  {
+   "id": "lobby",
+   "name": "1층 로비 정문",
+   "f": 1,
+   "p": [
+    1.82,
+    6.0
+   ],
+   "campusNode": "futureDoor",
+   "verification_status": "candidate",
+   "note": "캠퍼스 경로의 미래관 도착 노드(futureDoor)를 도면에 옮긴 위치. 로비 계단 앞.",
+   "campusNodes": [
+    "futureDoor",
+    "ent-future-2"
+   ]
   },
-  "entrances": [
-    {
-      "id": "lobby",
-      "name": "1층 로비 출입구",
-      "f": 1,
-      "p": [1.82, 6.0],
-      "campusNode": "futureDoor",
-      "verification_status": "candidate",
-      "note": "캠퍼스 경로의 미래관 도착 노드(futureDoor)를 도면에 옮긴 위치. 로비 계단 앞."
-    },
-    {
-      "id": "b1",
-      "name": "지하 1층 출입구",
-      "f": 0,
-      "p": [26.46, -19.0],
-      "verification_status": "candidate",
-      "note": "도면의 지하 1층 바깥 유리문(실사 사진 00015). 캠퍼스 그래프와는 아직 연결하지 않음."
-    }
-  ]
+  {
+   "id": "lobby-back",
+   "name": "1층 로비 후문",
+   "f": 1,
+   "p": [
+    13.8,
+    22.1
+   ],
+   "campusNodes": [
+    "ent-future-1"
+   ],
+   "verification_status": "candidate",
+   "note": "팀 조사 ent-future-1(미래관 출입구 1, 도면 13.8, 28.0) 바로 안쪽 계단실의 걸을 수 있는 곳."
+  },
+  {
+   "id": "side",
+   "name": "1층 측면 입구 (106호 쪽)",
+   "f": 1,
+   "p": [
+    -26.3,
+    2.0
+   ],
+   "campusNodes": [
+    "ent-future-3"
+   ],
+   "verification_status": "candidate",
+   "note": "팀 조사 ent-future-3(미래관 출입구 3, 도면 -24.5, -5.3). 서쪽 동을 가로지르는 복도 동쪽 끝으로 옮김."
+  },
+  {
+   "id": "west",
+   "name": "1층 서쪽 입구 (103호 쪽)",
+   "f": 1,
+   "p": [
+    -41.3,
+    2.0
+   ],
+   "campusNodes": [
+    "ent-future-4"
+   ],
+   "verification_status": "candidate",
+   "note": "팀 조사 ent-future-4(미래관 출입구 4, 도면 -42.4, -0.9). 서쪽 동을 가로지르는 복도 서쪽 끝으로 옮김."
+  },
+  {
+   "id": "b1",
+   "name": "지하 1층 출입구",
+   "f": 0,
+   "p": [
+    26.46,
+    -19.0
+   ],
+   "verification_status": "candidate",
+   "note": "도면의 지하 1층 바깥 유리문(실사 사진 00015). 팀 조사 출입구 ent-future-7(미래관 출입구 5)과 같은 곳.",
+   "campusNodes": [
+    "ent-future-7"
+   ]
+  }
+ ]
 }

@@ -155,12 +155,21 @@ export function createView(el, indoor, { onPick } = {}) {
                 polygonOffsetUnits: -4,
               }
             : {},
+          { elevDoors: elevDoorsOf(+o.name.slice(1)) },
         );
       nodes[o.name] = o;
     });
     scene.add(g.scene);
     buildLabels();
     setFloor(floor, true);
+  }
+
+  // 이 층 엘리베이터 문 자리(도면의 EV 문)
+  function elevDoorsOf(n) {
+    const fl = M.floors.find((f) => f.n === n);
+    return (fl?.doors || [])
+      .filter((d) => d.cat === "elev" || /^EV/.test(d.id))
+      .map((d) => d.p);
   }
 
   function buildLabels() {
@@ -210,11 +219,51 @@ export function createView(el, indoor, { onPick } = {}) {
       else if (firstPerson) nodes[key].visible = Math.abs(n - walkPose.f) <= 1;
       else nodes[key].visible = kind !== "C" && n === floor;
     }
+    const mode = firstPerson ? "walk" : "map";
     for (const c of routeGroup.children)
-      c.visible = firstPerson
-        ? true
-        : c.userData.f == null || c.userData.f === floor;
+      c.visible =
+        c.userData.mode && c.userData.mode !== mode
+          ? false
+          : firstPerson
+            ? !c.isCSS2DObject || routeTagSeen(c)
+            : c.userData.f == null || c.userData.f === floor;
+    routeDepth();
     dirty = true;
+  }
+
+  // 걸어 보기에서는 지금 시점에서 보이는 경로만: 경로 띠·화살표·표시가 벽·바닥에 가려지게.
+  // (지도 보기에서는 벽 아래 경로도 보이도록 원래대로 가리지 않음)
+  function routeDepth() {
+    routeGroup.traverse((o) => {
+      if (!o.material) return;
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+        if (m.userData.depth0 === undefined) m.userData.depth0 = m.depthTest;
+        m.depthTest = firstPerson || m.userData.depth0;
+      }
+    });
+  }
+  // 글자 표시(층 이동·안내 번호)는 깊이로 가려지지 않으므로, 같은 층에서 벽에 막히지 않을 때만
+  function routeTagSeen(o) {
+    if (o.userData.f !== walkPose.f) return false;
+    const x1 = o.position.x,
+      y1 = -o.position.z;
+    return seeFrom(walkPose.f, walkPose.x, walkPose.y, x1, y1);
+  }
+  // 걷기 격자로 두 점 사이가 벽에 막혔는지(0.8m 넘게 이어서 못 걷는 곳이면 막힘). 끝 1m는 봐줌(계단·문 앞)
+  function seeFrom(f, x0, y0, x1, y1) {
+    const L = Math.hypot(x1 - x0, y1 - y0);
+    if (L > 25) return false;
+    const n = Math.max(1, Math.ceil(L / 0.25));
+    let run = 0;
+    for (let i = 1; i < n; i++) {
+      if (L * (1 - i / n) < 1) break;
+      const t = i / n;
+      if (!indoor.walk(f, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)) {
+        run += L / n;
+        if (run > 0.8) return false;
+      } else run = 0;
+    }
+    return true;
   }
 
   // 층 바꾸기: animate면 카메라가 층 높이만큼 부드럽게 오르내립니다.
@@ -455,6 +504,76 @@ export function createView(el, indoor, { onPick } = {}) {
     depthTest: false,
   });
 
+  // 걸어 보기용(눈높이) 경로 재질
+  const matWalkLine = new THREE.MeshBasicMaterial({
+    toneMapped: false,
+    color: VIOLET,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+  });
+  const matWalkHalo = new THREE.MeshBasicMaterial({
+    toneMapped: false,
+    color: VIOLET,
+    transparent: true,
+    opacity: 0.16,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+  });
+  const matWalkChev = new THREE.MeshBasicMaterial({
+    toneMapped: false,
+    color: 0xffffff,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -3,
+  });
+  // 가는 '>' 모양 화살표(두 획): 선 위에 every m마다
+  function chevronsV(pts, every = 1.4, size = 0.13, stroke = 0.035) {
+    const v = [];
+    const quad = (x0, y0, x1, y1, z) => {
+      const L = Math.hypot(x1 - x0, y1 - y0) || 1,
+        nx = (-(y1 - y0) / L) * stroke * 0.5,
+        ny = ((x1 - x0) / L) * stroke * 0.5;
+      const A = [x0 + nx, z, -(y0 + ny)],
+        B = [x0 - nx, z, -(y0 - ny)],
+        C = [x1 + nx, z, -(y1 + ny)],
+        D = [x1 - nx, z, -(y1 - ny)];
+      v.push(...A, ...B, ...C, ...C, ...B, ...D);
+    };
+    let acc = every / 2;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1],
+        b = pts[i],
+        L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (L < 0.01) continue;
+      const ux = (b[0] - a[0]) / L,
+        uy = (b[1] - a[1]) / L;
+      while (acc < L) {
+        const t = acc / L,
+          x = a[0] + (b[0] - a[0]) * t,
+          y = a[1] + (b[1] - a[1]) * t,
+          z = a[2] + (b[2] - a[2]) * t + 0.012;
+        const tx = x + ux * size * 0.5,
+          ty = y + uy * size * 0.5;
+        for (const sgn of [1, -1])
+          quad(
+            x - ux * size * 0.5 - uy * size * 0.75 * sgn,
+            y - uy * size * 0.5 + ux * size * 0.75 * sgn,
+            tx,
+            ty,
+            z,
+          );
+        acc += every;
+      }
+      acc -= L;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(v, 3));
+    return geo;
+  }
+
   function clearRoute() {
     for (const c of [...routeGroup.children]) {
       routeGroup.remove(c);
@@ -489,24 +608,44 @@ export function createView(el, indoor, { onPick } = {}) {
       ]) {
         const m = new THREE.Mesh(ribbon(r.pts, 0.9), mat);
         m.renderOrder = order;
-        m.userData.f = r.f;
+        m.userData = { f: r.f, mode: "map" };
         routeGroup.add(m);
       }
       const c = new THREE.Mesh(chevrons(r.pts), matChev);
       c.renderOrder = 3;
-      c.userData.f = r.f;
+      c.userData = { f: r.f, mode: "map" };
       routeGroup.add(c);
+      // 걸어 보기: 얇은 선 + 은은한 테두리 + 작은 '>' 화살표 (눈높이에서 복도를 덮지 않게)
+      const walkPts = r.pts.map((p) => [p[0], p[1], p[2] - 0.05]);
+      for (const [geo, mat, order] of [
+        [ribbon(walkPts, 0.5), matWalkHalo, 1],
+        [ribbon(walkPts, 0.14), matWalkLine, 2],
+        [chevronsV(walkPts), matWalkChev, 3],
+      ]) {
+        const m = new THREE.Mesh(geo, mat);
+        m.renderOrder = order;
+        m.userData = { f: r.f, mode: "walk" };
+        routeGroup.add(m);
+      }
     }
     const s = route.pts[0],
       e = route.pts[route.pts.length - 1];
     const start = makeStart();
     start.position.copy(T(s.x, s.y, s.z + 0.1));
-    start.userData.f = s.f;
+    start.userData = { f: s.f, mode: "map" };
     routeGroup.add(start);
     const pin = makePin();
     pin.position.copy(T(e.x, e.y, e.z));
-    pin.userData.f = e.f;
+    pin.userData = { f: e.f, mode: "map" };
     routeGroup.add(pin);
+    const wStart = makeWalkStart();
+    wStart.position.copy(T(s.x, s.y, s.z + 0.04));
+    wStart.userData = { f: s.f, mode: "walk" };
+    routeGroup.add(wStart);
+    const wPin = makeWalkPin();
+    wPin.position.copy(T(e.x, e.y, e.z));
+    wPin.userData = { f: e.f, mode: "walk" };
+    routeGroup.add(wPin);
     // 층 이동 지점 표시
     const legs = route.legs;
     for (let li = 0; li < legs.length; li++) {
@@ -620,6 +759,81 @@ export function createView(el, indoor, { onPick } = {}) {
     ring.renderOrder = 4;
     dot.renderOrder = 5;
     g.add(ring, dot);
+    return g;
+  }
+  // 걸어 보기 출발: 바닥의 작은 고리
+  function makeWalkStart() {
+    const g = new THREE.Group();
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.2, 0.28, 40),
+      new THREE.MeshBasicMaterial({
+        toneMapped: false,
+        color: VIOLET,
+        side: THREE.DoubleSide,
+      }),
+    );
+    const dot = new THREE.Mesh(
+      new THREE.CircleGeometry(0.1, 24),
+      new THREE.MeshBasicMaterial({
+        toneMapped: false,
+        color: VIOLET,
+        side: THREE.DoubleSide,
+      }),
+    );
+    ring.rotation.x = dot.rotation.x = -Math.PI / 2;
+    g.add(ring, dot);
+    return g;
+  }
+  // 걸어 보기 도착: 바닥 고리(보라·흰) + 가는 기둥 위 작은 구슬(눈높이 아래)
+  function makeWalkPin() {
+    const g = new THREE.Group();
+    const violet = new THREE.MeshBasicMaterial({
+      toneMapped: false,
+      color: VIOLET,
+      side: THREE.DoubleSide,
+    });
+    const outer = new THREE.Mesh(
+      new THREE.RingGeometry(0.36, 0.44, 48),
+      violet,
+    );
+    const inner = new THREE.Mesh(
+      new THREE.RingGeometry(0.2, 0.25, 40),
+      new THREE.MeshBasicMaterial({
+        toneMapped: false,
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+      }),
+    );
+    const fill = new THREE.Mesh(
+      new THREE.CircleGeometry(0.36, 48),
+      new THREE.MeshBasicMaterial({
+        toneMapped: false,
+        color: VIOLET,
+        transparent: true,
+        opacity: 0.18,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    for (const m of [outer, inner, fill]) {
+      m.rotation.x = -Math.PI / 2;
+      m.position.y = 0.04;
+    }
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.012, 0.012, 1.05, 10),
+      violet,
+    );
+    stem.position.y = 0.55;
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(0.12, 24, 16),
+      new THREE.MeshLambertMaterial({
+        toneMapped: false,
+        color: DEEP,
+        emissive: 0x2a1580,
+      }),
+    );
+    head.position.y = 1.15;
+    g.add(fill, outer, inner, stem, head);
     return g;
   }
   function makePin() {
