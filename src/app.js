@@ -349,7 +349,7 @@ function updateRoute({ announce = false } = {}) {
 }
 function buildingSelect(id) {
   const place = PLACES.find((item) => item.id === id);
-  if (place && isDesktop.matches) {
+  if (place) {
     closeBuildingPopover();
     showBuildingCard(id);
     return;
@@ -549,44 +549,35 @@ $("#map-top").onclick = () => map?.top();
 function setPanelClosed(closed) {
   // 길찾기 패널과 길 막힘 제보 패널은 같은 자리를 써서 하나만 엽니다.
   if (!closed) setReportsPanel(false);
+  // 모바일은 아래 시트가 하나라, 길찾기를 열면 건물 정보 시트를 닫습니다.
+  if (!closed && !isDesktop.matches && !$("#building-card").hidden)
+    closeBuildingCard();
   $("#map-view").classList.toggle("panel-closed", closed);
   $("#panel-toggle").setAttribute("aria-expanded", String(!closed));
   $('[data-side="route"]').setAttribute("aria-pressed", String(!closed));
-  // 데스크톱(Figma v2)은 위쪽 바의 "길찾기" 버튼 하나로 패널을 열고 닫습니다.
-  $("#panel-toggle").textContent = isDesktop.matches
-    ? "길찾기"
-    : closed
-      ? "길찾기 열기"
-      : "길찾기 접기";
+  // Figma v2: 위쪽 바의 "길찾기" 버튼 하나로 패널을 열고 닫습니다(데스크톱·모바일 공통).
+  $("#panel-toggle").textContent = "길찾기";
 }
 $("#panel-toggle").onclick = () =>
   setPanelClosed(!$("#map-view").classList.contains("panel-closed"));
 
-// ===== 길 막힘 제보 패널 (데스크톱) =====
-// 제보 목록은 데스크톱에서는 이 패널로, 모바일에서는 길찾기 패널 안 원래 자리로 옮깁니다.
-const reportsSection = $(".road-reports"),
-  reportsHome = document.createComment("road-reports");
-reportsSection.before(reportsHome);
-function placeReports() {
-  if (isDesktop.matches) $("#reports-panel-body").append(reportsSection);
-  else reportsHome.after(reportsSection);
-}
+// ===== 길 막힘 제보 패널 =====
+// 제보 목록을 이 패널로 옮깁니다(데스크톱은 왼쪽 패널, 모바일은 아래 시트).
+$("#reports-panel-body").append($(".road-reports"));
 function setReportsPanel(open) {
-  const show = open && isDesktop.matches;
-  if (show) setPanelClosed(true);
-  $("#reports-panel").hidden = !show;
-  $('[data-side="report"]').setAttribute("aria-pressed", String(show));
+  if (open) {
+    setPanelClosed(true);
+    if (!isDesktop.matches) closeBuildingCard();
+  }
+  $("#reports-panel").hidden = !open;
+  $('[data-side="report"]').setAttribute("aria-pressed", String(open));
+  $("#v2-report").setAttribute("aria-pressed", String(open));
 }
 $("#reports-panel-close").onclick = () => setReportsPanel(false);
 $("#reports-panel-start").onclick = () => {
   setReportsPanel(false);
   $("#report-start").click();
 };
-placeReports();
-isDesktop.addEventListener("change", () => {
-  placeReports();
-  if (!isDesktop.matches) setReportsPanel(false);
-});
 
 // ===== 경로 방식 카드: 두 방식의 시간·거리를 함께 보여 줍니다 =====
 function updateModeOptions() {
@@ -638,6 +629,11 @@ function showBuildingCard(id) {
     ? ""
     : "실내 지도는 아직 미래관만 준비돼 있어요.";
   map?.highlightBuilding(id);
+  // 모바일은 아래 시트가 하나뿐이라, 건물 정보를 띄울 때 다른 시트를 닫습니다.
+  if (!isDesktop.matches) {
+    setReportsPanel(false);
+    setPanelClosed(true);
+  }
   $("#building-card").hidden = false;
   renderResultPanel();
 }
@@ -830,23 +826,20 @@ document.addEventListener("keydown", (e) => {
   e.preventDefault();
   searchInput.focus();
 });
-isDesktop.addEventListener("change", () => {
-  setPanelClosed($("#map-view").classList.contains("panel-closed"));
-  if (!isDesktop.matches) closeBuildingCard();
-});
 
 // ===== 오른쪽 결과 카드 (데스크톱) =====
 // 건물을 고르면 건물 정보 카드, 경로를 그리면 경로 카드 하나만 보여 줍니다.
 let routeShown = false,
   desktopStarted = false;
 function renderResultPanel() {
-  const desktop = isDesktop.matches;
-  // 경로 결과는 길찾기 패널 안에, 오른쪽에는 건물 정보 카드만 둡니다.
-  $("#route-card").hidden = !(desktop && routeShown);
-  const any = desktop && !$("#building-card").hidden;
+  // 경로 결과는 길찾기 패널 안에, 건물 정보 카드는 따로 둡니다
+  // (데스크톱은 오른쪽 카드, 모바일은 아래 시트).
+  $("#route-card").hidden = !routeShown;
+  const any = !$("#building-card").hidden;
   $("#result-panel").hidden = !any;
   $("#map-view").classList.toggle("has-results", any);
-  $("#route-summary-bar").hidden = !(desktop && routeShown);
+  $("#map-view").classList.toggle("route-shown", routeShown);
+  $("#route-summary-bar").hidden = !routeShown;
   side("route").setAttribute(
     "aria-pressed",
     String(routeShown || !$("#map-view").classList.contains("panel-closed")),
@@ -1147,6 +1140,33 @@ for (const type of ["gesturestart", "gesturechange", "gestureend"])
   });
 // Ctrl·⌘ + / − / 0 키 확대는 막지 않습니다(글자를 키워 보는 접근성 기능, 사용자 결정).
 
+// ===== 모바일(760px 이하) Figma v2: 출발·도착 칸은 위쪽 카드, 나머지는 아래 시트 =====
+// 출발·도착 칸(journey-form)만 모바일에서는 위쪽 카드로 옮기고, 데스크톱에서는 원래 자리로 돌려놓습니다.
+const journeyForm = $(".journey-form"),
+  journeyHome = document.createComment("journey-form");
+journeyForm.before(journeyHome);
+function placeJourneyForm() {
+  if (isDesktop.matches) journeyHome.after(journeyForm);
+  else $(".mobile-route-fields").append(journeyForm);
+}
+placeJourneyForm();
+isDesktop.addEventListener("change", placeJourneyForm);
+$("#mobile-route-back").onclick = () => setPanelClosed(true);
+
+// 모바일 오른쪽 둥근 버튼: 길 막힘 제보 패널, 관리자 검토(관리자 기기에서만 보임)
+$("#v2-report").onclick = () =>
+  setReportsPanel($("#reports-panel").hidden);
+$("#v2-admin").onclick = () => $("#admin-toggle").click();
+function syncAdminButton() {
+  $("#v2-admin").hidden = $("#admin-toggle").hidden;
+}
+syncAdminButton();
+new MutationObserver(syncAdminButton).observe($("#admin-toggle"), {
+  attributes: true,
+  attributeFilter: ["hidden"],
+});
+
+
 // ===== GPS 현재 위치 추적 =====
 // 공개 데이터의 중심 위·경도를 로컬 미터 좌표로 변환합니다.
 // 실서비스 전에는 학교에서 기준점을 실측해 좌표 오차를 보정해야 합니다.
@@ -1270,13 +1290,13 @@ function routeView() {
   document.body.classList.toggle("exploring", exploring);
   if (exploring) {
     if (!$("#map-view").dataset.opened) {
-      // 데스크톱은 지도부터 보여 주고, 길찾기 버튼을 누르면 패널이 열립니다.
-      setPanelClosed(isDesktop.matches);
+      // 지도부터 보여 주고, 길찾기 버튼을 누르면 패널이 열립니다(데스크톱·모바일 공통).
+      setPanelClosed(true);
       $("#map-view").dataset.opened = "true";
     }
     map?.moveTo($("#campus-map"), false);
-    if (isDesktop.matches && !desktopStarted) {
-      // 데스크톱 첫 화면은 경로 없이 지도만 보여 주고, 검색이나 길찾기로 시작합니다.
+    if (!desktopStarted) {
+      // 첫 화면은 경로 없이 지도만 보여 주고, 검색이나 길찾기로 시작합니다.
       desktopStarted = true;
       $("#origin").value = "";
       $("#destination").value = "";
@@ -1913,6 +1933,8 @@ function renderAdminAlert() {
   const count = clusters.filter((c) => c.needsReview).length;
   $("#admin-alert-count").textContent = count;
   $("#admin-alert-count").hidden = count === 0;
+  $("#v2-admin-count").textContent = count;
+  $("#v2-admin-count").hidden = count === 0;
   $("#side-alert-count").textContent = count;
   $("#side-alert-count").hidden = count === 0;
 }
