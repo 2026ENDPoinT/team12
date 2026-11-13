@@ -50,3 +50,36 @@ npm run dev
 | `demo.mp4`, `demo.json` | AR 데모용 영상 구간 (원본 `room.mp4`는 커밋하지 않음) |
 
 Node.js 24에서 실행을 확인했습니다.
+
+## 소스 구조
+
+```text
+src/
+  app.js                    화면 흐름과 UI 연결
+  map.js                    지도 카메라·상호작용·경로 표시
+  map/
+    buildings/
+      catalog.mjs           건물별 외관 등록 정보
+      index.mjs             건물 레이어 생성
+      models/               사진 기반 건물 16개
+      appearance.mjs        공통 외벽·지붕 스타일
+      procedural.mjs        공통 파사드 셰이더·옥상 장식
+      facade-studies.mjs    중앙도서관 외벽 시안
+    landscape/              붕어방·나무·식재·도로 폭 규칙
+  data.mjs                  조사 그래프 연결·건물 이름·등록 출입구
+  survey.mjs                팀 조사 GeoJSON을 보행 그래프에 병합
+  geo.mjs                   좌표·평면 기하 계산
+  routing.mjs               길찾기
+  reports.mjs               길 막힘 제보
+  gis.mjs                   GIS 내보내기
+  schools.json              학교 목록
+
+data/                       원본 지리 데이터·현장 조사 양식
+scripts/                    개발·빌드·데이터 준비
+tests/                     자동 검증
+dist/                      배포 파일 (`npm run build`로 갱신)
+```
+
+건물의 형태·색·등록 방법은 [건물 디자인 관리](BUILDING-DESIGN.md)를 참고하세요. 건물 외관 수정은 `src/map/buildings/`에서 진행하고, 생성된 `dist/app.js`는 직접 편집하지 않습니다.
+
+출입구는 `data/team-survey.json`을 기준으로 표시하고 길찾기에 연결합니다. `src/data.mjs`에 출입구 좌표를 따로 적지 않습니다. 조사된 출입구가 없는 건물은 기존 자동 생성 노드로 임시 연결합니다.

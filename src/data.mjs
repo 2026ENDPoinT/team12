@@ -3,6 +3,7 @@ import teamSurvey from "../data/team-survey.json" with { type: "json" };
 import { mergeSurvey } from "./survey.mjs";
 
 const officialBuildingNames = {
+  "way-382499369": "국제관",
   "way-382499356": "중앙도서관 별관",
   student: "학생회관",
   "way-470633094": "파워플랜트",

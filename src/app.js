@@ -357,7 +357,7 @@ if (!map) {
   map.setRoute(
     shortestPath(
       "gate",
-      "futureDoor",
+      PLACES.find((place) => place.id === "future").entry,
       "shortest",
       NODES,
       availableEdges(confirmedEdges),
@@ -554,7 +554,7 @@ function routeView() {
     map?.setRoute(
       shortestPath(
         "gate",
-        "futureDoor",
+        PLACES.find((place) => place.id === "future").entry,
         "shortest",
         NODES,
         availableEdges(confirmedEdges),
