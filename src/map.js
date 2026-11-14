@@ -519,7 +519,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     routeLength = route.meters;
   }
   // 30m 안 신고를 한 구역으로 묶어 구역마다 표시 하나만 띄웁니다.
-  // 서로 다른 기기 3건 이상이면 주의(노란색), 관리자가 확정하면 빨간색으로 막습니다.
+  // 신고 3건 이상이면 주의(노란색), 관리자가 확정하면 빨간색으로 막습니다.
   function setReports(reports) {
     clearReportSelection();
     clearGroup(warningGroup);
@@ -768,23 +768,28 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     camera.updateProjectionMatrix();
     controls.update();
   }
-  let shortcutPicker = null;
+  let shortcutPicker = null,
+    roadPicker = null; // 관리자 확정: 실제로 막을 길을 지도에서 고르는 중
   const raycaster = new THREE.Raycaster(),
     mouse = new THREE.Vector2(),
     groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.8);
   let down = null;
+  // 땅 위 한 점에서 가장 가까운 길(간선)을 골라 미리 칠하고 handler에 넘깁니다.
+  function pickRoad(point, handler) {
+    const selection = locateReportPoint({ x: point.x, z: point.z });
+    if (selection) previewReportSelection(selection);
+    handler(
+      selection || {
+        error: "건물이나 잔디 대신, 지도에서 길 가까운 위치를 눌러주세요.",
+      },
+    );
+  }
   function pickPoint(x, y) {
     mouse.set(x, y);
     raycaster.setFromCamera(mouse, camera);
     const hit = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3());
     if (!hit) return;
-    const selection = locateReportPoint({ x: hit.x, z: hit.z });
-    if (selection) previewReportSelection(selection);
-    onRoadSelect(
-      selection || {
-        error: "건물이나 잔디 대신, 지도에서 길 가까운 위치를 눌러주세요.",
-      },
-    );
+    pickRoad(hit, onRoadSelect);
   }
   // ===== 두 손가락 제스처 (지도 앱 방식) =====
   // 벌리기/오므리기 = 확대·축소, 함께 좌우 이동 = 회전.
@@ -1052,9 +1057,12 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     const r = renderer.domElement.getBoundingClientRect(),
       x = ((e.clientX - r.left) / r.width) * 2 - 1,
       y = (-(e.clientY - r.top) / r.height) * 2 + 1;
-    if (shortcutPicker || editHandler) {
+    if (shortcutPicker || roadPicker || editHandler) {
       const hit = groundAt(e.clientX, e.clientY);
-      if (hit) (shortcutPicker || editHandler.click)?.({ x: hit.x, z: hit.z });
+      if (hit) {
+        if (roadPicker) pickRoad(hit, roadPicker);
+        else (shortcutPicker || editHandler.click)?.({ x: hit.x, z: hit.z });
+      }
       return;
     }
     if (reporting) {
@@ -1073,12 +1081,15 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     isEnabled: () => !homeMode && !reporting && !editHandler,
   });
   renderer.domElement.addEventListener("keydown", (e) => {
-    if (shortcutPicker && e.key === "Enter") {
+    if ((shortcutPicker || roadPicker) && e.key === "Enter") {
       e.preventDefault();
       mouse.set(0, 0);
       raycaster.setFromCamera(mouse, camera);
       const point = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3());
-      if (point) shortcutPicker({ x: point.x, z: point.z });
+      if (point) {
+        if (roadPicker) pickRoad(point, roadPicker);
+        else shortcutPicker({ x: point.x, z: point.z });
+      }
       return;
     }
     if (reporting && e.key === "Enter") {
@@ -1378,6 +1389,11 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     setShortcutPicker(handler) {
       shortcutPicker = handler;
       host.classList.toggle("shortcut-picking", Boolean(handler));
+    },
+    // 관리자 확정: 지도를 누르면 가까운 길을 골라 handler({ edgeId, point, ... })로 넘깁니다. null이면 끔.
+    setRoadPicker(handler) {
+      roadPicker = handler;
+      setReporting(Boolean(handler));
     },
     setEntrances,
     setEntrancesVisible,

@@ -8494,7 +8494,8 @@ body {
 .shortcut-picking canvas { cursor: crosshair; }
 .shortcut-picking :is(.building-label, .entrance-dot) { pointer-events: none !important; }
 #shortcut-start { margin-top: 8px; }
-#shortcut-picker { z-index: 20; }
+#shortcut-picker,
+#admin-road-picker { z-index: 20; }
 dialog.shortcut-dialog {
   --shortcut-field: #ffffff42;
   --shortcut-border: #ffffffa6;

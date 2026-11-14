@@ -75,8 +75,8 @@ export async function signOutAdmin() {
   if (error) throw error;
 }
 
-// 같은 사람이 같은 구간을 여러 번 눌러서 신고 건수를 부풀리는 걸 막기 위한
-// 이 브라우저만의 익명 ID입니다. 개인정보를 담지 않습니다.
+// 반복 신고 여부를 관리자가 함께 판단할 수 있게 남기는 브라우저 단위 익명 ID입니다.
+// 신고 3건 집계는 실제 행 수를 사용하며, 이 값에는 개인정보를 담지 않습니다.
 const DEVICE_ID_KEY = "sai:seoultech:device-id:v1";
 export function getDeviceId() {
   try {
@@ -130,7 +130,8 @@ export async function insertReportRow({
 
 // 관리자 확정: 구역의 모든 신고를 confirmed로 바꾸고(행은 기록으로 남김), 고른 사진 하나를
 // 대표(is_cover)로 표시합니다. 대표 사진은 사용자에게 빨간색 표시와 함께 보입니다.
-export async function confirmReportRows(ids, coverId) {
+export async function confirmReportRows(ids, coverId, confirmedEdgeId) {
+  if (!confirmedEdgeId) throw new Error("확정할 길을 선택해 주세요.");
   const { data: auth, error: authError } = await supabase.auth.getUser();
   if (authError || !isAdminUser(auth.user))
     throw new Error("관리자 로그인이 필요합니다.");
@@ -140,6 +141,7 @@ export async function confirmReportRows(ids, coverId) {
       status: "confirmed",
       confirmed_at: new Date().toISOString(),
       confirmed_by: auth.user.id,
+      confirmed_edge_id: confirmedEdgeId,
       is_cover: false,
     })
     .in("id", ids)
