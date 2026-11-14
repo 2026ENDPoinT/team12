@@ -2254,9 +2254,10 @@ async function adminAction(work, failMessage) {
     await work();
   } catch {
     toast(failMessage);
-    return;
+  } finally {
+    // DB 일부가 먼저 바뀐 뒤 다음 단계가 실패해도 목록은 실제 서버 상태로 맞춥니다.
+    await loadReports();
   }
-  await loadReports();
 }
 function clusterHeading(li, cluster, summary) {
   li.append(
@@ -2362,6 +2363,66 @@ function photoCard(cluster, report, { selectable }) {
   card.append(actions);
   return card;
 }
+// 관리자 확정: 신고 위치가 아니라 관리자가 지도에서 고른 실제 길(간선)을 막습니다.
+// 고른 간선 ID는 confirmed_edge_id로 저장되고, confirmedEdgesFromRows → availableEdges로 경로에서 빠집니다.
+let adminRoadConfirmation = null;
+function stopAdminRoadPicking({ reopen = false } = {}) {
+  adminRoadConfirmation = null;
+  $("#admin-road-picker").hidden = true;
+  $("#admin-road-picker-confirm").disabled = true;
+  map?.setRoadPicker(null);
+  map?.clearReportSelection();
+  if (reopen) openAdminPanel("reports");
+}
+function startAdminRoadPicking(cluster, coverId) {
+  stopShortcutPicking();
+  adminRoadConfirmation = {
+    ids: cluster.reports.map((report) => report.id),
+    coverId,
+    selection: null,
+  };
+  $("#admin-dialog").close();
+  $("#admin-road-picker").hidden = false;
+  $("#admin-road-picker-confirm").disabled = true;
+  $("#admin-road-picker-status").textContent =
+    "신고 위치와 실제 통제 구간이 다르면 올바른 길을 선택할 수 있어요.";
+  map?.focusTop(cluster.cover.point, 5);
+  map?.previewReportSelection({ edgeId: cluster.cover.edgeId });
+  map?.setRoadPicker((selection) => {
+    if (selection?.error) {
+      toast(selection.error);
+      return;
+    }
+    if (!selection?.edgeId) return;
+    adminRoadConfirmation.selection = selection;
+    $("#admin-road-picker-status").textContent =
+      `${reportLocation({ point: selection.point })} · 선택 완료`;
+    $("#admin-road-picker-confirm").disabled = false;
+  });
+}
+$("#admin-road-picker-cancel").onclick = () =>
+  stopAdminRoadPicking({ reopen: true });
+$("#admin-road-picker-confirm").onclick = async () => {
+  const pending = adminRoadConfirmation,
+    button = $("#admin-road-picker-confirm");
+  if (!pending?.selection?.edgeId || button.disabled) return;
+  button.disabled = true;
+  let confirmed = false;
+  try {
+    await confirmReportRows(
+      pending.ids,
+      pending.coverId,
+      pending.selection.edgeId,
+    );
+    confirmed = true;
+  } catch {
+    toast("확정 처리에 실패했어요. 다시 시도해주세요.");
+  }
+  // 성공·실패와 관계없이 서버 상태로 목록을 다시 읽고 관리자 창을 다시 엽니다(확정됨 목록으로 이동).
+  await loadReports();
+  stopAdminRoadPicking({ reopen: true });
+  if (confirmed) toast("선택한 길을 통행 막힘으로 확정했어요.");
+};
 function renderAdminSection(listId, emptyId, list) {
   $(emptyId).hidden = list.length > 0;
   $(listId).replaceChildren();
@@ -2370,7 +2431,7 @@ function renderAdminSection(listId, emptyId, list) {
     clusterHeading(
       li,
       cluster,
-      `신고 ${cluster.count}건 · 최근 ${new Date(cluster.latestAt).toLocaleString("ko-KR")}`,
+      `신고 ${cluster.count}건 · 기기 ${cluster.deviceCount}대 · 최근 ${new Date(cluster.latestAt).toLocaleString("ko-KR")}`,
     );
     const photos = el("ul", "admin-photos");
     enablePhotoDrag(photos);
@@ -2379,14 +2440,11 @@ function renderAdminSection(listId, emptyId, list) {
     const ids = cluster.reports.map((r) => r.id);
     const actions = el("div", "admin-actions");
     actions.append(
-      adminButton("고른 사진으로 확정 · 통행 막힘", "confirm", () => {
+      adminButton("길 선택 후 확정 · 통행 막힘", "confirm", () => {
         const coverId =
           li.querySelector(`input[name="cover-${cluster.id}"]:checked`)
             ?.value || cluster.cover.id;
-        adminAction(
-          () => confirmReportRows(ids, coverId),
-          "확정 처리에 실패했어요. 다시 시도해주세요.",
-        );
+        startAdminRoadPicking(cluster, coverId);
       }),
       adminButton("반려 · 신고 취소", "dismiss", () =>
         adminAction(
@@ -2701,7 +2759,14 @@ $("#photo-cleanup").onclick = async () => {
 // 관리자 창은 열어 둔 채 기다리는 화면이라 열려 있어도 갱신합니다.
 // ponytail: 10초 폴링. 즉시 반영이 필요하면 Supabase Realtime 구독으로 바꾸세요.
 function refreshShared() {
-  if (document.hidden || reporting || $("#report-dialog").open) return;
+  // 관리자가 확정할 길을 고르는 중이면 건너뜁니다. 다시 읽으면 고른 길 표시가 지워지기 때문입니다.
+  if (
+    document.hidden ||
+    reporting ||
+    adminRoadConfirmation ||
+    $("#report-dialog").open
+  )
+    return;
   loadReports();
   loadWorks();
   loadShortcuts();

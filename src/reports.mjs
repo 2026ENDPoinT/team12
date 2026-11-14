@@ -122,6 +122,9 @@ export function sanitizeReports(value, edges = EDGES, nodes = NODES) {
         ? { takenAt: report.takenAt }
         : {}),
       ...(report.confirmed === true ? { confirmed: true } : {}),
+      ...(typeof report.confirmedEdgeId === "string"
+        ? { confirmedEdgeId: report.confirmedEdgeId }
+        : {}),
       ...(report.isCover === true ? { isCover: true } : {}),
     });
   }
@@ -145,6 +148,9 @@ export function rowToReport(row) {
       : {}),
     ...(row.taken_at ? { takenAt: row.taken_at } : {}),
     ...(row.status === "confirmed" ? { confirmed: true } : {}),
+    ...(row.confirmed_edge_id
+      ? { confirmedEdgeId: row.confirmed_edge_id }
+      : {}),
     ...(row.is_cover ? { isCover: true } : {}),
   };
 }
@@ -166,12 +172,14 @@ export function confirmedEdgesFromRows(rows, edges = EDGES, nodes = NODES) {
   for (const row of rows || []) {
     if (row.status !== "confirmed") continue;
     const point = { x: row.point_x, z: row.point_z };
-    let edge = lookup.get(row.edge_id);
+    const selected = row.confirmed_edge_id;
+    let edge = lookup.get(selected || row.edge_id);
     if (
-      !edge ||
-      (Number.isFinite(point.x) &&
-        Number.isFinite(point.z) &&
-        projectToSegment(point, nodes[edge.a], nodes[edge.b]).distance > 20)
+      !selected &&
+      (!edge ||
+        (Number.isFinite(point.x) &&
+          Number.isFinite(point.z) &&
+          projectToSegment(point, nodes[edge.a], nodes[edge.b]).distance > 20))
     )
       edge =
         Number.isFinite(point.x) && Number.isFinite(point.z)
@@ -222,7 +230,7 @@ export function pickCover(reports) {
 }
 
 // 신고를 구역으로 묶습니다. 구역 상태:
-// pending(신고 접수, 지도엔 안 보임) → caution(서로 다른 기기 threshold 이상, 노란색)
+// pending(신고 접수, 지도엔 안 보임) → caution(신고 threshold 이상, 노란색)
 // → confirmed(관리자 확정, 빨간색 차단).
 // ponytail: 모든 쌍 비교 O(n²). 신고는 최대 500건이라 충분합니다.
 export function clusterReports(
@@ -246,8 +254,9 @@ export function clusterReports(
   });
   return [...byRoot.values()]
     .map((members) => {
-      // 같은 기기가 여러 번 신고해도 1건으로 셉니다. 기기 ID가 없는 신고는 각각 1건입니다.
-      const count = new Set(members.map((r) => r.deviceId || r.id)).size;
+      // 관리자 목록의 "3건 이상"은 실제 접수된 신고 행 수를 뜻합니다.
+      const count = members.length;
+      const deviceCount = new Set(members.map((r) => r.deviceId || r.id)).size;
       const cover = pickCover(members);
       const status = members.some((r) => r.confirmed)
         ? "confirmed"
@@ -261,10 +270,19 @@ export function clusterReports(
         )[0].id,
         reports: members,
         count,
+        deviceCount,
         status,
         needsReview: status === "caution",
         cover,
-        edgeIds: [...new Set(members.map((r) => r.edgeId))],
+        edgeIds: [
+          ...new Set(
+            members.map((r) =>
+              status === "confirmed" && r.confirmedEdgeId
+                ? r.confirmedEdgeId
+                : r.edgeId,
+            ),
+          ),
+        ],
         latestAt: members.reduce(
           (latest, r) =>
             Date.parse(r.createdAt) > Date.parse(latest) ? r.createdAt : latest,

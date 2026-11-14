@@ -93,7 +93,7 @@ test("several reports on one edge remain separate points and don't block routing
   assert.equal(sanitizeReports([one, two]).length, 2);
   assert.ok(availableEdges([]).some((e) => edgeId(e) === edgeId(edge)));
 });
-test("caution (yellow) only appears once THRESHOLD distinct devices report the area", () => {
+test("caution (yellow) appears once THRESHOLD reports reach the area", () => {
   const edge = EDGES[0],
     device = (i) => reportFor(edge, { id: `r${i}`, deviceId: `device-${i}` });
   assert.equal(clusterReports([device(0)])[0].status, "pending");
@@ -102,14 +102,15 @@ test("caution (yellow) only appears once THRESHOLD distinct devices report the a
   assert.equal(clusterReports(many)[0].status, "caution");
   assert.equal(clusterReports(many)[0].needsReview, true);
 });
-test("the same device reporting one area several times counts once", () => {
+test("admin threshold counts reports while retaining the distinct device count", () => {
   const edge = EDGES[0],
     reports = Array.from({ length: REPORT_THRESHOLD }, (_, i) =>
       reportFor(edge, { id: `r${i}`, deviceId: "same-device" }),
     ),
     [cluster] = clusterReports(reports);
-  assert.equal(cluster.count, 1);
-  assert.equal(cluster.status, "pending");
+  assert.equal(cluster.count, REPORT_THRESHOLD);
+  assert.equal(cluster.deviceCount, 1);
+  assert.equal(cluster.status, "caution");
 });
 // 긴 간선 위 a에서 meters만큼 떨어진 점
 function along(edge, meters) {
@@ -180,6 +181,23 @@ test("a confirmed report makes its whole area confirmed; routing blocks confirme
     !availableEdges([edgeId(edge)]).some((e) => edgeId(e) === edgeId(edge)),
   );
 });
+test("an admin-selected edge overrides the reported edge after confirmation", () => {
+  const reported = EDGES[0],
+    selected = EDGES[1],
+    reports = [
+      reportFor(reported, {
+        confirmed: true,
+        confirmedEdgeId: edgeId(selected),
+      }),
+    ],
+    [cluster] = clusterReports(reports);
+  assert.deepEqual(cluster.edgeIds, [edgeId(selected)]);
+  assert.ok(
+    !availableEdges(cluster.edgeIds).some(
+      (edge) => edgeId(edge) === edgeId(selected),
+    ),
+  );
+});
 test("pickCover prefers the admin's choice, then the newest report with a photo", () => {
   const edge = EDGES[0],
     old = reportFor(edge, {
@@ -243,9 +261,11 @@ test("rowToReport maps Supabase snake_case rows to the client report shape", () 
   const confirmed = rowToReport({
     ...row,
     status: "confirmed",
+    confirmed_edge_id: edgeId(EDGES[1]),
     is_cover: true,
   });
   assert.equal(confirmed.confirmed, true);
+  assert.equal(confirmed.confirmedEdgeId, edgeId(EDGES[1]));
   assert.equal(confirmed.isCover, true);
 });
 test("confirmedEdgesFromRows collects only status='confirmed' rows, deduped", () => {
@@ -269,6 +289,56 @@ test("confirmedEdgesFromRows collects only status='confirmed' rows, deduped", ()
   assert.deepEqual(confirmedEdgesFromRows(rows), [edgeId(edge)]);
   assert.deepEqual(confirmedEdgesFromRows([]), []);
   assert.deepEqual(confirmedEdgesFromRows(undefined), []);
+});
+test("confirmedEdgesFromRows uses the edge selected by the admin", () => {
+  const reported = EDGES[0],
+    selected = EDGES[1],
+    base = reportFor(reported);
+  assert.deepEqual(
+    confirmedEdgesFromRows([
+      {
+        edge_id: edgeId(reported),
+        confirmed_edge_id: edgeId(selected),
+        point_x: base.point.x,
+        point_z: base.point.z,
+        status: "confirmed",
+      },
+    ]),
+    [edgeId(selected)],
+  );
+});
+test("routing detours around the edge selected by the admin", () => {
+  const nodes = {
+      a: { x: 0, z: 0 },
+      b: { x: 1, z: 0 },
+      c: { x: 2, z: 0 },
+      d: { x: 1, z: 2 },
+    },
+    edges = [
+      { a: "a", b: "b", meters: 1 },
+      { a: "b", b: "c", meters: 1 },
+      { a: "a", b: "d", meters: 2 },
+      { a: "d", b: "c", meters: 2 },
+    ],
+    blocked = confirmedEdgesFromRows(
+      [
+        {
+          edge_id: "a--b",
+          confirmed_edge_id: "b--c",
+          status: "confirmed",
+        },
+      ],
+      edges,
+      nodes,
+    ),
+    route = shortestPath(
+      "a",
+      "c",
+      "shortest",
+      nodes,
+      availableEdges(blocked, edges),
+    );
+  assert.deepEqual(route.path, ["a", "d", "c"]);
 });
 test("confirmedEdgesFromRows remaps a confirmed edge that got split, using the stored point", () => {
   const edge = EDGES[0],
@@ -371,9 +441,10 @@ test("orphanPhotos picks only old photos that no report points to", async () => 
   assert.deepEqual(orphanPhotos(files, ["dev1/1.jpg", null], { now }), [
     "dev1/2.jpg",
   ]);
-  assert.deepEqual(
-    orphanPhotos(files, [], { now, minAgeMs: 0 }).sort(),
-    ["dev1/1.jpg", "dev1/2.jpg", "dev2/3.png"],
-  );
+  assert.deepEqual(orphanPhotos(files, [], { now, minAgeMs: 0 }).sort(), [
+    "dev1/1.jpg",
+    "dev1/2.jpg",
+    "dev2/3.png",
+  ]);
   assert.deepEqual(orphanPhotos(null, null), []);
 });
