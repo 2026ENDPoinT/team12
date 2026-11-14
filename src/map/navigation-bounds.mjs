@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { pointInRing } from "../geo.mjs";
+import { pointInRing } from "../campus/geo.mjs";
 
 // Constrain the ground point at the viewport centre, rather than the orbit target:
 // Space/Shift can move the target above/below ground while keeping its angle.

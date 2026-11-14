@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { orphanPhotos } from "./reports.mjs";
+import { orphanPhotos } from "../reports/reports.mjs";
 
 // Supabase 프로젝트 연결 정보. anon/publishable 키는 RLS로 보호되는 공개 키라
 // 커밋해도 괜찮습니다 (service_role 키는 절대 여기 두지 마세요).

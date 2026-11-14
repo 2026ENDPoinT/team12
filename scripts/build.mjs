@@ -1,7 +1,7 @@
 import { build } from "esbuild";
 import { rm, mkdir, copyFile, writeFile } from "node:fs/promises";
-import { CAMPUS_GEOMETRY, ENTRANCES } from "../src/data.mjs";
-import { createCampusGeoJson } from "../src/gis.mjs";
+import { CAMPUS_GEOMETRY, ENTRANCES } from "../src/campus/data.mjs";
+import { createCampusGeoJson } from "../src/campus/gis.mjs";
 import { copyIndoorAssets } from "./indoor-assets.mjs";
 
 // 개발용 소스맵을 공개 배포물에 포함하지 않습니다.
@@ -16,7 +16,7 @@ await build({
   format: "iife",
   outfile: "dist/app.js",
 });
-// 편집기는 ?edit=1에서만 불러오는 별도 파일입니다(src/edit-mode.js 참고).
+// 편집기는 ?edit=1에서만 불러오는 별도 파일입니다(src/editor/edit-mode.js 참고).
 await build({
   entryPoints: ["src/editor/index.js"],
   bundle: true,

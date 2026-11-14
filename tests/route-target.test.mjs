@@ -8,11 +8,11 @@ import {
   EDGES,
   PLACES,
   placeEntries,
-} from "../src/data.mjs";
-import { mergeSurvey } from "../src/survey.mjs";
-import { routeBetween, routeStartEntries } from "../src/route-target.mjs";
-import { shortestPath } from "../src/routing.mjs";
-import { toLngLat } from "../src/geo.mjs";
+} from "../src/campus/data.mjs";
+import { mergeSurvey } from "../src/campus/survey.mjs";
+import { routeBetween, routeStartEntries } from "../src/navigation/route-target.mjs";
+import { shortestPath } from "../src/navigation/routing.mjs";
+import { toLngLat } from "../src/campus/geo.mjs";
 import { SAMPLE_DOORS } from "./fixtures.mjs";
 
 const origin = CAMPUS_GEOMETRY.meta;

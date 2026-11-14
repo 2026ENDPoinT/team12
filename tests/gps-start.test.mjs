@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { attachGps, GPS_ATTACH_M } from "../src/gps-start.mjs";
-import { shortestPath } from "../src/routing.mjs";
-import { NODES, EDGES, BUILDINGS } from "../src/data.mjs";
-import { insideBuilding } from "../src/geo.mjs";
+import { attachGps, GPS_ATTACH_M } from "../src/navigation/gps-start.mjs";
+import { shortestPath } from "../src/navigation/routing.mjs";
+import { NODES, EDGES, BUILDINGS } from "../src/campus/data.mjs";
+import { insideBuilding } from "../src/campus/geo.mjs";
 
 // 시험용 사각형 길: A(0,0)─B(100,0) 아래쪽, C(0,40)─D(100,40) 위쪽, 양옆 세로 길.
 const box = (x0, z0, x1, z1) => ({

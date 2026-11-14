@@ -14,7 +14,7 @@
 | `road_reports` | 공사·통행 막힘 신고 | `id` uuid PK, `edge_id`, `point_x`/`point_z`(캠퍼스 미터 좌표), `reason`(construction/blocked/other), `reason_note`, `photo_path`, `reporter_device_id`, `status`(reported/confirmed/dismissed), `confirmed_at`, `confirmed_by`, `is_cover`, `created_at` |
 | `building_works` | 관리자가 등록한 건물 공사 기간 | `id` uuid PK, `building_id`(`data/seoultech.json`의 건물 id), `start_date`, `end_date`, `note`, `created_at` |
 
-건물·출입구·보행 노드/간선, 사용자 프로필, 신고 확인/투표 테이블은 **없다**. 건물·노드·간선·출입구는 DB가 아니라 `data/seoultech.json` + `data/team-survey.json`(GeoJSON)에 있고 앱이 불러올 때 합친다(`src/data.mjs`). 신고 "투표"는 별도 테이블 없이 같은 30m 구역의 서로 다른 `reporter_device_id` 수로 센다(`src/reports.mjs` `clusterReports`). 외래 키·unique·인덱스(PK 제외)·PostGIS는 쓰지 않는다.
+건물·출입구·보행 노드/간선, 사용자 프로필, 신고 확인/투표 테이블은 **없다**. 건물·노드·간선·출입구는 DB가 아니라 `data/seoultech.json` + `data/team-survey.json`(GeoJSON)에 있고 앱이 불러올 때 합친다(`src/campus/data.mjs`). 신고 "투표"는 별도 테이블 없이 같은 30m 구역의 서로 다른 `reporter_device_id` 수로 센다(`src/reports/reports.mjs` `clusterReports`). 외래 키·unique·인덱스(PK 제외)·PostGIS는 쓰지 않는다.
 
 ## RLS (모든 앱 테이블 RLS 켜짐)
 | 테이블 | SELECT | INSERT | UPDATE | DELETE |

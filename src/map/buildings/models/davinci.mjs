@@ -1,6 +1,6 @@
 import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
-import { insideBuilding } from "../../../geo.mjs";
+import { insideBuilding } from "../../../campus/geo.mjs";
 
 // Silver horizontal wings and a glazed central hall, guided by supplied photos.
 export function createDavinciBuilding(building, wallColor, entrance) {

@@ -1,11 +1,11 @@
 // 조사 데이터 편집기. 주소에 ?edit=1이 있을 때만 별도 파일(editor.js)로 불러옵니다.
-// 지도·캠퍼스 데이터·경로 계산은 앱이 window.__saiEditor로 넘겨준 것을 씁니다(src/edit-mode.js).
+// 지도·캠퍼스 데이터·경로 계산은 앱이 window.__saiEditor로 넘겨준 것을 씁니다(src/editor/edit-mode.js).
 //
 // 흐름: 지도 클릭 → 조사 항목(위경도 GeoJSON) 만들기 → mergeSurvey로 그래프에 합치기
 //       → 앱에 넘겨 오버레이·경로 다시 그리기(저장 전 미리보기) → 저장 → 브라우저에 임시 저장
 //       → 내보내기로 data/team-survey.json 파일 받기 → 저장소에 커밋
-import { mergeSurvey, attachToGraph } from "../survey.mjs";
-import { toLngLat, toScene, projectToSegment } from "../geo.mjs";
+import { mergeSurvey, attachToGraph } from "../campus/survey.mjs";
+import { toLngLat, toScene, projectToSegment } from "../campus/geo.mjs";
 
 const DRAFT_KEY = "sai:seoultech:survey-draft:v1";
 const WALL_SNAP_M = 5; // 벽에서 이 거리 안을 클릭해야 출입구가 됨
@@ -758,6 +758,6 @@ function startEditor(api) {
   apply();
 }
 
-// 앱(src/edit-mode.js)이 넘겨준 통로가 있을 때만 시작합니다. 파일 맨 끝에서 불러야
+// 앱(src/editor/edit-mode.js)이 넘겨준 통로가 있을 때만 시작합니다. 파일 맨 끝에서 불러야
 // 위의 상수와 함수가 모두 준비된 뒤에 실행됩니다.
 if (window.__saiEditor) startEditor(window.__saiEditor);

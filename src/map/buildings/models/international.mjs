@@ -1,6 +1,6 @@
 import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
-import { insideBuilding } from "../../../geo.mjs";
+import { insideBuilding } from "../../../campus/geo.mjs";
 
 // Photo-guided International Hall; orientation follows its south-facing frontage.
 export function createInternationalBuilding(building, wallColor) {

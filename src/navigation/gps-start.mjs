@@ -1,8 +1,8 @@
 // GPS 위치를 경로의 출발점(또는 도착점)으로 그래프에 붙입니다. 명세 Phase 2-3.
 // 가장 가까운 노드로 순간이동하지 않고, 가장 가까운 길 위의 점에서 길을 둘로 잘라 시작합니다.
 // 그래서 긴 길 중간에서 출발해도 뒤로 갔다 돌아오지 않고, 다익스트라가 양쪽 중 짧은 쪽을 고릅니다.
-import { attachToGraph } from "./survey.mjs";
-import { insideBuilding } from "./geo.mjs";
+import { attachToGraph } from "../campus/survey.mjs";
+import { insideBuilding } from "../campus/geo.mjs";
 
 // GPS 오차(실외 약 10m)에 여유를 둔 거리입니다. 이 안에 건물을 지나지 않고 닿는 길이 없으면
 // 가장 가까운 노드에 붙입니다(예전 방식). 경로가 아예 안 나오는 것보다 낫기 때문입니다.

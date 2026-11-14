@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { draggedSheetHeight, shouldCollapseSheet } from "../src/sheet.mjs";
+import { draggedSheetHeight, shouldCollapseSheet } from "../src/ui/sheet.mjs";
 
 test("sheet follows the pointer at mobile zoom and stays between snap points", () => {
   assert.equal(draggedSheetHeight(400, 90, .9, 100, 400), 300);

@@ -1,5 +1,5 @@
 import { roadDimensions } from "./roads.mjs";
-import { insideBuilding, pointInRing, projectToSegment } from "../../geo.mjs";
+import { insideBuilding, pointInRing, projectToSegment } from "../../campus/geo.mjs";
 
 // Hand-positioned interpretation of the supplied aerial photo, in campus meters.
 // Dense banks, a loose roadside row and an open lawn; no runtime randomness.

@@ -1,5 +1,5 @@
-import { EDGES, NODES, BUILDINGS } from "./data.mjs";
-import { projectToSegment, insideBuilding } from "./geo.mjs";
+import { EDGES, NODES, BUILDINGS } from "../campus/data.mjs";
+import { projectToSegment, insideBuilding } from "../campus/geo.mjs";
 
 export const edgeId = (edge) => [edge.a, edge.b].sort().join("--");
 export const edgeName = (edge) => edge.name || "교내 보행로";

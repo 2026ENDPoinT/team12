@@ -1,15 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
-import { BUILDINGS } from "../src/data.mjs";
+import { BUILDINGS } from "../src/campus/data.mjs";
 import {
   BUILDING_NUMBERS,
   buildingLabel,
   activeWorks,
   worksPeriod,
   today,
-} from "../src/buildings.mjs";
-import { insideBuilding } from "../src/geo.mjs";
+} from "../src/campus/buildings.mjs";
+import { insideBuilding } from "../src/campus/geo.mjs";
 import { buildingAppearance } from "../src/map/buildings/appearance.mjs";
 import {
   facadeGeometry,
@@ -117,7 +117,7 @@ test("all campus shapes generate finite facade attributes without changing sourc
 
 // Exercise the complete layer, including photo models, generic models and studies.
 test("building registry creates all visible buildings with valid interaction records", async () => {
-  const { ENTRANCES } = await import("../src/data.mjs");
+  const { ENTRANCES } = await import("../src/campus/data.mjs");
   const { BUILDING_DESIGNS } = await import("../src/map/buildings/catalog.mjs");
   const { createBuildingLayer } = await import(
     "../src/map/buildings/index.mjs"

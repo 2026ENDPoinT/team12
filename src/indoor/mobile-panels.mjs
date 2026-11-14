@@ -1,4 +1,4 @@
-import { draggedSheetHeight, shouldCollapseSheet } from "../sheet.mjs";
+import { draggedSheetHeight, shouldCollapseSheet } from "../ui/sheet.mjs";
 
 // 실외 경로 시트와 같은 높이·속도 기준으로 움직이는 실내 모바일 패널.
 export function bindMobilePanel(panel, handle) {

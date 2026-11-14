@@ -2,8 +2,8 @@
 // - 보행 그래프 디버그 오버레이 토글과 범례 (앱 본체에 포함, 수 KB)
 // - 편집기(editor.js)는 별도 파일로 빌드되어 이때만 불러옵니다. 편집기는 window.__saiEditor로
 //   지도·데이터·경로 계산 함수를 넘겨받으므로, 지도 엔진과 캠퍼스 데이터를 다시 내려받지 않습니다.
-import { OVERLAY_STYLES } from "./graph-overlay.js";
-import { toEntranceMarkers } from "./data.mjs";
+import { OVERLAY_STYLES } from "../map/graph-overlay.js";
+import { toEntranceMarkers } from "../campus/data.mjs";
 
 export const EDIT_MODE = new URLSearchParams(location.search).has("edit");
 

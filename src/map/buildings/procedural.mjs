@@ -1,7 +1,7 @@
 import { windowLights } from "../night-lighting.mjs";
 import { applyBuildingFinish } from "./finishes.mjs";
 import * as THREE from "three";
-import { insideBuilding } from "../../geo.mjs";
+import { insideBuilding } from "../../campus/geo.mjs";
 
 export function roofRectangleFits(building, x, z, halfX, halfZ) {
   const min = [x - halfX, z - halfZ],

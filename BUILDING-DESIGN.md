@@ -7,7 +7,7 @@
 - `src/map/buildings/index.mjs`: 등록 정보를 읽어 전용/공통 모델을 생성하는 지도 연결부. 새 전용 모델은 여기의 팩터리 목록에 추가하고 catalog에서 해당 모델명을 선택한다.
 - `src/map/buildings/appearance.mjs`: 공통 외벽 프리셋과 이름별 분류, 임시 지붕 팔레트. 전용 모델 ID 목록을 별도로 복제하지 않고 catalog를 참조한다.
 - `src/map/landscape/`: 붕어방·식재·나무 렌더링. `roads.mjs`의 도로 폭은 지도 렌더링과 식재 충돌 검사에서 함께 사용한다.
-- `src/data.mjs`, `data/`: 건물 이름·위치·외곽선·보행망. 외관 변경과 구분해 관리한다.
+- `src/campus/data.mjs`, `data/`: 건물 이름·위치·외곽선·보행망. 외관 변경과 구분해 관리한다.
 
 기존 외관 수정은 해당 모델 파일과 catalog에서 처리한다. 색상 변경 때 `map.js`를 고칠 필요는 없다. 지형은 기존처럼 평평하게 유지한다.
 

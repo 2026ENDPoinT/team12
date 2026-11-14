@@ -7,9 +7,9 @@ import {
   BUILDINGS,
   ENTRANCES,
   MAIN_GATE,
-} from "../src/data.mjs";
-import { shortestPath } from "../src/routing.mjs";
-import { insideBuilding, projectToSegment } from "../src/geo.mjs";
+} from "../src/campus/data.mjs";
+import { shortestPath } from "../src/navigation/routing.mjs";
+import { insideBuilding, projectToSegment } from "../src/campus/geo.mjs";
 function referenceDistance(start, mode) {
   const dist = Object.fromEntries(
     Object.keys(NODES).map((id) => [id, Infinity]),
