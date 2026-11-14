@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BUILDING_INFO, buildingInfo } from "../src/building-info.mjs";
-import { BUILDINGS } from "../src/data.mjs";
+import { BUILDING_INFO, buildingInfo } from "../src/ui/building-info.mjs";
+import { BUILDINGS } from "../src/campus/data.mjs";
 
 test("건물 정보는 실제 지도에 있는 건물 이름으로만 적는다", () => {
   const names = new Set(BUILDINGS.map((b) => b.name));

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { orientationHeading, smoothHeading, headingDelta, gpsHeading, cameraOffsetForHeading, createHeadingTracker } from "../src/heading.mjs";
+import { orientationHeading, smoothHeading, headingDelta, gpsHeading, cameraOffsetForHeading, createHeadingTracker } from "../src/navigation/heading.mjs";
 
 test("compass accepts iOS and absolute Android headings, but rejects relative or inaccurate data", () => {
   assert.equal(orientationHeading({ webkitCompassHeading: 350, webkitCompassAccuracy: 10 }, 90), 80);

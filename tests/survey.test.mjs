@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CAMPUS_GEOMETRY, BUILDINGS, MAIN_GATE } from "../src/data.mjs";
+import { CAMPUS_GEOMETRY, BUILDINGS, MAIN_GATE } from "../src/campus/data.mjs";
 import { SAMPLE_DOORS } from "./fixtures.mjs";
-import { mergeSurvey, attachToGraph, crossesBuilding } from "../src/survey.mjs";
-import { toLngLat } from "../src/geo.mjs";
-import { shortestPath } from "../src/routing.mjs";
-import { sanitizeReports, availableEdges, edgeId } from "../src/reports.mjs";
+import { mergeSurvey, attachToGraph, crossesBuilding } from "../src/campus/survey.mjs";
+import { toLngLat } from "../src/campus/geo.mjs";
+import { shortestPath } from "../src/navigation/routing.mjs";
+import { sanitizeReports, availableEdges, edgeId } from "../src/reports/reports.mjs";
 
 const origin = CAMPUS_GEOMETRY.meta,
   base = { nodes: CAMPUS_GEOMETRY.nodes, edges: CAMPUS_GEOMETRY.edges },

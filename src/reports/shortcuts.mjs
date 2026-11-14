@@ -1,4 +1,4 @@
-import { crossesBuilding } from "./survey.mjs";
+import { crossesBuilding } from "../campus/survey.mjs";
 
 export function shortcutNodes(edges) {
   return new Set(edges.filter((edge) =>

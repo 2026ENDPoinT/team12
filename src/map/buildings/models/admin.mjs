@@ -1,6 +1,6 @@
 import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
-import { insideBuilding } from "../../../geo.mjs";
+import { insideBuilding } from "../../../campus/geo.mjs";
 
 // Corrected photo reference: tall glazed main block with a low east wing.
 export function createAdminBuilding(building, wallColor) {

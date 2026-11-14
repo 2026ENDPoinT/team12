@@ -1,7 +1,7 @@
 import { applyModelFinishes } from "./finishes.mjs";
 import { getBuildingDesign } from "./catalog.mjs";
 import * as THREE from "three";
-import { insideBuilding } from "../../geo.mjs";
+import { insideBuilding } from "../../campus/geo.mjs";
 
 // Schematic facade study, not a photo-verified reconstruction.
 // Only these IDs opt in; photo-based models never pass through this module.

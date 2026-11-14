@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 import { createNavigationBounds } from "../src/map/navigation-bounds.mjs";
-import { CAMPUS_GEOMETRY } from "../src/data.mjs";
-import { pointInRing, projectToSegment } from "../src/geo.mjs";
+import { CAMPUS_GEOMETRY } from "../src/campus/data.mjs";
+import { pointInRing, projectToSegment } from "../src/campus/geo.mjs";
 
 const square = [
   [-100, -100],

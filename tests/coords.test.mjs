@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CAMPUS_GEOMETRY, BUILDINGS } from "../src/data.mjs";
-import { toScene, toLngLat, gpsToCampus } from "../src/geo.mjs";
-import { campusToGps } from "../src/gis.mjs";
+import { CAMPUS_GEOMETRY, BUILDINGS } from "../src/campus/data.mjs";
+import { toScene, toLngLat, gpsToCampus } from "../src/campus/geo.mjs";
+import { campusToGps } from "../src/campus/gis.mjs";
 
 const origin = CAMPUS_GEOMETRY.meta;
 

@@ -2,6 +2,17 @@
 
 길찾기 개선 작업([routing-spec.md](routing-spec.md))에서 정한 사항을 기록합니다. 최신 결정이 위에 옵니다.
 
+## 2026-11-14 · src 파일을 기능별 폴더로 정리
+
+- **결정** (사용자 요청): `src/` 최상위에 흩어진 파일 20개를 기능별 폴더로 옮긴다. 파일 이름과 내용은 그대로 두고 위치와 import 경로만 바꾼다. 의존 방향은 `app.js`·`ui/` → `map/`·`navigation/`·`reports/`·`editor/` → `campus/` 한쪽으로만 둔다.
+  - `ui/`: sheet, search-suggestions, building-info, schools.json
+  - `campus/`: data, survey, geo, gis, buildings
+  - `navigation/`: routing, route-target, gps-start, guidance, heading
+  - `reports/`: reports, shortcuts · `api/`: backend
+  - `map/`에 map.js·graph-overlay.js, `editor/`에 edit-mode.js
+- **검증**: 옮기기 전후 `npm run build`의 `dist/app.js`·`editor.js`·`indoor/indoor.js`·`indoor/ar-worker.js`·`dist/data/*`가 바이트 단위로 같다. `npm test` 결과도 같다.
+- 이 아래 예전 기록의 파일 경로는 당시 위치 그대로 둔다.
+
 ## 2026-11-14 · 신고 확정: 3건 집계·관리자가 막을 길 선택
 
 - **문제**: (1) 같은 휴대폰으로 3번 신고하면 "서로 다른 기기 수"로 세어 1건으로 남아 "검토 필요 · 3건 이상"으로 안 옮겨갔다. (2) 확정 중 한 단계가 실패하면 화면을 다시 읽지 않아 목록이 그대로였다. (3) 확정은 신고자가 찍은 구간을 막아서, 실제 보라색 경로가 쓰는 간선과 어긋나면 빨간 구간을 뚫고 지나갔다.

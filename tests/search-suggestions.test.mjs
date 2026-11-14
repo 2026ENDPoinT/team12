@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { PLACES } from "../src/data.mjs";
+import { PLACES } from "../src/campus/data.mjs";
 import { createIndoor } from "../src/indoor/model.mjs";
-import { suggestMatches } from "../src/search-suggestions.mjs";
+import { suggestMatches } from "../src/ui/search-suggestions.mjs";
 
 test("suggests campus buildings for Hangul typos and ignores unrelated input", () => {
   const suggest = (query) => suggestMatches(query, PLACES, (place) => [place.name]);

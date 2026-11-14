@@ -1,6 +1,6 @@
 import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
-import { insideBuilding } from "../../../geo.mjs";
+import { insideBuilding } from "../../../campus/geo.mjs";
 
 // Photo-proportioned tower; visual height is an estimate, not a surveyed value.
 export function createTechnoparkBuilding(building) {

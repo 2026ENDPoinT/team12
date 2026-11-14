@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { routePoints, guidanceAt, guidanceSummary } from "../src/guidance.mjs";
+import { routePoints, guidanceAt, guidanceSummary } from "../src/navigation/guidance.mjs";
 
 const route = [
   { x: 0, z: 0 },

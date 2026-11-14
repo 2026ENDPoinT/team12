@@ -1,4 +1,4 @@
-import { NODES, EDGES } from "./data.mjs";
+import { NODES, EDGES } from "../campus/data.mjs";
 
 /**
  * [팀 알고리즘 교체 지점 — 시작]

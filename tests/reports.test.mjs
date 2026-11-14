@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { NODES, EDGES, CAMPUS_GEOMETRY } from "../src/data.mjs";
-import { shortestPath } from "../src/routing.mjs";
+import { NODES, EDGES, CAMPUS_GEOMETRY } from "../src/campus/data.mjs";
+import { shortestPath } from "../src/navigation/routing.mjs";
 import {
   edgeId,
   availableEdges,
@@ -16,8 +16,8 @@ import {
   confirmedEdgesFromRows,
   REPORT_THRESHOLD,
   REASON_NOTE_MAX,
-} from "../src/reports.mjs";
-import { gpsToCampus } from "../src/geo.mjs";
+} from "../src/reports/reports.mjs";
+import { gpsToCampus } from "../src/campus/geo.mjs";
 function reportFor(edge, overrides = {}) {
   const a = NODES[edge.a],
     b = NODES[edge.b];
@@ -429,7 +429,7 @@ test("GPS shot position flows from DB rows and drives the auto-picked cover", ()
 });
 
 test("orphanPhotos picks only old photos that no report points to", async () => {
-  const { orphanPhotos } = await import("../src/reports.mjs");
+  const { orphanPhotos } = await import("../src/reports/reports.mjs");
   const now = Date.parse("2026-11-14T12:00:00Z");
   const files = [
     { path: "dev1/1.jpg", createdAt: "2026-11-12T12:00:00Z" }, // 오래됨 + 신고 있음 → 남김

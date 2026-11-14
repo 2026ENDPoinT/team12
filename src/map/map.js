@@ -1,15 +1,15 @@
-import { createStreetLights, windowLights } from "./map/night-lighting.mjs";
-import { touchGestureMode, touchTurn } from "./map/touch-gesture.mjs";
-import { cameraOffsetForHeading, smoothHeading } from "./heading.mjs";
-import { createNavigationBounds } from "./map/navigation-bounds.mjs";
-import { createKeyboardPan } from "./map/keyboard-pan.mjs";
-import { createMapProfiler } from "./map/performance.mjs";
-import { createGroundMaterial } from "./map/landscape/ground-materials.mjs";
-import { createRoadLayer } from "./map/landscape/road-layer.mjs";
-import { createBuildingLayer } from "./map/buildings/index.mjs";
-import { createCampusTrees } from "./map/landscape/trees.mjs";
-import { createPondDetails } from "./map/landscape/pond-details.mjs";
-import { createTechnyong } from "./map/mascot/technyong.mjs";
+import { createStreetLights, windowLights } from "./night-lighting.mjs";
+import { touchGestureMode, touchTurn } from "./touch-gesture.mjs";
+import { cameraOffsetForHeading, smoothHeading } from "../navigation/heading.mjs";
+import { createNavigationBounds } from "./navigation-bounds.mjs";
+import { createKeyboardPan } from "./keyboard-pan.mjs";
+import { createMapProfiler } from "./performance.mjs";
+import { createGroundMaterial } from "./landscape/ground-materials.mjs";
+import { createRoadLayer } from "./landscape/road-layer.mjs";
+import { createBuildingLayer } from "./buildings/index.mjs";
+import { createCampusTrees } from "./landscape/trees.mjs";
+import { createPondDetails } from "./landscape/pond-details.mjs";
+import { createTechnyong } from "./mascot/technyong.mjs";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {
@@ -23,16 +23,16 @@ import {
   CAMPUS_GEOMETRY,
   ENTRANCES,
   MAIN_GATE,
-} from "./data.mjs";
+} from "../campus/data.mjs";
 import {
   locateReportPoint,
   edgeId,
   reportLocation,
   clusterReports,
-} from "./reports.mjs";
-import crosswalks from "../data/crosswalks.json";
-import { insideBuilding, projectToSegment, toScene } from "./geo.mjs";
-import { buildingLabel, worksPeriod } from "./buildings.mjs";
+} from "../reports/reports.mjs";
+import crosswalks from "../../data/crosswalks.json";
+import { insideBuilding, projectToSegment, toScene } from "../campus/geo.mjs";
+import { buildingLabel, worksPeriod } from "../campus/buildings.mjs";
 import { createGraphOverlay } from "./graph-overlay.js";
 const VIOLET = 0x7950ff;
 

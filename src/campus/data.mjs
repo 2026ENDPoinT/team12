@@ -1,5 +1,5 @@
-import geometry from "../data/seoultech.json" with { type: "json" };
-import teamSurvey from "../data/team-survey.json" with { type: "json" };
+import geometry from "../../data/seoultech.json" with { type: "json" };
+import teamSurvey from "../../data/team-survey.json" with { type: "json" };
 import { mergeSurvey } from "./survey.mjs";
 
 const officialBuildingNames = {

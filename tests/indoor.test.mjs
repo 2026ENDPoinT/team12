@@ -11,7 +11,7 @@ import {
 } from "../src/indoor/guide.mjs";
 import { createAlign } from "../src/indoor/align.mjs";
 import * as L from "../src/indoor/ar/localize.mjs";
-import { NODES } from "../src/data.mjs";
+import { NODES } from "../src/campus/data.mjs";
 
 const M = JSON.parse(readFileSync("data/mirae/mirae.json", "utf8"));
 const E = JSON.parse(readFileSync("data/mirae/entrances.json", "utf8"));

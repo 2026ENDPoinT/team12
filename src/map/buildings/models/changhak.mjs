@@ -1,6 +1,6 @@
 import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
-import { insideBuilding } from "../../../geo.mjs";
+import { insideBuilding } from "../../../campus/geo.mjs";
 
 // Three-storey courtyard block, proportioned from the supplied photographs.
 export function createChanghakBuilding(building, wallColor) {

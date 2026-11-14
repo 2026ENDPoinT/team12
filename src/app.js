@@ -1,8 +1,8 @@
-import { shortcutEdge, shortcutNodes, withApprovedShortcuts } from "./shortcuts.mjs";
-import { normalizeSearch, suggestMatches } from "./search-suggestions.mjs";
-import { shortestPath } from "./routing.mjs";
-import { routeBetween, routeStartEntries } from "./route-target.mjs";
-import { attachGps } from "./gps-start.mjs";
+import { shortcutEdge, shortcutNodes, withApprovedShortcuts } from "./reports/shortcuts.mjs";
+import { normalizeSearch, suggestMatches } from "./ui/search-suggestions.mjs";
+import { shortestPath } from "./navigation/routing.mjs";
+import { routeBetween, routeStartEntries } from "./navigation/route-target.mjs";
+import { attachGps } from "./navigation/gps-start.mjs";
 import {
   edgeId,
   reportLocation,
@@ -16,7 +16,7 @@ import {
   confirmedEdgesFromRows,
   reasonLabel,
   REPORT_THRESHOLD,
-} from "./reports.mjs";
+} from "./reports/reports.mjs";
 import {
   fetchReportRows,
   insertReportRow,
@@ -34,15 +34,15 @@ import {
   signOutAdmin,
   isAdminUser,
   supabase,
-} from "./backend.mjs";
+} from "./api/backend.mjs";
 import {
   activeWorks,
   BUILDING_NUMBERS,
   buildingLabel,
   worksPeriod,
   today,
-} from "./buildings.mjs";
-import catalog from "./schools.json";
+} from "./campus/buildings.mjs";
+import catalog from "./ui/schools.json";
 import {
   CAMPUS,
   CAMPUS_GEOMETRY,
@@ -54,15 +54,15 @@ import {
   ENTRANCES,
   SURVEY,
   placeEntries,
-} from "./data.mjs";
-import { createCampusMap } from "./map.js";
-import { buildingInfo } from "./building-info.mjs";
-import { setupEditMode, EDIT_MODE } from "./edit-mode.js";
-import { gpsToCampus } from "./geo.mjs";
-import { gisSummary } from "./gis.mjs";
-import { routePoints, guidanceAt, guidanceSummary, INSTRUCTION } from "./guidance.mjs";
-import { draggedSheetHeight, shouldCollapseSheet } from "./sheet.mjs";
-import { createHeadingTracker, gpsHeading } from "./heading.mjs";
+} from "./campus/data.mjs";
+import { createCampusMap } from "./map/map.js";
+import { buildingInfo } from "./ui/building-info.mjs";
+import { setupEditMode, EDIT_MODE } from "./editor/edit-mode.js";
+import { gpsToCampus } from "./campus/geo.mjs";
+import { gisSummary } from "./campus/gis.mjs";
+import { routePoints, guidanceAt, guidanceSummary, INSTRUCTION } from "./navigation/guidance.mjs";
+import { draggedSheetHeight, shouldCollapseSheet } from "./ui/sheet.mjs";
+import { createHeadingTracker, gpsHeading } from "./navigation/heading.mjs";
 const $ = (s) => document.querySelector(s),
   $$ = (s) => document.querySelectorAll(s),
   // 761px 이상은 Figma v2 데스크톱 화면(떠 있는 패널·건물 카드·건물 검색)을 씁니다.

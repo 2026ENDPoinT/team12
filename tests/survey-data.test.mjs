@@ -11,10 +11,10 @@ import {
   SURVEY,
   placeEntries,
   toEntranceMarkers,
-} from "../src/data.mjs";
-import { mergeSurvey } from "../src/survey.mjs";
-import { toScene } from "../src/geo.mjs";
-import { shortestPath } from "../src/routing.mjs";
+} from "../src/campus/data.mjs";
+import { mergeSurvey } from "../src/campus/survey.mjs";
+import { toScene } from "../src/campus/geo.mjs";
+import { shortestPath } from "../src/navigation/routing.mjs";
 
 test("markers use the survey IDs and coordinates without hardcoded candidate entries", () => {
   assert.deepEqual(ENTRANCES, toEntranceMarkers(SURVEY.entrances));

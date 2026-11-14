@@ -1,6 +1,6 @@
 import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
-import { insideBuilding } from "../../../geo.mjs";
+import { insideBuilding } from "../../../campus/geo.mjs";
 
 // The photo elevation faces north, toward the rear-gate approach.
 // The south elevation seen from the default camera is an inferred rear facade.

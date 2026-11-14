@@ -1,4 +1,4 @@
-import { normalizeSearch, suggestMatches } from "../search-suggestions.mjs";
+import { normalizeSearch, suggestMatches } from "../ui/search-suggestions.mjs";
 
 export const routePlaceLabel = (place) =>
   place ? `${place.title}${place.name ? " " + place.name : ""}` : "";

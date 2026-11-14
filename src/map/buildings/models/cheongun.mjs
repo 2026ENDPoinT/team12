@@ -1,6 +1,6 @@
 import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
-import { insideBuilding } from "../../../geo.mjs";
+import { insideBuilding } from "../../../campus/geo.mjs";
 
 // Photo-guided courtyard building; roof structures are schematic, not surveyed.
 export function createCheongunBuilding(building, wallColor) {

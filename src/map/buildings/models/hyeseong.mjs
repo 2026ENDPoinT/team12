@@ -1,6 +1,6 @@
 import { applyModelFinishes } from "../finishes.mjs";
 import * as THREE from "three";
-import { insideBuilding } from "../../../geo.mjs";
+import { insideBuilding } from "../../../campus/geo.mjs";
 
 // Photo-guided pale stone wings, recessed central bays and low entrance canopy.
 export function createHyeseongBuilding(building, wallColor) {
