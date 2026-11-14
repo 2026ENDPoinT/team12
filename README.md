@@ -1,99 +1,39 @@
-# team12
+![발표 슬라이드 1](docs/presentation/slide-01.png)
 
-ENDPoinT 해커톤 2026 Team 12 · 서울과기대 캠퍼스 길찾기 프로젝트
+![발표 슬라이드 2](docs/presentation/slide-02.png)
 
-## 프로젝트 실행
+![발표 슬라이드 3](docs/presentation/slide-03.png)
 
-Node.js와 Git을 설치한 뒤 터미널에서 아래 명령어를 순서대로 실행합니다.
+![발표 슬라이드 4](docs/presentation/slide-04.png)
 
-```sh
-git clone https://github.com/2026ENDPoinT/team12.git
-cd team12
-npm ci
-npm run dev
-```
+![발표 슬라이드 5](docs/presentation/slide-05.png)
 
-브라우저에서 http://127.0.0.1:4173 을 열면 됩니다. 개발 서버는 `Ctrl+C`로 종료합니다.
-미래관 실내 지도·AR 길안내는 http://127.0.0.1:4173/indoor/ 입니다.
+![발표 슬라이드 6](docs/presentation/slide-06.png)
 
-### 휴대폰에서 확인 (AR 카메라)
+![발표 슬라이드 7](docs/presentation/slide-07.png)
 
-카메라와 방향 센서는 HTTPS에서만 동작합니다. PC와 휴대폰을 같은 와이파이에 연결하고
-`npm run dev:phone`을 실행한 뒤, 터미널에 나오는 `https://<PC IP>:4173/indoor/` 주소를
-휴대폰에서 엽니다. 인증서 경고가 나오면 "계속"을 누릅니다. 배포 주소(GitHub Pages)는 바로 열립니다.
+![발표 슬라이드 8](docs/presentation/slide-08.png)
 
-## IntelliJ에서 실행
+![발표 슬라이드 9](docs/presentation/slide-09.png)
 
-1. IntelliJ에서 내려받은 `team12` 폴더를 엽니다.
-2. 아래쪽 Terminal을 엽니다.
-3. 처음 한 번 `npm ci`를 실행합니다.
-4. `npm run dev`를 실행합니다.
-5. 브라우저에서 http://127.0.0.1:4173 을 엽니다.
+![발표 슬라이드 10](docs/presentation/slide-10.png)
 
-## 명령어
+![발표 슬라이드 11](docs/presentation/slide-11.png)
 
-| 명령어              | 용도                          |
-| ------------------- | ----------------------------- |
-| `npm run dev`       | 로컬 개발 서버 실행           |
-| `npm test`          | 테스트 실행                   |
-| `npm run build`     | 배포용 `dist` 생성            |
-| `npm run dev:phone` | 휴대폰 확인용 HTTPS 개발 서버 |
+![발표 슬라이드 12](docs/presentation/slide-12.png)
 
-## 미래관 실내 데이터
+![발표 슬라이드 13](docs/presentation/slide-13.png)
 
-| 구분                  | 위치                                 | 관리 방법                                                                  |
-| --------------------- | ------------------------------------ | -------------------------------------------------------------------------- |
-| 실내 모델·보행 그래프 | `data/mirae/mirae.glb`, `mirae.json` | 공개 실행 데이터. `python scripts/extract-mirae.py <v6 index.html>`로 생성 |
-| 카메라 위치·자세      | `data/mirae/sv.json`                 | 공개 실행 데이터. 원본 사진 ID와 좌표·층·회전만 포함                       |
-| AR 특징 인덱스        | `data/mirae/ar-index.bin`            | 공개 파생 데이터. `python scripts/build-ar-index.py`로 생성                |
-| 출입구·좌표 변환      | `data/mirae/entrances.json`          | 공개 실행 데이터                                                           |
-| 검증용 원본 프레임    | `private/mirae/sv/*.jpg`             | **커밋·배포 금지**. 팀 공유가 필요하면 접근 제한 저장소 사용               |
-| 데모                  | `data/mirae/demo.mp4`, `demo.json`   | 공개 시연 데이터. 원본 `room.mp4`는 커밋하지 않음                          |
+![발표 슬라이드 14](docs/presentation/slide-14.png)
 
-`npm run build`는 공개 허용 목록만 `dist/indoor/assets/`에 복사하며, 이전 배포 파일을 먼저 지웁니다.
-실내 데이터의 공개 범위와 갱신 절차는 [실내·AR 데이터 관리](docs/indoor-data.md)를 참고하세요.
-AR 인덱스를 다시 만들 때는 먼저 `python3 -m pip install -r scripts/requirements-ar.txt`를 실행합니다.
+![발표 슬라이드 15](docs/presentation/slide-15.png)
 
-Node.js 24에서 실행을 확인했습니다.
+![발표 슬라이드 16](docs/presentation/slide-16.png)
 
-## 소스 구조
+![발표 슬라이드 17](docs/presentation/slide-17.png)
 
-```text
-src/
-  app.js                    화면 흐름과 UI 연결
-  map.js                    지도 카메라·상호작용·경로 표시
-  map/
-    buildings/
-      catalog.mjs           건물별 외관 등록 정보
-      index.mjs             건물 레이어 생성
-      models/               사진 기반 건물 16개
-      appearance.mjs        공통 외벽·지붕 스타일
-      procedural.mjs        공통 파사드 셰이더·옥상 장식
-      facade-studies.mjs    중앙도서관 외벽 시안
-    landscape/              붕어방·나무·식재·도로 폭 규칙
-  data.mjs                  조사 그래프 연결·건물 이름·등록 출입구
-  survey.mjs                팀 조사 GeoJSON을 보행 그래프에 병합
-  geo.mjs                   좌표·평면 기하 계산
-  routing.mjs               길찾기
-  reports.mjs               길 막힘 제보
-  gis.mjs                   GIS 내보내기
-  schools.json              학교 목록
+![발표 슬라이드 18](docs/presentation/slide-18.png)
 
-data/                       원본 지리 데이터·현장 조사 양식
-scripts/                    개발·빌드·데이터 준비
-tests/                     자동 검증
-dist/                      배포 파일 (`npm run build`로 갱신)
-```
+![발표 슬라이드 19](docs/presentation/slide-19.png)
 
-건물의 형태·색·등록 방법은 [건물 디자인 관리](BUILDING-DESIGN.md)를 참고하세요. 건물 외관 수정은 `src/map/buildings/`에서 진행하고, 생성된 `dist/app.js`는 직접 편집하지 않습니다.
-
-출입구는 `data/team-survey.json`을 기준으로 표시하고 길찾기에 연결합니다. `src/data.mjs`에 출입구 좌표를 따로 적지 않습니다. 조사된 출입구가 없는 건물은 기존 자동 생성 노드로 임시 연결합니다.
-
-## 지도 조작
-
-- 마우스 왼쪽 드래그: 위치 이동, 오른쪽 드래그: 회전·기울이기
-- 지도를 클릭한 뒤 W/S: 확대·축소, A/D: 화면 기준 좌우 이동, Space: 수직 상승, Shift: 수직 하강. 기존 직교 시점과 기울기를 유지하며 카메라와 주시점을 함께 움직입니다. 키를 누르는 동안 부드럽게 가속하고 놓으면 짧게 감속합니다. Ctrl을 함께 누르면 2.5배 빠르게 조작합니다. 검색창 입력 중에는 작동하지 않습니다.
-- 휠: 확대·축소, 방향키: 회전·기울이기, +/−: 확대·축소, 0: 시점 초기화
-- 터치·트랙패드: 한 손가락 드래그(트랙패드는 누른 채 드래그)는 위치 이동, 두 손가락 벌리기·오므리기는 확대·축소, 두 손가락 함께 좌우 이동은 회전·상하 이동은 기울이기. 트랙패드 회전은 클릭 없이 두 손가락 스크롤로 조작합니다.
-
-지도 이동은 실제 캠퍼스 외곽선 안으로 제한합니다. 키보드·마우스·터치·확대·회전 처리 후 화면 중앙이 바라보는 지면 좌표를 제한해 캠퍼스 전체가 화면 밖으로 사라지지 않도록 합니다. 가장자리의 배경 여백은 보일 수 있습니다.
+![발표 슬라이드 20](docs/presentation/slide-20.png)
