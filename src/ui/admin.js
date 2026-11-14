@@ -24,15 +24,8 @@ import {
 import { BUILDINGS } from "../data.mjs";
 import { setupEditMode, EDIT_MODE } from "../edit-mode.js";
 import { $, $$, side, el } from "./dom.mjs";
-import {
-  map,
-  clusters,
-  reporting,
-  toast,
-  loadReports,
-  loadShortcuts,
-  stopShortcutPicking,
-} from "../app.js";
+import { map, toast, loadShortcuts, stopShortcutPicking } from "../app.js";
+import { clusters, reporting, loadReports } from "./report.js";
 
 // 관리자 로그인 상태(Supabase Auth가 알려 줌)와 등록된 건물 공사 목록
 export let adminAuthenticated = false;
