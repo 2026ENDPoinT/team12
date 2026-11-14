@@ -1,6 +1,7 @@
 // AR 위치 인식 워커: 화면이 끊기지 않도록 사진 비교와 입자 필터를 별도 스레드에서 돌립니다.
 import { Localizer } from "./pf.mjs";
 import { makeWalk } from "../model.mjs";
+import { validateReferenceData } from "./reference-data.mjs";
 
 let loc = null;
 const reply = (type, r, extra = {}) => self.postMessage({ type, r, ...extra });
@@ -10,19 +11,29 @@ self.onmessage = async (e) => {
   if (m.type === "init") {
     try {
       const [idx, sv] = await Promise.all([
-        fetch(m.indexUrl).then((r) => {
+        fetch(m.indexUrl, {
+          cache: "no-cache",
+          credentials: "same-origin",
+        }).then((r) => {
           if (!r.ok) throw new Error(`기준 데이터 ${r.status}`);
           return r.arrayBuffer();
         }),
-        fetch(m.svUrl).then((r) => r.json()),
+        fetch(m.svUrl, { cache: "no-cache", credentials: "same-origin" }).then(
+          (r) => {
+            if (!r.ok) throw new Error(`기준 메타데이터 ${r.status}`);
+            return r.json();
+          },
+        ),
       ]);
+      const index = new Uint8Array(idx);
+      const shots = validateReferenceData(index, sv);
       loc = new Localizer({
-        index: new Uint8Array(idx),
-        shots: sv.shots,
+        index,
+        shots,
         walk: makeWalk(m.grid),
         portals: m.portals || [],
       });
-      self.postMessage({ type: "ready", shots: sv.shots.length });
+      self.postMessage({ type: "ready", shots: shots.length });
     } catch (err) {
       self.postMessage({
         type: "error",

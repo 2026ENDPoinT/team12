@@ -32,22 +32,27 @@ npm run dev
 
 ## 명령어
 
-| 명령어 | 용도 |
-| --- | --- |
-| `npm run dev` | 로컬 개발 서버 실행 |
-| `npm test` | 테스트 실행 |
-| `npm run build` | 배포용 `dist` 생성 |
+| 명령어              | 용도                          |
+| ------------------- | ----------------------------- |
+| `npm run dev`       | 로컬 개발 서버 실행           |
+| `npm test`          | 테스트 실행                   |
+| `npm run build`     | 배포용 `dist` 생성            |
 | `npm run dev:phone` | 휴대폰 확인용 HTTPS 개발 서버 |
 
-## 미래관 실내 데이터 (`data/mirae/`)
+## 미래관 실내 데이터
 
-| 파일 | 만드는 방법 |
-| --- | --- |
-| `mirae.glb`, `mirae.json` | `python scripts/extract-mirae.py <v6 index.html>` |
-| `ar-index.bin` | `python scripts/build-ar-index.py <원본 sv 폴더> data/mirae/sv.json data/mirae/ar-index.bin` |
-| `sv/`, `sv.json` | 촬영 영상 프레임(480×270로 축소)과 카메라 자세 |
-| `entrances.json` | 도면 ↔ 캠퍼스 좌표 변환, 실내 출입구 |
-| `demo.mp4`, `demo.json` | AR 데모용 영상 구간 (원본 `room.mp4`는 커밋하지 않음) |
+| 구분                  | 위치                                 | 관리 방법                                                                  |
+| --------------------- | ------------------------------------ | -------------------------------------------------------------------------- |
+| 실내 모델·보행 그래프 | `data/mirae/mirae.glb`, `mirae.json` | 공개 실행 데이터. `python scripts/extract-mirae.py <v6 index.html>`로 생성 |
+| 카메라 위치·자세      | `data/mirae/sv.json`                 | 공개 실행 데이터. 원본 사진 ID와 좌표·층·회전만 포함                       |
+| AR 특징 인덱스        | `data/mirae/ar-index.bin`            | 공개 파생 데이터. `python scripts/build-ar-index.py`로 생성                |
+| 출입구·좌표 변환      | `data/mirae/entrances.json`          | 공개 실행 데이터                                                           |
+| 검증용 원본 프레임    | `private/mirae/sv/*.jpg`             | **커밋·배포 금지**. 팀 공유가 필요하면 접근 제한 저장소 사용               |
+| 데모                  | `data/mirae/demo.mp4`, `demo.json`   | 공개 시연 데이터. 원본 `room.mp4`는 커밋하지 않음                          |
+
+`npm run build`는 공개 허용 목록만 `dist/indoor/assets/`에 복사하며, 이전 배포 파일을 먼저 지웁니다.
+실내 데이터의 공개 범위와 갱신 절차는 [실내·AR 데이터 관리](docs/indoor-data.md)를 참고하세요.
+AR 인덱스를 다시 만들 때는 먼저 `python3 -m pip install -r scripts/requirements-ar.txt`를 실행합니다.
 
 Node.js 24에서 실행을 확인했습니다.
 

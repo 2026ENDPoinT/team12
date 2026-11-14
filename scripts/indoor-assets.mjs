@@ -1,10 +1,9 @@
-import { cp, mkdir, readdir, stat } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { copyFile, mkdir, rm, stat } from "node:fs/promises";
+import { join } from "node:path";
 
-// data/mirae → dist/indoor/assets 복사 (바뀐 파일만). dist/indoor/assets는 커밋하지 않습니다.
-const SRC = "data/mirae",
-  OUT = "dist/indoor/assets";
-const FILES = [
+// GitHub Pages에서 공개해도 되는 실행용 파생 데이터만 허용합니다.
+// 촬영 원본(private/mirae/sv)은 이 목록에 넣지 않습니다.
+export const PUBLIC_INDOOR_ASSETS = Object.freeze([
   "mirae.glb",
   "mirae.json",
   "sv.json",
@@ -12,21 +11,21 @@ const FILES = [
   "entrances.json",
   "demo.mp4",
   "demo.json",
-];
+]);
 
-async function copyIfNewer(from, to) {
-  if (!existsSync(from)) return 0;
-  if (existsSync(to) && (await stat(to)).mtimeMs >= (await stat(from)).mtimeMs)
-    return 0;
-  await cp(from, to);
-  return 1;
-}
-export async function copyIndoorAssets() {
-  await mkdir(`${OUT}/sv`, { recursive: true });
-  let n = 0;
-  for (const f of FILES) n += await copyIfNewer(`${SRC}/${f}`, `${OUT}/${f}`);
-  if (existsSync(`${SRC}/sv`))
-    for (const f of await readdir(`${SRC}/sv`))
-      n += await copyIfNewer(`${SRC}/sv/${f}`, `${OUT}/sv/${f}`);
-  return n;
+export async function copyIndoorAssets({
+  src = "data/mirae",
+  out = "dist/indoor/assets",
+} = {}) {
+  // 이전 빌드의 사진이나 삭제된 파일이 배포물에 남지 않게 매번 새로 만듭니다.
+  await rm(out, { recursive: true, force: true });
+  await mkdir(out, { recursive: true });
+
+  for (const name of PUBLIC_INDOOR_ASSETS) {
+    const from = join(src, name);
+    const info = await stat(from).catch(() => null);
+    if (!info?.isFile()) throw new Error(`필수 실내 자산이 없습니다: ${from}`);
+    await copyFile(from, join(out, name));
+  }
+  return PUBLIC_INDOOR_ASSETS.length;
 }

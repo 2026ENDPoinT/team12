@@ -2,12 +2,11 @@
 //  ★ WebXR(안드로이드 크롬 ARCore)이 되면: VIO가 휴대폰 6축 움직임을 cm 단위로 추적하고,
 //    같은 카메라 영상으로 입자 필터가 '건물 ↔ VIO 좌표' 정렬을 잡습니다(xr.js, xr-math.mjs).
 //    경로는 실제 바닥에 고정되고, 방향·속도는 VIO가, 절대 위치는 사진 비교가 맡습니다.
-//  아래 1)~4)는 WebXR이 없는 기기(아이폰 사파리 등)와 데모 영상에서 쓰는 기존 방식입니다.
+//  아래 1)~3)는 WebXR이 없는 기기(아이폰 사파리 등)와 데모 영상에서 쓰는 기존 방식입니다.
 //  1) 화면을 수평 기준으로 펴서 워커로 보내면, 입자 필터가 촬영 사진 비교 + 걸음 + 벽·층 연결을
 //     시간에 따라 합쳐 위치·층·방향(센서 기준 차이)을 추정합니다. (pf.mjs)
 //  2) 걸음은 가속도 봉우리로 세고(보행자 추측항법), 방향은 자이로로 매 프레임 이어 갑니다.
 //  3) 화면에 보이는 위치는 경로 근처면 경로 위에 붙이고 부드럽게 따라가, 경로·화살표가 흔들리지 않게 합니다.
-//  4) ?loc=<주소> 를 주면 위치 계산 서버(특징점 측위)의 결과도 함께 반영합니다(docs/decisions.md 참고).
 import * as THREE from "three";
 import { sampleQuery, blurGray, blurSigma, headingOf } from "./localize.mjs";
 import {
@@ -1169,7 +1168,6 @@ export async function openAR(opts) {
           );
         }
       }
-      remoteFix(now);
     }
 
     // 방향 기준(건물 − 센서)은 천천히 따라가 경로가 좌우로 흔들리지 않게
@@ -1511,50 +1509,6 @@ export async function openAR(opts) {
       b.classList.toggle("on", b.textContent === floorLabel(pose.f));
     floorBox.hidden = !floorBox.hidden;
   };
-
-  // ---- 위치 계산 서버(선택): ?loc=<주소>. 1.5초마다 화면 한 장을 보내 결과를 입자 필터에 반영.
-  // 사진은 서버가 위치 계산에만 쓰고 저장하지 않아야 합니다(docs/decisions.md).
-  const LOC_URL = demo ? null : new URLSearchParams(location.search).get("loc");
-  const shot = LOC_URL ? document.createElement("canvas") : null;
-  let locBusy = false,
-    locLast = 0;
-  function remoteFix(now) {
-    if (!LOC_URL || locBusy || now - locLast < 1500 || !ori) return;
-    const vw = video.videoWidth,
-      vh = video.videoHeight;
-    if (!vw) return;
-    locBusy = true;
-    locLast = now;
-    const sc = 640 / Math.max(vw, vh);
-    shot.width = Math.round(vw * sc);
-    shot.height = Math.round(vh * sc);
-    shot.getContext("2d").drawImage(video, 0, 0, shot.width, shot.height);
-    const R = deviceR(ori);
-    const yaw = (headingOf(R) * 180) / Math.PI;
-    const meta = {
-      R, // 카메라→(센서 기준)세계 회전, 중력 방향 포함
-      fovLong,
-      prior: pose.ok
-        ? { f: pose.f, x: pose.x, y: pose.y, yaw: pose.yaw }
-        : { f: pointAt(route, cum, hintS).f },
-    };
-    shot.toBlob(
-      async (blob) => {
-        try {
-          const fd = new FormData();
-          fd.append("image", blob, "q.jpg");
-          fd.append("meta", JSON.stringify(meta));
-          const res = await fetch(LOC_URL, { method: "POST", body: fd });
-          const r = await res.json();
-          if (!closed && r && r.ok)
-            worker.postMessage({ type: "fix", fix: r, yaw });
-        } catch {}
-        locBusy = false;
-      },
-      "image/jpeg",
-      0.7,
-    );
-  }
 
   // ---- 보조
   function setStatus(kind, text) {
