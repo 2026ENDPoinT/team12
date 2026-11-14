@@ -1,3 +1,9 @@
+# 사이 (SAI)
+
+서울과학기술대학교 3D 캠퍼스 지도와 미래관 실내·AR 길찾기 서비스입니다.
+
+[서비스 바로가기](https://2026endpoint.github.io/team12/)
+
 ![발표 슬라이드 1](docs/presentation/slide-01.png)
 
 ![발표 슬라이드 2](docs/presentation/slide-02.png)
