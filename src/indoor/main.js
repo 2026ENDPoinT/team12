@@ -37,10 +37,7 @@ const state = {
   focusStep: null, // 안내 목록에서 누른 단계(미리 걷기를 여기서 시작)
   sheet: "home",
 };
-let indoor,
-  view,
-  entrances,
-  sv = null;
+let indoor, view, entrances;
 let routePlaces;
 const routeFields = {};
 
@@ -513,9 +510,9 @@ function routeUrl() {
   q.set("from", state.start.id);
   q.set("to", state.dest.key);
   if (state.mode === "elevator") q.set("mode", "elevator");
-  // 시험용 설정(진단 표시·화각·위치 서버)은 주소에 남겨 둠
+  // 시험용 진단 표시와 화각 설정만 주소에 남겨 둠
   const cur = new URLSearchParams(location.search);
-  for (const k of ["debug", "fov", "loc"]) if (cur.has(k)) q.set(k, cur.get(k));
+  for (const k of ["debug", "fov"]) if (cur.has(k)) q.set(k, cur.get(k));
   return `${location.pathname}?${q}`;
 }
 $("#route-share").onclick = async () => {
@@ -638,44 +635,10 @@ function frameRoute() {
   view.fit(x0, y0, x1, y1, use[0].f, sheetCover());
 }
 
-async function loadSV() {
-  if (!sv) sv = await fetch(A + "sv.json").then((r) => r.json());
-  return sv;
-}
-// 위치·방향에 맞는 실제 사진
-function photoNear(x, y, f, yaw, R = 3.5, maxA = 45) {
-  if (!sv) return null;
-  let best = null;
-  for (const s of sv.shots) {
-    if (s.f !== f) continue;
-    const d = Math.hypot(s.x - x, s.y - y);
-    if (d > R) continue;
-    const a =
-      yaw == null ? 0 : Math.abs(((((s.yaw - yaw) % 360) + 540) % 360) - 180);
-    if (a > maxA) continue;
-    const sc = d + a * 0.05;
-    if (!best || sc < best[0]) best = [sc, s];
-  }
-  return best && best[1];
-}
-const photoUrl = (s) => `${A}sv/${String(s.id).padStart(5, "0")}.jpg`;
-// 단계를 시작할 때 바라보는 방향(사진 고르기용)
-function stepHeading(st) {
-  const r = state.route,
-    cum = routeMetrics(r);
-  const a = pointAt(r, cum, st.s + 0.3),
-    b = pointAt(r, cum, st.s + 3);
-  return Math.hypot(b.x - a.x, b.y - a.y) > 0.5
-    ? (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI
-    : null;
-}
-
-async function renderSteps() {
+function renderSteps() {
   const ol = $("#route-steps");
   ol.replaceChildren();
   const steps = state.steps;
-  await loadSV().catch(() => null);
-  if (state.steps !== steps) return;
   steps.forEach((st, i) => {
     const li = el(
       "li",
@@ -695,16 +658,6 @@ async function renderSteps() {
     if (st.sub && st.kind !== "start") meta.push(st.sub);
     txt.append(el("small", "", meta.join(" · ")));
     li.append(ico, txt);
-    if (st.kind !== "start" && st.kind !== "arrive" && st.kind !== "elev") {
-      const ph = photoNear(st.at[0], st.at[1], st.f, stepHeading(st));
-      if (ph) {
-        const img = el("img");
-        img.loading = "lazy";
-        img.alt = "이 지점의 실제 모습";
-        img.src = photoUrl(ph);
-        li.append(img);
-      }
-    }
     li.onclick = () => focusStep(i);
     li.tabIndex = 0;
     li.setAttribute("role", "button");
@@ -750,9 +703,8 @@ for (const b of $$(".voice-btn"))
 // ---------- 미리 걷기 (1인칭 애니메이션)
 const WALK_STOP = 3.2; // 도착 표시 앞에서 멈추는 거리(m): 표시가 화면에 보이게
 let walking = null;
-$("#walk-open").onclick = async () => {
+$("#walk-open").onclick = () => {
   if (!state.route) return;
-  await loadSV().catch(() => null);
   const r = state.route,
     cum = routeMetrics(r);
   const total = cum[cum.length - 1];
@@ -765,7 +717,6 @@ $("#walk-open").onclick = async () => {
     end: Math.max(0, total - WALK_STOP),
     yaw: null,
     last: performance.now(),
-    shot: null,
     playing: true,
     speed: 1,
     step: -1,
@@ -940,16 +891,6 @@ function walkStep(now) {
     true,
   );
   card.append(arrow, t);
-  // 실제 사진
-  const ph = photoNear(p.x, p.y, p.f, w.yaw, 3, 40);
-  const fig = $("#walk-photo");
-  if (ph && !w.lift) {
-    if (w.shot !== ph.id) {
-      w.shot = ph.id;
-      fig.querySelector("img").src = photoUrl(ph);
-    }
-    fig.hidden = false;
-  } else fig.hidden = true;
   if (done && w.playing) {
     w.playing = false;
     syncWalkButtons();

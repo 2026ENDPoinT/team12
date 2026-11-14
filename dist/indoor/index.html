@@ -3,6 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta
       name="viewport"
       content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"
     />
@@ -13,7 +18,7 @@
     />
     <title>미래관 실내 · 사이</title>
     <link rel="icon" href="../favicon.svg?v=between" type="image/svg+xml" />
-    <link rel="stylesheet" href="indoor.css" />
+    <link rel="stylesheet" href="indoor.css?v=no-external-font" />
     <link rel="stylesheet" href="indoor-ui.css?v=mobile-top-1" />
   </head>
   <body>
@@ -383,7 +388,9 @@
           aria-label="패널 접기"
           aria-expanded="true"
           aria-controls="search-content"
-        ><i></i></button>
+        >
+          <i></i>
+        </button>
         <div id="search-content" class="search-content">
           <p id="search-hint" class="search-hint" role="status"></p>
           <ul id="search-results" class="results"></ul>
@@ -396,10 +403,6 @@
       <div class="walk-top">
         <div id="walk-step" class="hud-card"></div>
       </div>
-      <figure id="walk-photo" class="walk-photo" hidden>
-        <img alt="이 위치에서 찍은 실제 사진" />
-        <figcaption>실제 사진</figcaption>
-      </figure>
       <div class="walk-bottom">
         <div class="walk-progress"><i id="walk-bar"></i></div>
         <div class="walk-ctrl">

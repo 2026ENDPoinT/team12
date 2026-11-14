@@ -3,9 +3,10 @@ node_modules/
 .DS_Store
 dist/*.map
 dist/indoor/*.map
-# 미래관 실내 자산은 data/mirae에서 빌드 때 복사합니다.
+# 미래관 공개 실내 자산은 data/mirae에서 빌드 때 복사합니다.
 dist/indoor/assets/
-# 원본 촬영 영상(544MB)과 v6 작업 폴더는 커밋하지 않습니다.
+# 위치 인식 원본 프레임·촬영 영상과 v6 작업 폴더는 커밋하지 않습니다.
+private/
 room.mp4
 mirae_map_final_v6/
 # npm run dev:phone 용 자체 서명 인증서
