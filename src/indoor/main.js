@@ -15,6 +15,7 @@ import { uiIcon, setDirectionIcon } from "./ui.mjs";
 import { createRoutePlaces, routePlaceLabel } from "./route-places.mjs";
 import { bindRouteSearch } from "./route-search.mjs";
 import { bindMobilePanel } from "./mobile-panels.mjs";
+import { photoNear, demoRoute } from "./imagery.mjs";
 
 // 휴대폰: 패널·검색창 위에서 두 손가락으로 벌려도 페이지가 확대되지 않게 합니다.
 // 실내 지도(.view) 위의 제스처는 지도 확대·회전에 그대로 씁니다.
@@ -38,6 +39,8 @@ const state = {
   sheet: "home",
 };
 let indoor, view, entrances;
+let imagery = { photos: false }, photos = [];
+const assetUrl = (name) => `${A}${name}${imagery.version ? `?v=${imagery.version}` : ""}`;
 let routePlaces;
 const routeFields = {};
 
@@ -57,13 +60,16 @@ function el(tag, cls, text) {
 
 // ---------- 시작
 async function init() {
-  const [M, E] = await Promise.all([
+  const [M, E, media] = await Promise.all([
     fetch(A + "mirae.json").then((r) => {
       if (!r.ok) throw new Error(`층 데이터 ${r.status}`);
       return r.json();
     }),
     fetch(A + "entrances.json").then((r) => r.json()),
+    fetch(A + "imagery.json").then((r) => r.ok ? r.json() : { photos: false }).catch(() => ({ photos: false })),
   ]);
+  imagery = media;
+  if (imagery.photos) photos = (await fetch(assetUrl("sv.json")).then((r) => r.json())).shots;
   indoor = createIndoor(M);
   entrances = E.entrances;
   routePlaces = createRoutePlaces(indoor, entrances);
@@ -527,7 +533,7 @@ $("#route-share").onclick = async () => {
   } catch {}
 };
 
-function computeRoute() {
+function computeRoute(routeOverride = null) {
   const d = state.dest;
   if (!d || !state.start) {
     state.route = null;
@@ -551,7 +557,7 @@ function computeRoute() {
     syncFloors();
     return;
   }
-  const r = indoor.routeTo(state.start, d, { mode: state.mode });
+  const r = routeOverride || indoor.routeTo(state.start, d, { mode: state.mode });
   syncRouteFields();
   setSheet("route");
   const sum = $("#route-summary");
@@ -658,6 +664,20 @@ function renderSteps() {
     if (st.sub && st.kind !== "start") meta.push(st.sub);
     txt.append(el("small", "", meta.join(" · ")));
     li.append(ico, txt);
+    if (imagery.photos) {
+      const cum = routeMetrics(state.route);
+      const a = pointAt(state.route, cum, st.s + 0.3);
+      const b = pointAt(state.route, cum, st.s + 3);
+      const yaw = Math.hypot(b.x-a.x, b.y-a.y) > 0.5 ? Math.atan2(b.y-a.y, b.x-a.x)*180/Math.PI : null;
+      const shot = photoNear(photos, st.at[0], st.at[1], st.f, yaw);
+      if (shot) {
+        const image = el("img", "step-photo");
+        image.src = assetUrl(`sv/${String(shot.id).padStart(5, "0")}.jpg`);
+        image.alt = `${floorName(st.f)} 안내 지점 실사`;
+        image.loading = "lazy";
+        li.append(image);
+      }
+    }
     li.onclick = () => focusStep(i);
     li.tabIndex = 0;
     li.setAttribute("role", "button");
@@ -859,6 +879,12 @@ function walkStep(now) {
   const d = ((((want - w.yaw) % 360) + 540) % 360) - 180;
   w.yaw += d * Math.min(1, dt * 3.2);
   view.setWalkPose({ x: p.x, y: p.y, z: p.z, f: p.f, yaw: w.yaw, pitch: -0.1 });
+  const shot = imagery.photos ? photoNear(photos, p.x, p.y, p.f, w.yaw) : null;
+  $("#walk-photo").hidden = !shot;
+  if (shot && $("#walk-photo img").dataset.id !== String(shot.id)) {
+    $("#walk-photo img").src = assetUrl(`sv/${String(shot.id).padStart(5, "0")}.jpg`);
+    $("#walk-photo img").dataset.id = shot.id;
+  }
   $("#walk-bar").style.width = `${(w.s / Math.max(0.01, w.end)) * 100}%`;
 
   // 안내 카드: 다음 동작과 남은 거리
@@ -910,6 +936,7 @@ function launchAR(demo) {
     mode: state.mode,
     demo,
     assets: A,
+    assetVersion: imagery.version,
     onDemo: startDemo,
     onRoute: (r, steps) => {
       state.route = r;
@@ -921,12 +948,20 @@ function launchAR(demo) {
 $("#ar-open").onclick = () => launchAR(false);
 $("#demo-open").onclick = startDemo;
 async function startDemo() {
-  const meta = await fetch(A + "demo.json").then((r) => r.json());
+  const meta = await fetch(assetUrl("demo.json")).then((r) => r.json());
+  const fromPlace = indoor.findDest(meta.from);
   const ent = entrances.find((e) => e.id === meta.from) || entrances[0];
-  setStart(entranceStart(ent));
+  let start = fromPlace ? placeStart(fromPlace) : entranceStart(ent);
+  if (meta.start && indoor.floors.includes(meta.start.f) && [meta.start.x,meta.start.y].every(Number.isFinite)) {
+    const point = indoor.nearest(meta.start.f, meta.start.x, meta.start.y, 3);
+    if (!point) throw new Error("데모 시작점이 보행 가능한 복도에 없습니다.");
+    start = { ...start, f: meta.start.f, x: point[0], y: point[1], name: meta.start.name || start.name };
+  }
+  setStart(start);
   state.dest = indoor.findDest(meta.to);
+  if (!state.dest) throw new Error("데모 도착 호실을 찾을 수 없습니다.");
   setMode("stairs", false);
-  computeRoute();
+  computeRoute(demoRoute(indoor.routeTo(state.start, state.dest), meta, indoor));
   launchAR(true);
 }
 

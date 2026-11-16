@@ -19,6 +19,14 @@ import numpy as np, cv2
 AZ_N, EL_N, STEP, EL_TOP = 46, 20, 2.0, 12.0
 
 
+def camera_intrinsics(sv, shot):
+    camera = sv.get("videos", {}).get(shot.get("v"), {})
+    K = camera.get("K", sv.get("K"))
+    if K is None or len(K) != 6 or not all(math.isfinite(v) for v in K):
+        raise ValueError(f"Invalid camera intrinsics for shot {shot['id']}")
+    return K
+
+
 def strip_rays():
     az = -AZ_N + STEP / 2 + np.arange(AZ_N) * STEP  # -45..45
     el = EL_TOP - STEP / 2 - np.arange(EL_N) * STEP  # 11..-27
@@ -52,15 +60,15 @@ def main():
         raise SystemExit(f"원본 프레임 폴더가 없습니다: {img_dir}")
     if not sv_path.is_file():
         raise SystemExit(f"카메라 자세 파일이 없습니다: {sv_path}")
-    sv = json.loads(sv_path.read_text())
-    K = sv["K"]
+    sv = json.loads(sv_path.read_text(encoding="utf8"))
     strips = []
     for s in sv["shots"]:
+        K = camera_intrinsics(sv, s)
         image_path = img_dir / f"{s['id']:05d}.jpg"
         g = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
         if g is None:
             raise SystemExit(f"원본 프레임을 읽을 수 없습니다: {image_path}")
-        if g.shape[1] != K[4]:
+        if (g.shape[1], g.shape[0]) != (K[4], K[5]):
             g = cv2.resize(g, (int(K[4]), int(K[5])), interpolation=cv2.INTER_AREA)
         strips.append(make_strip(g, K, s["R"], s["yaw"]))
     data = np.stack(strips)

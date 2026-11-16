@@ -38,7 +38,7 @@ await build({
   format: "iife",
   outfile: "dist/indoor/ar-worker.js",
 });
-await copyIndoorAssets();
+await copyIndoorAssets({ includeLocal: process.argv.includes("--local") });
 await mkdir("dist/data", { recursive: true });
 await copyFile("data/seoultech.json", "dist/data/seoultech.json");
 await copyFile(

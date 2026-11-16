@@ -19,7 +19,7 @@
     <title>미래관 실내 · 사이</title>
     <link rel="icon" href="../favicon.svg?v=between" type="image/svg+xml" />
     <link rel="stylesheet" href="indoor.css?v=no-external-font" />
-    <link rel="stylesheet" href="indoor-ui.css?v=mobile-top-1" />
+    <link rel="stylesheet" href="indoor-ui.css?v=reshoot-v2" />
   </head>
   <body>
     <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg">
@@ -403,6 +403,10 @@
       <div class="walk-top">
         <div id="walk-step" class="hud-card"></div>
       </div>
+      <figure id="walk-photo" class="walk-photo" hidden>
+        <img alt="이 위치에서 촬영한 실사 사진" />
+        <figcaption>실제 사진</figcaption>
+      </figure>
       <div class="walk-bottom">
         <div class="walk-progress"><i id="walk-bar"></i></div>
         <div class="walk-ctrl">
@@ -562,6 +566,6 @@
     </div>
 
     <div id="toast" class="toast" role="status" hidden></div>
-    <script src="indoor.js?v=no-page-zoom-1" defer></script>
+    <script src="indoor.js?v=reshoot-v2" defer></script>
   </body>
 </html>

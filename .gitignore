@@ -9,6 +9,12 @@ dist/indoor/assets/
 private/
 room.mp4
 mirae_map_final_v6/
+# 로컬 재촬영 원본·패키지·생성 자산은 Git에 올리지 않습니다.
+/mirae_reshoot_v2.tar.gz
+/mirae_reshoot_v2/
+/2층.mp4
+/data/mirae-local/
+__pycache__/
 # npm run dev:phone 용 자체 서명 인증서
 .cert/
 dist/editor.js
@@ -19,3 +25,5 @@ dist/editor.js
 # Supabase CLI 로컬 상태
 supabase/.temp/
 supabase/.branches/
+# 데모 녹화 결과물(영상·로그)은 Git에 올리지 않습니다.
+/demo-output/
