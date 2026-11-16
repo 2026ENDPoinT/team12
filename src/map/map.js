@@ -456,6 +456,43 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   // 경로를 따라 걷는 마스코트(테크뇽). 처음 경로를 그릴 때 한 번만 만들고 재사용합니다.
   const WALKER_SCALE = 8,
     WALKER_Y = 1.9;
+  // 테크뇽은 서울과기대 마스코트라 다른 학교는 예전 기본 표시(경로: 연두 구, 내 위치: 파란 점)를 씁니다.
+  const useMascot = !!CAMPUS.features.mascot;
+  // 경로를 따라 움직이는 표시. lift: 지면에서 표시 기준점까지 높이.
+  function createRouteWalker() {
+    if (useMascot) {
+      const mascot = createTechnyong();
+      mascot.object.scale.setScalar(WALKER_SCALE);
+      return { ...mascot, lift: WALKER_Y };
+    }
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(2.1, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xd5ff76 }),
+    );
+    return { object: dot, update() {}, lift: 4 };
+  }
+  // 내 위치 표시(흰 테두리 userBase·정확도 원은 공통).
+  function createUserMarker() {
+    if (useMascot) {
+      const mascot = createTechnyong();
+      mascot.object.scale.setScalar(7.5);
+      mascot.object.position.y = 2.3;
+      mascot.object.rotation.y = Math.PI;
+      return mascot;
+    }
+    const group = new THREE.Group(),
+      dot = new THREE.Mesh(
+        new THREE.CircleGeometry(4.5, 32),
+        new THREE.MeshBasicMaterial({ color: 0x2878f0, depthTest: false }),
+      );
+    dot.rotation.x = -Math.PI / 2;
+    dot.position.y = 0.9;
+    dot.renderOrder = 5;
+    group.add(dot);
+    group.position.y = 2.3;
+    group.rotation.y = Math.PI;
+    return { object: group, update() {} };
+  }
   // GPS 표시는 파란 점 대신 테크뇽으로 한 번만 만들어 위치만 갱신합니다.
   const userAccuracy = new THREE.Mesh(
       new THREE.CircleGeometry(1, 48),
@@ -570,14 +607,11 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
       routeGroup.add(ring);
     }
     if (routeCurve.curves.length) {
-      if (!technyong) {
-        technyong = createTechnyong();
-        technyong.object.scale.setScalar(WALKER_SCALE);
-      }
+      if (!technyong) technyong = createRouteWalker();
       // clearGroup은 메시만 정리하므로 재사용하는 마스코트 그룹은 지워지지 않고 떼어지기만 합니다.
       movingDot = technyong.object;
       movingDot.visible = routeMascotVisible;
-      movingDot.position.set(origin.x, origin.y - 1.8 + WALKER_Y, origin.z);
+      movingDot.position.set(origin.x, origin.y - 1.8 + technyong.lift, origin.z);
       walkerHeading = null;
       placeWalker(0, 0, 0, false);
       routeGroup.add(movingDot);
@@ -714,10 +748,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     }
     userLocationGroup.visible = true;
     if (!userTechnyong) {
-      userTechnyong = createTechnyong();
-      userTechnyong.object.scale.setScalar(7.5);
-      userTechnyong.object.position.y = 2.3;
-      userTechnyong.object.rotation.y = Math.PI;
+      userTechnyong = createUserMarker();
       userLocationGroup.add(userTechnyong.object);
       setMascotOverlay(navigationMode);
     }
@@ -1331,7 +1362,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   function placeWalker(u, t, dt, moving) {
     routeCurve.getPoint(u, movingDot.position);
     // 경로선 점은 지면 위 1.8m이므로 마스코트 발 높이로 맞춥니다.
-    movingDot.position.y += WALKER_Y - 1.8;
+    movingDot.position.y += technyong.lift - 1.8;
     const tangent = routeCurve.getTangent(Math.min(u, 0.999));
     const target = Math.atan2(tangent.x, tangent.z);
     if (walkerHeading === null || dt === 0) walkerHeading = target;

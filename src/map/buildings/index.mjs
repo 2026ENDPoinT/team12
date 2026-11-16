@@ -24,6 +24,11 @@ import { createTechnoparkBuilding } from "./models/technopark.mjs";
 import { createAdminBuilding } from "./models/admin.mjs";
 import { createHyeseongBuilding } from "./models/hyeseong.mjs";
 import { createInternationalBuilding } from "./models/international.mjs";
+import {
+  createPnuAdminBuilding,
+  createPnuHumanitiesBuilding,
+  createPnuWoonjukjeongBuilding,
+} from "./models/pnu.mjs";
 
 const MODEL_FACTORIES = {
   future: createFutureBuilding,
@@ -42,6 +47,10 @@ const MODEL_FACTORIES = {
   admin: createAdminBuilding,
   hyeseong: createHyeseongBuilding,
   international: createInternationalBuilding,
+  // 부산대학교
+  "pnu-admin": createPnuAdminBuilding,
+  "pnu-humanities": createPnuHumanitiesBuilding,
+  "pnu-woonjukjeong": createPnuWoonjukjeongBuilding,
 };
 
 function createRoof(building) {

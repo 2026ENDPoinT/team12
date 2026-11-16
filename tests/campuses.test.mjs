@@ -90,3 +90,19 @@ test("다른 학교를 열었다가 돌아오면 서울과기대 데이터가 �
   assert.ok(data.PLACES.some((p) => p.id === "future"));
   assert.equal(data.previewPlaceId(), "future");
 });
+
+test("부산대: 학교 공개 건물 현황표 층수와 건물번호가 들어 있고 카드 형식으로 보인다", async () => {
+  const { floorRange } = await import("../src/ui/building-info.mjs");
+  assert.equal(floorRange(10, 1), "B1 · 1F–10F");
+  assert.equal(floorRange(8, 2), "B2–B1 · 1F–8F");
+  assert.equal(floorRange(1, 0), "1F");
+  const pusan = load(campusById("pusan"));
+  const byName = (name) => pusan.buildings.find((b) => b.name === name);
+  assert.deepEqual(
+    ["대학본부", "인문관", "새벽벌도서관(제2도서관)"].map((n) => [byName(n).number, byName(n).floors]),
+    [["205", 10], ["306", 4], ["420", 4]],
+  );
+  const official = pusan.buildings.filter((b) => b.heightSource === "official");
+  assert.ok(official.length >= 60);
+  for (const b of official) assert.equal(b.h, b.floors * 4);
+});

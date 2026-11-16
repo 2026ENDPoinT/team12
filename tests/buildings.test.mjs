@@ -141,11 +141,17 @@ test("building registry creates all visible buildings with valid interaction rec
     assert(layer.pickables.includes(record.body));
   }
   for (const mesh of layer.pickables) assert(ids.has(mesh.userData.building));
+  // 디자인은 서울과기대 또는 다른 학교(data/campuses) 건물 중 하나여야 합니다.
+  const { CAMPUSES } = await import("../src/campus/registry.mjs");
+  const { readFileSync } = await import("node:fs");
+  const allIds = new Set(BUILDINGS.map((b) => b.id));
+  for (const campus of CAMPUSES.filter((c) => c.id !== "seoultech"))
+    for (const b of JSON.parse(
+      readFileSync(new URL(`../${campus.data}`, import.meta.url), "utf8"),
+    ).buildings)
+      allIds.add(b.id);
   for (const [id, design] of Object.entries(BUILDING_DESIGNS)) {
-    assert(
-      BUILDINGS.some((b) => b.id === id),
-      `Unknown design ID: ${id}`,
-    );
+    assert(allIds.has(id), `Unknown design ID: ${id}`);
     if (design.model)
       assert(!design.facadeStudy, `Conflicting facade modes: ${id}`);
   }
@@ -196,4 +202,36 @@ test("activeWorks keeps ongoing/upcoming works and drops ended or malformed rows
   assert.equal(worksPeriod(works[0]), "2026.11.01 ~ 2026.12.20");
   assert.equal(activeWorks(null).length, 0);
   assert.equal(today(new Date(2026, 0, 5)), "2026-01-05");
+});
+
+test("부산대 건물 레이어: 전용 모델 3개와 공통 외벽이 지형 위에 유효하게 만들어진다", async () => {
+  const data = await import("../src/campus/data.mjs");
+  const { campusById } = await import("../src/campus/registry.mjs");
+  const { readFileSync } = await import("node:fs");
+  const { createBuildingLayer } = await import("../src/map/buildings/index.mjs");
+  const { getBuildingDesign } = await import("../src/map/buildings/catalog.mjs");
+  const seoultech = JSON.parse(readFileSync(new URL("../data/seoultech.json", import.meta.url), "utf8"));
+  const survey = JSON.parse(readFileSync(new URL("../data/team-survey.json", import.meta.url), "utf8"));
+  const pusan = campusById("pusan");
+  try {
+    data.useCampus(pusan, JSON.parse(readFileSync(new URL(`../${pusan.data}`, import.meta.url), "utf8")));
+    const layer = createBuildingLayer(data.BUILDINGS, data.ENTRANCES, data.TERRAIN);
+    const models = layer.records.filter((r) => getBuildingDesign(r.b.id).model);
+    assert.deepEqual(models.map((r) => r.b.name).sort(), ["대학본부", "운죽정", "인문관"]);
+    for (const record of layer.records) {
+      assert(record.body.isMesh);
+      assert(Number.isFinite(record.base) && record.base >= 0, "지형 바닥 높이");
+      assert(Number.isFinite(record.height) && record.height > 0);
+    }
+    // 대학본부는 공식 지상 10층이므로 탑이 저층부보다 높아야 함
+    const admin = models.find((r) => r.b.name === "대학본부");
+    assert(admin.height > 40);
+    layer.group.updateMatrixWorld(true);
+    layer.group.traverse((object) => {
+      assert(object.matrixWorld.elements.every(Number.isFinite));
+      if (object.isInstancedMesh) assert(object.instanceMatrix.array.every(Number.isFinite));
+    });
+  } finally {
+    data.useCampus(campusById("seoultech"), seoultech, survey);
+  }
 });

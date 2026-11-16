@@ -37,6 +37,19 @@ export const BUILDING_DESIGNS = {
   student2: { colors: { wall: 0xc99e72, glass: 0x607d83 } },
   creative: { colors: { wall: 0xd1b480, glass: 0x617c82 } },
   library: { facadeStudy: "vertical-glass" },
+  // 부산대학교(ID = pusan-w<OSM way>). 사진 출처는 models/pnu.mjs 참고.
+  "pusan-w108067609": {
+    model: "pnu-admin",
+    colors: { wall: 0xd5d5ce, glass: 0x5f7f95 },
+  },
+  "pusan-w108072568": {
+    model: "pnu-humanities",
+    colors: { wall: 0xeceeea, glass: 0x6f9bb8 },
+  },
+  "pusan-w472078880": {
+    model: "pnu-woonjukjeong",
+    colors: { wall: 0x8a6a4f, glass: 0x8fb0b5 },
+  },
   "vw-77": {
     hidden: true,
     note: "Duplicate unnamed volume overlapping the administration entrance.",
