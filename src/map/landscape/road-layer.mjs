@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { roadDimensions } from "./roads.mjs";
 import { createGroundMaterial } from "./ground-materials.mjs";
+import { drapeGeometry } from "../terrain-drape.mjs";
 
 const JOIN_SIDES = 16;
 const JOIN_RING = Array.from({ length: JOIN_SIDES }, (_, i) => {
@@ -77,7 +78,8 @@ function createCrosswalkMarkings(crosswalks) {
   return positions;
 }
 
-export function createRoadLayer(roads, crosswalks = []) {
+// terrain이 있으면 길 면을 잘게 나눠 지형 높이에 맞춥니다(terrain-drape.mjs).
+export function createRoadLayer(roads, crosswalks = [], terrain = null) {
   const batches = { curb: [], vehicle: [], walk: [], steps: [] };
   for (const road of roads) {
     if (road.points.length < 2) continue;
@@ -111,12 +113,13 @@ export function createRoadLayer(roads, crosswalks = []) {
       materials[kind].dispose();
       continue;
     }
-    const geometry = new THREE.BufferGeometry();
+    let geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
       "position",
       new THREE.Float32BufferAttribute(positions, 3),
     );
     geometry.computeVertexNormals();
+    geometry = drapeGeometry(geometry, terrain, 4);
     const mesh = new THREE.Mesh(geometry, materials[kind]);
     mesh.name = `roads-${kind}`;
     mesh.receiveShadow = true;

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { networkInterfaces } from "node:os";
 import { copyIndoorAssets } from "./indoor-assets.mjs";
+import { copyCampusData } from "./campus-data.mjs";
 
 // IntelliJ 터미널에서 npm run dev 실행 → 파일 저장 → 브라우저 새로고침.
 // app.js(앱)·editor.js(?edit=1 편집기)·미래관 실내 지도를 함께 빌드합니다.
@@ -18,7 +19,7 @@ const opts = {
 const contexts = await Promise.all([
   context({
     ...opts,
-    entryPoints: { app: "src/app.js", editor: "src/editor/index.js" },
+    entryPoints: { app: "src/main.js", editor: "src/editor/index.js" },
     outdir: "dist",
   }),
   context({
@@ -33,6 +34,7 @@ const contexts = await Promise.all([
   }),
 ]);
 await copyIndoorAssets({ includeLocal: true });
+await copyCampusData();
 await Promise.all(contexts.map((c) => c.watch()));
 
 const serveOpts = {

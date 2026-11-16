@@ -40,7 +40,14 @@ export function deadEnds(nodes, edges) {
   );
 }
 
-export function createGraphOverlay({ THREE, scene, CSS2DObject }) {
+// groundAt(x, z): 지면 높이(지형이 없으면 0). 선·점을 지면 위 Y만큼 띄워 그립니다.
+export function createGraphOverlay({
+  THREE,
+  scene,
+  CSS2DObject,
+  groundAt = () => 0,
+}) {
+  const at = (n, lift = Y) => groundAt(n.x, n.z) + lift;
   const group = new THREE.Group();
   group.visible = false;
   group.renderOrder = 6;
@@ -85,7 +92,7 @@ export function createGraphOverlay({ THREE, scene, CSS2DObject }) {
     geometry.setAttribute(
       "position",
       new THREE.Float32BufferAttribute(
-        list.flatMap((n) => [n.x, Y + 0.1, n.z]),
+        list.flatMap((n) => [n.x, at(n, Y + 0.1), n.z]),
         3,
       ),
     );
@@ -111,7 +118,7 @@ export function createGraphOverlay({ THREE, scene, CSS2DObject }) {
       "padding:2px 6px;border-radius:4px;white-space:nowrap;pointer-events:none;" +
       "transform:translateY(-14px)";
     const object = new CSS2DObject(element);
-    object.position.set(node.x, Y, node.z);
+    object.position.set(node.x, at(node), node.z);
     object.visible = enabled && !hidden;
     scene.add(object);
     labels.push(object);
@@ -133,7 +140,7 @@ export function createGraphOverlay({ THREE, scene, CSS2DObject }) {
       if (!a || !b) continue;
       const style = edgeStyle(edge);
       if (!byStyle.has(style)) byStyle.set(style, []);
-      byStyle.get(style).push(a.x, Y, a.z, b.x, Y, b.z);
+      byStyle.get(style).push(a.x, at(a), a.z, b.x, at(b), b.z);
     }
     for (const [style, positions] of byStyle)
       lines(positions, OVERLAY_STYLES[style].color);
@@ -174,16 +181,18 @@ export function createGraphOverlay({ THREE, scene, CSS2DObject }) {
   function bar(a, b, width, color, y) {
     const length = Math.hypot(b.x - a.x, b.z - a.z);
     if (length < 0.01) return;
+    const ya = at(a, y),
+      yb = at(b, y);
     const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(width, 0.2, length),
+      new THREE.BoxGeometry(width, 0.2, Math.hypot(length, yb - ya)),
       new THREE.MeshBasicMaterial({
         color,
         depthTest: false,
         transparent: true,
       }),
     );
-    mesh.position.set((a.x + b.x) / 2, y, (a.z + b.z) / 2);
-    mesh.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
+    mesh.position.set((a.x + b.x) / 2, (ya + yb) / 2, (a.z + b.z) / 2);
+    mesh.lookAt(b.x, yb, b.z);
     mesh.renderOrder = 8;
     preview.add(mesh);
   }
@@ -212,11 +221,11 @@ export function createGraphOverlay({ THREE, scene, CSS2DObject }) {
         const length = Math.hypot(b.x - a.x, b.z - a.z);
         for (let s = 0; s < length; s += 5) {
           const e = Math.min(s + 3, length),
-            at = (t) => ({
+            along = (t) => ({
               x: a.x + ((b.x - a.x) * t) / length,
               z: a.z + ((b.z - a.z) * t) / length,
             });
-          bar(at(s), at(e), width, color, y);
+          bar(along(s), along(e), width, color, y);
         }
       }
     }
@@ -230,7 +239,7 @@ export function createGraphOverlay({ THREE, scene, CSS2DObject }) {
         }),
       );
       mesh.rotation.x = -Math.PI / 2;
-      mesh.position.set(dot.x, Y + 0.6, dot.z);
+      mesh.position.set(dot.x, at(dot, Y + 0.6), dot.z);
       mesh.renderOrder = 9;
       preview.add(mesh);
     }

@@ -1,5 +1,6 @@
 // One place for model selection, color overrides, facade studies and visibility.
 // Geometry and photo proportions remain in models/. Source GIS stays in data/.
+import { LANDMARK_DESIGNS } from "./landmark-designs.mjs";
 export const BUILDING_DESIGNS = {
   future: { model: "future", colors: { wall: 0xdde3df, glass: 0x437d83 } },
   "way-579071105": {
@@ -37,6 +38,7 @@ export const BUILDING_DESIGNS = {
   student2: { colors: { wall: 0xc99e72, glass: 0x607d83 } },
   creative: { colors: { wall: 0xd1b480, glass: 0x617c82 } },
   library: { facadeStudy: "vertical-glass" },
+  ...LANDMARK_DESIGNS,
   "vw-77": {
     hidden: true,
     note: "Duplicate unnamed volume overlapping the administration entrance.",

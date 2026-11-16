@@ -112,5 +112,6 @@ test("on the campus graph, a point mid-way on a long path routes forward along i
     at = attachGps(point, { nodes: NODES, edges: EDGES }, { buildings: BUILDINGS });
   assert.equal(at.kind, "edge");
   const route = shortestPath(at.nodeId, edge.b, "shortest", at.graph.nodes, at.graph.edges);
-  assert.ok(route.meters <= edge.meters * 0.7 + 0.1);
+  // 경로 거리는 경사를 포함한 길이라 평면 거리보다 조금 깁니다(경사 20%여도 2% 이내).
+  assert.ok(route.meters <= edge.meters * 0.7 * 1.02 + 0.1);
 });

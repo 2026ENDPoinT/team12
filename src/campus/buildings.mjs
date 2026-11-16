@@ -1,4 +1,4 @@
-import { BUILDINGS } from "./data.mjs";
+import { BUILDINGS, CAMPUS } from "./data.mjs";
 
 // 학교 공식 캠퍼스맵(건물번호순)의 번호입니다.
 // 출처: https://www.seoultech.ac.kr/intro/map 의 캠퍼스맵 PDF. 공식 목록에 없는 건물은 번호 없이 이름만 씁니다.
@@ -39,10 +39,17 @@ export const BUILDING_NUMBERS = {
   테크노큐브: 62,
 };
 
-export const buildingLabel = (b) =>
-  BUILDING_NUMBERS[b.name] ? `${BUILDING_NUMBERS[b.name]} ${b.name}` : b.name;
+// 지금 열린 학교의 건물 번호입니다. 서울과기대는 위 공식 목록, 다른 학교는 지도 데이터의
+// number(OSM ref 등 공개 자료)를 씁니다. 번호가 없으면 undefined.
+export function buildingNumber(name) {
+  if (CAMPUS.features.buildingInfo) return BUILDING_NUMBERS[name];
+  return BUILDINGS.find((b) => b.name === name)?.number || undefined;
+}
 
-const buildingIds = new Set(BUILDINGS.map((b) => b.id));
+export const buildingLabel = (b) => {
+  const number = buildingNumber(b.name);
+  return number ? `${number} ${b.name}` : b.name;
+};
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // 오늘 날짜(YYYY-MM-DD, 기기 시간대 기준). 공사 기간 비교에 씁니다.
@@ -57,7 +64,7 @@ export function activeWorks(rows, day = today()) {
   for (const row of rows || []) {
     if (
       !row ||
-      !buildingIds.has(row.building_id) ||
+      !BUILDINGS.some((b) => b.id === row.building_id) ||
       !DATE.test(row.start_date) ||
       !DATE.test(row.end_date) ||
       row.start_date > row.end_date ||

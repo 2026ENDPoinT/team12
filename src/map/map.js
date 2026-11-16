@@ -23,7 +23,15 @@ import {
   CAMPUS_GEOMETRY,
   ENTRANCES,
   MAIN_GATE,
+  CAMPUS,
+  TERRAIN,
 } from "../campus/data.mjs";
+import {
+  buildingBase,
+  drapedPolygon,
+  drapeGeometry,
+  terrainSkirt,
+} from "./terrain-drape.mjs";
 import {
   locateReportPoint,
   edgeId,
@@ -63,7 +71,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   renderer.domElement.tabIndex = 0;
   renderer.domElement.setAttribute(
     "aria-label",
-    "서울과기대 3D 지도. 왼쪽 드래그 지도 이동, 지도 클릭 후 W/S 확대·축소, A/D 좌우 이동, Space 상승, Shift 하강, Ctrl 가속, 휠·두 손가락 벌리기 확대, 더블클릭 확대, 오른쪽 드래그 회전·기울이기. 터치: 한 손가락 이동, 두 손가락 벌리기 확대, 함께 좌우로 밀기 회전, 위아래로 밀기 기울이기. 신고 모드에서 지도 위치 클릭. 방향키 회전, Enter로 지도 가운데 위치 신고.",
+    `${CAMPUS.short} 3D 지도. 왼쪽 드래그 지도 이동, 지도 클릭 후 W/S 확대·축소, A/D 좌우 이동, Space 상승, Shift 하강, Ctrl 가속, 휠·두 손가락 벌리기 확대, 더블클릭 확대, 오른쪽 드래그 회전·기울이기. 터치: 한 손가락 이동, 두 손가락 벌리기 확대, 함께 좌우로 밀기 회전, 위아래로 밀기 기울이기. 신고 모드에서 지도 위치 클릭. 방향키 회전, Enter로 지도 가운데 위치 신고.`,
   );
   const scene = new THREE.Scene(),
     camera = new THREE.OrthographicCamera(-600, 600, 600, -600, 1, 3500);
@@ -95,12 +103,19 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   sun.position.set(-450, 750, 550);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
+  // 그림자 범위: 기본 ±800m(서울과기대). 더 큰 캠퍼스는 경계가 다 들어가도록 넓힙니다.
+  const shadowHalf = Math.max(
+    800,
+    ...CAMPUS_GEOMETRY.boundary.flat().map(([x, z]) =>
+      Math.ceil(Math.max(Math.abs(x), Math.abs(z)) + 60),
+    ),
+  );
   Object.assign(sun.shadow.camera, {
-    left: -800,
-    right: 800,
-    top: 800,
-    bottom: -800,
-    far: 2500,
+    left: -shadowHalf,
+    right: shadowHalf,
+    top: shadowHalf,
+    bottom: -shadowHalf,
+    far: 2500 + (shadowHalf - 800) * 2,
   });
   sun.shadow.normalBias = 0.45;
   sun.shadow.bias = -0.0002;
@@ -117,19 +132,37 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
       );
     return shape;
   }
+  // 지면 높이(m). 지형 데이터가 없는 학교는 0(평지)입니다(src/campus/terrain.mjs).
+  const ground = (x, z) => TERRAIN.heightAt(x, z);
+  // 지면 위 y만큼 띄운 면. 지형이 있으면 잘게 나눠 지면을 따라갑니다(terrain-drape.mjs).
   function flatPolygon(outline, color, y, holes = []) {
     const mesh = new THREE.Mesh(
-      new THREE.ShapeGeometry(shapeFor(outline, holes)),
+      drapedPolygon(outline, holes, y, TERRAIN),
       matte(color),
     );
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.y = y;
     mesh.receiveShadow = true;
     scene.add(mesh);
     return mesh;
   }
   const terrainMeshes = [];
   for (const ring of CAMPUS_GEOMETRY.boundary) {
+    if (TERRAIN.has) {
+      // 땅 윗면은 지형을 따라가고, 옆면은 경계를 따라 바닥(-5m)까지 내려옵니다.
+      const top = new THREE.Mesh(
+        drapedPolygon(ring, [], 0, TERRAIN, 8),
+        createGroundMaterial("grass", 0x789463),
+      );
+      // 옆면은 잔디 무늬가 세로로 늘어나 줄무늬가 되므로 무늬 없는 흙색으로 칠합니다.
+      const sideMaterial = matte(0x7d7558);
+      sideMaterial.side = THREE.DoubleSide;
+      const side = new THREE.Mesh(terrainSkirt(ring, TERRAIN), sideMaterial);
+      for (const mesh of [top, side]) {
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+        terrainMeshes.push(mesh);
+      }
+      continue;
+    }
     const mesh = new THREE.Mesh(
       new THREE.ExtrudeGeometry(shapeFor(ring), {
         depth: 5,
@@ -166,9 +199,11 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
       );
     }
     if (land.kind === "water") {
-      poly.position.y = 0.3;
+      // 녹지(0.15)보다 조금 위(0.3)
+      poly.position.y = 0.15;
       const ring = land.outline;
-      const isBungeobang = ring.every(([, z]) => z < 0);
+      const isBungeobang =
+        !!CAMPUS.features.pond && ring.every(([, z]) => z < 0);
       poly.material.dispose();
       // Distance to the actual shoreline also works for the long, narrow stream.
       // One draw call per water polygon, with no texture downloads or reflections.
@@ -188,7 +223,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
         vertexShader: `
           varying vec2 waterPoint;
           void main() {
-            waterPoint = position.xy;
+            waterPoint = vec2(position.x, -position.z);
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
           }
         `,
@@ -251,41 +286,64 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     }
   }
   if (bankVertices.length) {
-    const geometry = new THREE.BufferGeometry();
+    let geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
       "position",
       new THREE.Float32BufferAttribute(bankVertices, 3),
     );
     geometry.computeVertexNormals();
+    geometry = drapeGeometry(geometry, TERRAIN, 4);
     const material = matte(0xd8cfb6);
     material.side = THREE.DoubleSide;
     const banks = new THREE.Mesh(geometry, material);
     banks.receiveShadow = true;
     scene.add(banks);
   }
-  const pondDetails = createPondDetails();
-  scene.add(pondDetails.group);
+  // 붕어방 데크·분수는 서울과기대에만 있습니다.
+  const pondDetails = CAMPUS.features.pond ? createPondDetails() : null;
+  if (pondDetails) {
+    // 데크·분수는 붕어방 가운데 지면 높이에 둡니다.
+    const pond = CAMPUS_GEOMETRY.lands.find(
+      (land) => land.kind === "water" && land.outline.every(([, z]) => z < 0),
+    );
+    if (pond) {
+      const n = pond.outline.length;
+      pondDetails.group.position.y = ground(
+        pond.outline.reduce((sum, [x]) => sum + x, 0) / n,
+        pond.outline.reduce((sum, [, z]) => sum + z, 0) / n,
+      );
+    }
+    scene.add(pondDetails.group);
+  }
+  // a→b 띠(경로선·신고 구간 등). y는 지면 위 높이이고, 지형 경사를 따라 기울입니다.
   function segment(a, b, width, color, y, group = scene, material = null) {
     const length = Math.hypot(b.x - a.x, b.z - a.z);
     if (length < 0.01) return;
+    const ya = ground(a.x, a.z) + y,
+      yb = ground(b.x, b.z) + y;
     const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(width, 0.22, length),
+      new THREE.BoxGeometry(width, 0.22, Math.hypot(length, yb - ya)),
       material || matte(color),
     );
-    mesh.position.set((a.x + b.x) / 2, y, (a.z + b.z) / 2);
-    mesh.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
+    mesh.position.set((a.x + b.x) / 2, (ya + yb) / 2, (a.z + b.z) / 2);
+    // 상자의 +z가 b를 향하게 돌립니다(오르막이면 앞이 들림).
+    mesh.lookAt(b.x, yb, b.z);
     mesh.receiveShadow = true;
     group.add(mesh);
     return mesh;
   }
-  const crosswalkLines = crosswalks.map(({ coordinates }) =>
+  // 서울과기대는 data/crosswalks.json, 다른 학교는 지도 데이터에 들어 있는 OSM 횡단보도를 씁니다.
+  const crosswalkSource = CAMPUS.features.crosswalks
+    ? crosswalks
+    : CAMPUS_GEOMETRY.crosswalks || [];
+  const crosswalkLines = crosswalkSource.map(({ coordinates }) =>
     coordinates.map((coordinate) => {
       const { x, z } = toScene(coordinate, CAMPUS_GEOMETRY.meta);
       return [x, z];
     }),
   );
-  scene.add(createRoadLayer(CAMPUS_GEOMETRY.roads, crosswalkLines));
-  const streetLights = createStreetLights(CAMPUS_GEOMETRY.roads);
+  scene.add(createRoadLayer(CAMPUS_GEOMETRY.roads, crosswalkLines, TERRAIN));
+  const streetLights = createStreetLights(CAMPUS_GEOMETRY.roads, ground);
   scene.add(streetLights);
   function setNightMode(enabled) {
     scene.background = enabled ? new THREE.Color(0x161e33) : null;
@@ -298,7 +356,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     windowLights.value = enabled ? 1 : 0;
   }
 
-  const buildingLayer = createBuildingLayer(BUILDINGS, ENTRANCES);
+  const buildingLayer = createBuildingLayer(BUILDINGS, ENTRANCES, TERRAIN);
   scene.add(buildingLayer.group);
   const buildingMeshes = buildingLayer.pickables,
     buildingGroups = new Map(),
@@ -310,6 +368,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     body,
     profile,
     height: displayHeight,
+    base,
   } of buildingLayer.records) {
     // 이름이 있는 건물만 라벨을 표시하고 모든 건물에 클릭을 연결합니다.
     let label = null;
@@ -324,16 +383,20 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
       };
       element.ondblclick = (e) => {
         e.stopPropagation();
-        if (!homeMode && !reporting) focusBuilding({ ...b, h: displayHeight });
+        if (!homeMode && !reporting)
+          focusBuilding({ ...b, h: displayHeight, base });
       };
       label = new CSS2DObject(element);
-      label.position.set(b.x, displayHeight + 12, b.z);
+      label.position.set(b.x, base + displayHeight + 12, b.z);
       scene.add(label);
       labelObjects.push({ id: b.id, label });
     }
-    buildingGroups.set(b.id, { body, profile, label, b });
+    buildingGroups.set(b.id, { body, profile, label, b, base });
   }
-  const campusTrees = createCampusTrees(CAMPUS_GEOMETRY);
+  const campusTrees = createCampusTrees(CAMPUS_GEOMETRY, {
+    pond: !!CAMPUS.features.pond,
+    heightAt: ground,
+  });
   scene.add(campusTrees);
   const entranceGroup = new THREE.Group(),
     entranceMaterial = new THREE.MeshBasicMaterial({
@@ -363,11 +426,12 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     markerElement.title = entrance.name;
     markerElement.setAttribute("role", "img");
     markerElement.setAttribute("aria-label", entrance.name);
-    stem.position.set(entrance.x, 3, entrance.z);
-    dot.position.set(entrance.x, 5.6, entrance.z);
+    const gy = ground(entrance.x, entrance.z);
+    stem.position.set(entrance.x, gy + 3, entrance.z);
+    dot.position.set(entrance.x, gy + 5.6, entrance.z);
     ring.rotation.x = -Math.PI / 2;
-    ring.position.set(entrance.x, 1.2, entrance.z);
-    marker.position.set(entrance.x, 8, entrance.z);
+    ring.position.set(entrance.x, gy + 1.2, entrance.z);
+    marker.position.set(entrance.x, gy + 8, entrance.z);
     stem.renderOrder = dot.renderOrder = ring.renderOrder = 4;
     entranceGroup.add(stem, dot, ring, marker);
   }
@@ -382,7 +446,11 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   gateLabel.className = "building-label gate-label";
   gateLabel.textContent = "정문";
   const gateObj = new CSS2DObject(gateLabel);
-  gateObj.position.set(MAIN_GATE.x, 12, MAIN_GATE.z);
+  gateObj.position.set(
+    MAIN_GATE.x,
+    ground(MAIN_GATE.x, MAIN_GATE.z) + 12,
+    MAIN_GATE.z,
+  );
   scene.add(gateObj);
   labelObjects.push({ id: "gate", label: gateObj });
   const routeGroup = new THREE.Group(),
@@ -395,6 +463,43 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   // 경로를 따라 걷는 마스코트(테크뇽). 처음 경로를 그릴 때 한 번만 만들고 재사용합니다.
   const WALKER_SCALE = 8,
     WALKER_Y = 1.9;
+  // 테크뇽은 서울과기대 마스코트라 다른 학교는 예전 기본 표시(경로: 연두 구, 내 위치: 파란 점)를 씁니다.
+  const useMascot = !!CAMPUS.features.mascot;
+  // 경로를 따라 움직이는 표시. lift: 지면에서 표시 기준점까지 높이.
+  function createRouteWalker() {
+    if (useMascot) {
+      const mascot = createTechnyong();
+      mascot.object.scale.setScalar(WALKER_SCALE);
+      return { ...mascot, lift: WALKER_Y };
+    }
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(2.1, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xd5ff76 }),
+    );
+    return { object: dot, update() {}, lift: 4 };
+  }
+  // 내 위치 표시(흰 테두리 userBase·정확도 원은 공통).
+  function createUserMarker() {
+    if (useMascot) {
+      const mascot = createTechnyong();
+      mascot.object.scale.setScalar(7.5);
+      mascot.object.position.y = 2.3;
+      mascot.object.rotation.y = Math.PI;
+      return mascot;
+    }
+    const group = new THREE.Group(),
+      dot = new THREE.Mesh(
+        new THREE.CircleGeometry(4.5, 32),
+        new THREE.MeshBasicMaterial({ color: 0x2878f0, depthTest: false }),
+      );
+    dot.rotation.x = -Math.PI / 2;
+    dot.position.y = 0.9;
+    dot.renderOrder = 5;
+    group.add(dot);
+    group.position.y = 2.3;
+    group.rotation.y = Math.PI;
+    return { object: group, update() {} };
+  }
   // GPS 표시는 파란 점 대신 테크뇽으로 한 번만 만들어 위치만 갱신합니다.
   const userAccuracy = new THREE.Mesh(
       new THREE.CircleGeometry(1, 48),
@@ -468,7 +573,12 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     }
     if (!route) return;
     const points = route.path.map(
-      (id) => new THREE.Vector3(nodes[id].x, 1.8, nodes[id].z),
+      (id) =>
+        new THREE.Vector3(
+          nodes[id].x,
+          ground(nodes[id].x, nodes[id].z) + 1.8,
+          nodes[id].z,
+        ),
     );
     routeCurve = new THREE.CurvePath();
     for (let i = 1; i < points.length; i++) {
@@ -486,7 +596,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
       );
       ring.rotation.x = -Math.PI / 2;
       ring.position.copy(origin);
-      ring.position.y = 2;
+      ring.position.y = origin.y + 0.2;
       routeGroup.add(ring);
     }
     const destination = points.at(-1);
@@ -500,18 +610,15 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
       );
       ring.rotation.x = -Math.PI / 2;
       ring.position.copy(destination);
-      ring.position.y = 2;
+      ring.position.y = destination.y + 0.2;
       routeGroup.add(ring);
     }
     if (routeCurve.curves.length) {
-      if (!technyong) {
-        technyong = createTechnyong();
-        technyong.object.scale.setScalar(WALKER_SCALE);
-      }
+      if (!technyong) technyong = createRouteWalker();
       // clearGroup은 메시만 정리하므로 재사용하는 마스코트 그룹은 지워지지 않고 떼어지기만 합니다.
       movingDot = technyong.object;
       movingDot.visible = routeMascotVisible;
-      movingDot.position.set(origin.x, WALKER_Y, origin.z);
+      movingDot.position.set(origin.x, origin.y - 1.8 + technyong.lift, origin.z);
       walkerHeading = null;
       placeWalker(0, 0, 0, false);
       routeGroup.add(movingDot);
@@ -558,7 +665,11 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
         onRoadSelect({ reportId: cover.id });
       };
       const label = new CSS2DObject(el);
-      label.position.set(cover.point.x, 12, cover.point.z);
+      label.position.set(
+        cover.point.x,
+        ground(cover.point.x, cover.point.z) + 12,
+        cover.point.z,
+      );
       label.visible = !homeMode;
       scene.add(label);
       warningLabels.push(label);
@@ -575,6 +686,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     for (const work of works) {
       const b = buildingGroups.get(work.buildingId)?.b;
       if (!b) continue;
+      const base = buildingGroups.get(work.buildingId).base || 0;
       const el = document.createElement("button"),
         bubble = document.createElement("span");
       el.className = "building-work";
@@ -593,7 +705,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
         timer = setTimeout(() => (bubble.hidden = true), 3000);
       };
       const label = new CSS2DObject(el);
-      label.position.set(b.x, b.h + 26, b.z);
+      label.position.set(b.x, base + b.h + 26, b.z);
       label.visible = !homeMode;
       scene.add(label);
       workLabels.push(label);
@@ -643,10 +755,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     }
     userLocationGroup.visible = true;
     if (!userTechnyong) {
-      userTechnyong = createTechnyong();
-      userTechnyong.object.scale.setScalar(7.5);
-      userTechnyong.object.position.y = 2.3;
-      userTechnyong.object.rotation.y = Math.PI;
+      userTechnyong = createUserMarker();
       userLocationGroup.add(userTechnyong.object);
       setMascotOverlay(navigationMode);
     }
@@ -655,12 +764,18 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     if (navigationMode) {
       // 새 위치로 순간이동하지 않고 animate에서 걸어가게 합니다. 멀리 튄 위치는 바로 옮깁니다.
       const jump = Math.hypot(position.x - navigationTarget.x, position.z - navigationTarget.z);
+      const gy = ground(position.x, position.z);
       if (!navigationTargetSet || jump > 80)
-        userLocationGroup.position.set(position.x, 0, position.z);
+        userLocationGroup.position.set(position.x, gy, position.z);
       if (jump > 0.5) navigationMovedAt = performance.now();
-      navigationTarget.set(position.x, 0, position.z);
+      navigationTarget.set(position.x, gy, position.z);
       navigationTargetSet = true;
-    } else userLocationGroup.position.set(position.x, 0, position.z);
+    } else
+      userLocationGroup.position.set(
+        position.x,
+        ground(position.x, position.z),
+        position.z,
+      );
     userAccuracy.scale.set(accuracy, accuracy, 1);
     if (follow) {
       if (navigationMode) {
@@ -668,14 +783,19 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
         return;
       }
       const offset = camera.position.clone().sub(controls.target);
-      controls.target.set(position.x, 0, position.z);
+      controls.target.set(position.x, ground(position.x, position.z), position.z);
       camera.position.copy(controls.target).add(offset);
       camera.zoom = Math.max(camera.zoom, 4.2);
       camera.updateProjectionMatrix();
       controls.update();
     }
   }
-  const graphOverlay = createGraphOverlay({ THREE, scene, CSS2DObject });
+  const graphOverlay = createGraphOverlay({
+    THREE,
+    scene,
+    CSS2DObject,
+    groundAt: ground,
+  });
   function setHomeMode(value) {
     homeMode = value;
     graphOverlay.setHidden(value);
@@ -721,16 +841,39 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     renderer.setSize(w, h);
     labels.setSize(w, h);
   }
+  // 처음 시점: 서울과기대는 기존 값 그대로, 다른 학교는 경계 상자 가운데를 보고
+  // 서울과기대(대각선 약 1155m)와 같은 비율로 화면에 들어오게 확대합니다.
+  const framing = (() => {
+    if (CAMPUS.features.pond) return { x: 0, z: -5, scale: 1 };
+    const points = CAMPUS_GEOMETRY.boundary.flat();
+    const xs = points.map(([x]) => x),
+      zs = points.map(([, z]) => z);
+    const minX = Math.min(...xs),
+      maxX = Math.max(...xs),
+      minZ = Math.min(...zs),
+      maxZ = Math.max(...zs);
+    return {
+      x: (minX + maxX) / 2,
+      z: (minZ + maxZ) / 2,
+      scale: THREE.MathUtils.clamp(
+        1155 / Math.hypot(maxX - minX, maxZ - minZ),
+        0.5,
+        1.6,
+      ),
+    };
+  })();
+  // 처음 시점의 바라보는 높이: 캠퍼스 가운데 지면(지형이 없으면 0)
+  const framingY = ground(framing.x, framing.z);
   function reset() {
-    camera.position.set(-670, 950, 1100);
-    controls.target.set(0, 0, -5);
-    camera.zoom = homeMode ? 1 : 1.15;
+    camera.position.set(framing.x - 670, framingY + 950, framing.z + 1105);
+    controls.target.set(framing.x, framingY, framing.z);
+    camera.zoom = (homeMode ? 1 : 1.15) * framing.scale;
     camera.updateProjectionMatrix();
     controls.update();
   }
   function focusBuilding(b) {
     const offset = camera.position.clone().sub(controls.target);
-    controls.target.set(b.x, b.h * 0.25, b.z);
+    controls.target.set(b.x, (b.base || 0) + b.h * 0.25, b.z);
     camera.position.copy(controls.target).add(offset);
     camera.zoom = 4;
     camera.updateProjectionMatrix();
@@ -739,7 +882,8 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   // 건물 검색 결과에서 고른 건물로 카메라를 옮깁니다(이름표 더블클릭과 같은 시점).
   function focusPlace(id) {
     const record = buildingLayer.records.find((r) => r.b.id === id);
-    if (record) focusBuilding({ ...record.b, h: record.height });
+    if (record)
+      focusBuilding({ ...record.b, h: record.height, base: record.base });
     return Boolean(record);
   }
   // 건물 정보 카드로 고른 건물의 이름표를 강조합니다. null이면 강조를 지웁니다.
@@ -752,14 +896,15 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     camera.updateProjectionMatrix();
   }
   function top() {
-    camera.position.set(0, 1400, 5);
-    controls.target.set(0, 0, 0);
+    camera.position.set(framing.x, framingY + 1400, framing.z + 5);
+    controls.target.set(framing.x, framingY, framing.z);
     controls.update();
   }
   // 편집 모드: 한 지점을 화면 가운데에 두고 위에서 내려다봅니다.
   function focusTop(point, zoomLevel = 5) {
-    controls.target.set(point.x, 0, point.z);
-    camera.position.set(point.x, 1400, point.z + 5);
+    const gy = ground(point.x, point.z);
+    controls.target.set(point.x, gy, point.z);
+    camera.position.set(point.x, gy + 1400, point.z + 5);
     camera.zoom = THREE.MathUtils.clamp(
       zoomLevel,
       controls.minZoom,
@@ -774,6 +919,22 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     mouse = new THREE.Vector2(),
     groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.8);
   let down = null;
+  // 화면 광선이 지면(지형)과 만나는 점. 지형 높이로 평면을 몇 번 옮겨 맞춥니다(산지에서도 수 번이면 수렴).
+  // 지형 메시 전체에 광선 검사를 하는 것보다 훨씬 가벼워 손가락 제스처 중에도 씁니다.
+  function hitGround() {
+    let hit = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3());
+    if (!hit || !TERRAIN.has) return hit;
+    const plane = groundPlane.clone();
+    for (let i = 0; i < 8; i++) {
+      plane.constant = -(ground(hit.x, hit.z) + 0.8);
+      const next = raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+      if (!next) break;
+      const moved = next.distanceTo(hit);
+      hit = next;
+      if (moved < 0.2) break;
+    }
+    return hit;
+  }
   // 땅 위 한 점에서 가장 가까운 길(간선)을 골라 미리 칠하고 handler에 넘깁니다.
   function pickRoad(point, handler) {
     const selection = locateReportPoint({ x: point.x, z: point.z });
@@ -787,7 +948,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   function pickPoint(x, y) {
     mouse.set(x, y);
     raycaster.setFromCamera(mouse, camera);
-    const hit = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3());
+    const hit = hitGround();
     if (!hit) return;
     pickRoad(hit, onRoadSelect);
   }
@@ -800,14 +961,19 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     MAX_PHI = controls.maxPolarAngle;
   let gesture = null,
     suppressTap = false;
-  function groundAt(clientX, clientY) {
+  // planeY를 주면 지형 대신 그 높이의 수평면과 만나는 점(끌기 이동량 계산용: 같은 평면이어야 튀지 않음).
+  function groundAt(clientX, clientY, planeY = null) {
     const r = renderer.domElement.getBoundingClientRect();
     mouse.set(
       ((clientX - r.left) / r.width) * 2 - 1,
       (-(clientY - r.top) / r.height) * 2 + 1,
     );
     raycaster.setFromCamera(mouse, camera);
-    return raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3());
+    if (planeY === null) return hitGround();
+    return raycaster.ray.intersectPlane(
+      new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY),
+      new THREE.Vector3(),
+    );
   }
   function twoFingers() {
     const [a, b] = [...touchPoints.values()];
@@ -859,7 +1025,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
       camera.lookAt(controls.target);
     }
     camera.updateMatrixWorld();
-    const moved = groundAt(to.x, to.y);
+    const moved = groundAt(to.x, to.y, anchor.y);
     // 첫 화면 미리보기는 지도가 화면 밖으로 밀리지 않도록 이동하지 않습니다.
     if (moved && !homeMode) {
       const shift = anchor.sub(moved).setY(0);
@@ -1085,7 +1251,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
       e.preventDefault();
       mouse.set(0, 0);
       raycaster.setFromCamera(mouse, camera);
-      const point = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3());
+      const point = hitGround();
       if (point) {
         if (roadPicker) pickRoad(point, roadPicker);
         else shortcutPicker({ x: point.x, z: point.z });
@@ -1202,7 +1368,8 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   // u: 경로 위 위치(0~1). 진행 방향을 바라보고, 모퉁이에서는 부드럽게 돌아섭니다.
   function placeWalker(u, t, dt, moving) {
     routeCurve.getPoint(u, movingDot.position);
-    movingDot.position.y = WALKER_Y;
+    // 경로선 점은 지면 위 1.8m이므로 마스코트 발 높이로 맞춥니다.
+    movingDot.position.y += technyong.lift - 1.8;
     const tangent = routeCurve.getTangent(Math.min(u, 0.999));
     const target = Math.atan2(tangent.x, tangent.z);
     if (walkerHeading === null || dt === 0) walkerHeading = target;
@@ -1219,7 +1386,11 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   let entryFlight;
   function resolveEntryView(record, entranceId) {
     if (!record) return null;
-    if (!entranceId && record.entryView) return record.entryView;
+    if (!entranceId && record.entryView)
+      return {
+        ...record.entryView,
+        door: record.entryView.door.clone().add(new THREE.Vector3(0, record.base || 0, 0)),
+      };
 
     const building = record.b;
     const entrance = mappedEntrances.find(
@@ -1244,7 +1415,10 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     if (insideBuilding({ x: point.x + outward.x * 0.25, z: point.z + outward.z * 0.25 }, building)) {
       outward.negate();
     }
-    return { door: new THREE.Vector3(point.x, 2.6, point.z), outward };
+    return {
+      door: new THREE.Vector3(point.x, (record.base || 0) + 2.6, point.z),
+      outward,
+    };
   }
 
   function flyIntoBuilding(id, entranceId, onApproach) {
@@ -1354,7 +1528,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
         reduceMotion ? 0 : Math.min(0.1, deltaSeconds),
         !reduceMotion,
       );
-    pondDetails.update(reduceMotion ? 0 : t / 1000);
+    pondDetails?.update(reduceMotion ? 0 : t / 1000);
     renderer.render(scene, camera);
     if (navigationMode && userLocationGroup.visible && userTechnyong) {
       const background = scene.background;

@@ -34,10 +34,12 @@ import {
   signOutAdmin,
   isAdminUser,
   supabase,
+  selectForCampus,
+  withCampus,
 } from "./api/backend.mjs";
 import {
   activeWorks,
-  BUILDING_NUMBERS,
+  buildingNumber,
   buildingLabel,
   worksPeriod,
   today,
@@ -54,7 +56,15 @@ import {
   ENTRANCES,
   SURVEY,
   placeEntries,
+  previewPlaceId,
+  TERRAIN,
+  withHeights,
 } from "./campus/data.mjs";
+import {
+  campusByName,
+  campusIdFromHash,
+  DEFAULT_CAMPUS_ID,
+} from "./campus/registry.mjs";
 import { createCampusMap } from "./map/map.js";
 import { buildingInfo } from "./ui/building-info.mjs";
 import { setupEditMode, EDIT_MODE } from "./editor/edit-mode.js";
@@ -113,13 +123,29 @@ let reports = [],
   works = [],
   // 30m 안 신고를 묶은 구역 (loadReports에서 다시 계산)
   clusters = [];
+// 지도 제목처럼 학교마다 다른 문구를 채웁니다(HTML 기본 문구는 서울과기대).
+$(".map-overlay-heading .map-live").lastChild.textContent =
+  ` ${CAMPUS.english} CAMPUS MAP`;
+$(".map-overlay-heading h3").textContent = CAMPUS.name;
+$(".admin-panel-header .eyebrow").textContent = `${CAMPUS.short} · 관리자 모드`;
+// 지도 출처: 다른 학교는 OSM(+브이월드를 보탰으면 브이월드)만 씁니다(HTML 기본 문구는 서울과기대).
+if (CAMPUS.id !== DEFAULT_CAMPUS_ID)
+  $(".map-attribution").textContent = CAMPUS_GEOMETRY.attribution?.supplemental
+    ? "© OpenStreetMap 기여자 · 국토교통부 브이월드"
+    : "© OpenStreetMap 기여자";
+// 지형 고도는 Copernicus DEM(ESA)을 썼으므로 출처를 덧붙입니다(전체 문구는 DATA-LICENSE.md).
+if (TERRAIN.has) $(".map-attribution").textContent += " · Copernicus DEM";
+// 편집기(팀 조사 데이터 편집)는 서울과기대에만 있습니다.
+$("#admin-menu-editor").hidden = !CAMPUS.features.editor;
 const GIS_SUMMARY = gisSummary(CAMPUS_GEOMETRY, ENTRANCES);
 $(".map-data-status").textContent =
   `건물 ${GIS_SUMMARY.buildings} · 등록 출입구 ${GIS_SUMMARY.entrances}`;
 const normalize = normalizeSearch;
+// 3D 지도를 제공하는 학교(registry.mjs)를 목록 앞쪽에 둡니다. 서울과기대가 맨 앞입니다.
 const schoolData = [
-  catalog.find((s) => s[0] === CAMPUS.name),
-  ...catalog.filter((s) => s[0] !== CAMPUS.name),
+  ...catalog.filter((s) => campusByName(s[0])?.id === DEFAULT_CAMPUS_ID),
+  ...catalog.filter((s) => campusByName(s[0]) && campusByName(s[0]).id !== DEFAULT_CAMPUS_ID),
+  ...catalog.filter((s) => !campusByName(s[0])),
 ];
 function renderSchools() {
   const q = normalize($("#school-search").value),
@@ -147,13 +173,13 @@ function renderSchools() {
     return;
   }
   for (const s of displayed) {
-    const supported = s[0] === CAMPUS.name,
+    const supported = campusByName(s[0]),
       b = document.createElement("button");
     b.className = "school-card" + (supported ? " featured" : "");
     b.innerHTML =
       '<span class="school-state"><i></i></span><span class="school-logo"></span><span class="school-copy"><b></b><small></small></span><span class="school-arrow">↗</span>';
     b.querySelector(".school-logo").textContent = supported
-      ? "ST"
+      ? supported.logo
       : s[0].slice(0, 1);
     b.querySelector("b").textContent = s[0];
     b.querySelector("small").textContent = `${s[2]} · ${s[1]}`;
@@ -163,7 +189,7 @@ function renderSchools() {
     );
     state.classList.toggle("soon", !supported);
     b.onclick = () => {
-      if (supported) location.hash = "campus/seoultech";
+      if (supported) location.hash = `campus/${supported.id}`;
       else
         toast(
           `${s[0]} 지도는 준비 중이에요. 서울과기대에서 먼저 체험해보세요.`,
@@ -318,9 +344,24 @@ function updateRoute({ announce = false } = {}) {
   $("#route-distance").textContent = Math.round(currentRoute.meters);
   $(".result-heading>div>small").textContent =
     mode === "stepfree" ? "계단 제외 시연 경로" : "시연 최단 경로";
-  $("#route-type").textContent = currentRoute.stairs ? "계단 포함" : "도보";
+  $("#route-type").textContent = currentRoute.stairs
+    ? "계단 포함"
+    : currentRoute.steep
+      ? "급경사 포함"
+      : "도보";
+  // 지형(고도)이 있는 학교는 오르막을 반영한 소요 시간으로 경로를 고릅니다(routing.mjs).
+  const climbNote =
+    currentRoute.climb >= 3 ? ` 오르막 약 ${Math.round(currentRoute.climb)}m.` : "";
+  const modeNote =
+    mode === "stepfree"
+      ? currentRoute.steep
+        ? "계단은 제외했지만 다른 길이 없어 급경사(8% 초과) 구간이 있어요."
+        : "등록된 계단과 급경사(8% 초과) 구간을 피한 경로예요."
+      : TERRAIN.has
+        ? "오르막·내리막을 반영해 가장 빨리 가는 경로예요."
+        : "등록된 시연 보행망에서 가장 짧은 경로예요.";
   $("#route-summary").textContent =
-    `${start.name} → ${destination.name} · ${mode === "stepfree" ? "등록된 계단 구간을 제외한 경로예요." : "등록된 시연 보행망에서 가장 짧은 경로예요."} 거리·시간은 시연 추정치입니다.`;
+    `${start.name} → ${destination.name} · ${modeNote}${climbNote} 거리·시간은 시연 추정치입니다.`;
   $("#route-steps").replaceChildren();
   const stride = Math.max(1, Math.ceil((currentRoute.path.length - 1) / 5));
   const visible = currentRoute.path.filter(
@@ -427,13 +468,13 @@ if (!map) {
   map.setRoute(
     shortestPath(
       "gate",
-      PLACES.find((place) => place.id === "future").entry,
+      PLACES.find((place) => place.id === previewPlaceId()).entry,
       "shortest",
       NODES,
       availableEdges(confirmedEdges),
     ),
     "gate",
-    "future",
+    previewPlaceId(),
   );
   // 편집기는 관리자 로그인을 확인한 뒤에만 켭니다(주소에 ?edit를 직접 붙여도 마찬가지).
   if (EDIT_MODE)
@@ -445,7 +486,8 @@ if (!map) {
       getGraph: () => graph,
       // 편집기가 조사 데이터를 바꿀 때마다 합친 그래프를 넘겨받아 경로를 다시 그립니다.
       applyGraph(next) {
-        graph = next;
+        // 편집기가 다시 합친 그래프에도 지면 높이를 붙여 오르막 계산을 유지합니다.
+        graph = { ...next, nodes: withHeights(next.nodes) };
         updateRoute();
       },
       // 주어진 그래프에서 지금 고른 출발지·도착지 경로를 계산만 합니다(화면은 그대로).
@@ -627,7 +669,7 @@ function updateModeOptions() {
       meta.textContent = "연결된 길이 없어요";
       time.textContent = "—";
     } else {
-      meta.textContent = `${Math.round(route.meters)} m${route.stairs ? " · 계단 포함" : ""}`;
+      meta.textContent = `${Math.round(route.meters)} m${route.stairs ? " · 계단 포함" : route.steep ? " · 급경사 포함" : ""}`;
       time.replaceChildren(String(route.minutes));
       const unit = document.createElement("small");
       unit.textContent = "분";
@@ -649,12 +691,12 @@ function showBuildingCard(id) {
   const place = placeWithEntries(id);
   if (!place) return;
   cardBuildingId = id;
-  const number = BUILDING_NUMBERS[place.name],
+  const number = buildingNumber(place.name),
     info = buildingInfo(place.name);
   $("#building-card-name").textContent = place.name;
   $("#building-card-sub").textContent =
     [number ? `${number}동` : "", info.area].filter(Boolean).join(" · ") ||
-    "서울과학기술대학교";
+    CAMPUS.name;
   $("#building-card-floors").textContent = info.floors || "—";
   $("#building-card-entrances").textContent = `${place.entries?.length || 0}곳`;
   $("#building-card-hours").textContent = info.hours || "—";
@@ -718,7 +760,7 @@ function matchBuildings(query) {
   if (!q) return [];
   return buildingPlaces
     .filter((p) => {
-      const n = BUILDING_NUMBERS[p.name];
+      const n = buildingNumber(p.name);
       return (
         p.name.replace(/\s+/g, "").toLowerCase().includes(q) ||
         (n && String(n) === q)
@@ -764,7 +806,7 @@ function renderBuildingResults() {
       );
     } else name.textContent = place.name;
     const sub = document.createElement("small");
-    const n = BUILDING_NUMBERS[place.name];
+    const n = buildingNumber(place.name);
     sub.textContent = n ? `${n}동` : "건물";
     text.append(name, sub);
     button.append(icon, text);
@@ -1425,7 +1467,7 @@ function stopGps({ keepStatus = false } = {}) {
     changed = true;
   }
   if (routePlaceId("#destination") === "gps") {
-    setRoutePlace("#destination", "future");
+    setRoutePlace("#destination", previewPlaceId());
     changed = true;
   }
   if (changed) updateRoute();
@@ -1480,7 +1522,7 @@ function startGps() {
           toast("현재 위치가 캠퍼스 밖이에요. 캠퍼스 안에서 안내를 시작해주세요.");
         }
         setGpsStatus(
-          `현재 위치가 서울과기대 지도 범위 밖이에요. 캠퍼스에 들어오면 자동으로 표시됩니다.`,
+          `현재 위치가 ${CAMPUS.short} 지도 범위 밖이에요. 캠퍼스에 들어오면 자동으로 표시됩니다.`,
         );
         firstFix = false;
         return;
@@ -1525,15 +1567,23 @@ function routeView() {
   stopShortcutPicking();
   setReporting(false);
   const isMap = location.hash.startsWith("#campus/");
-  if (isMap && location.hash !== "#campus/seoultech") {
+  const campusId = campusIdFromHash(location.hash);
+  if (isMap && !campusId) {
     history.replaceState(
       null,
       "",
       location.pathname + location.search + "#campuses",
     );
-    toast("현재 서울과기대 지도만 제공하고 있어요.");
+    toast("아직 지도를 준비 중인 학교예요.");
   }
-  const exploring = location.hash === "#campus/seoultech";
+  // 앱은 한 학교의 지도·그래프로 시작합니다. 다른 학교를 열거나, 다른 학교에서 첫 화면으로
+  // 돌아가면(첫 화면 미리보기는 서울과기대) 페이지를 새로 불러와 그 학교로 다시 시작합니다(main.js).
+  const wanted = campusId || DEFAULT_CAMPUS_ID;
+  if (wanted !== CAMPUS.id) {
+    location.reload();
+    return;
+  }
+  const exploring = campusId !== null;
   $("#home-view").hidden = exploring;
   $("#map-view").hidden = !exploring;
   document.body.classList.toggle("exploring", exploring);
@@ -1550,7 +1600,7 @@ function routeView() {
     updateModeOptions();
     renderResultPanel();
     map?.moveTo($("#campus-map"), false);
-    document.title = "서울과기대 길찾기 | 사이";
+    document.title = `${CAMPUS.short} 길찾기 | 사이`;
     $(isDesktop.matches ? "#building-search" : "#back-home").focus({
       preventScroll: true,
     });
@@ -1559,13 +1609,13 @@ function routeView() {
     map?.setRoute(
       shortestPath(
         "gate",
-        PLACES.find((place) => place.id === "future").entry,
+        PLACES.find((place) => place.id === previewPlaceId()).entry,
         "shortest",
         NODES,
         availableEdges(confirmedEdges),
       ),
       "gate",
-      "future",
+      previewPlaceId(),
     );
     document.title = "사이";
     if (location.hash === "#campuses")
@@ -1747,9 +1797,9 @@ shortcutForm.onsubmit = async (event) => {
   shortcutSubmit.disabled = true;
   $("#shortcut-repick").disabled = true;
   try {
-    const { error } = await supabase.from("shortcut_reports").insert({
+    const { error } = await supabase.from("shortcut_reports").insert(withCampus({
       node_a, node_b, note, has_stairs: $("#shortcut-stairs").value === "yes",
-    });
+    }));
     if (error) throw error;
     shortcutDialog.close();
     toast("지름길 제보가 접수됐어요. 관리자가 확인한 뒤 길찾기에 반영돼요.");
@@ -1764,9 +1814,10 @@ shortcutForm.onsubmit = async (event) => {
 
 async function loadShortcuts() {
   const request = ++shortcutLoad;
-  let query = supabase.from("shortcut_reports").select("*").order("created_at");
-  if (!adminAuthenticated) query = query.eq("status", "approved");
-  const { data, error } = await query;
+  const { data, error } = await selectForCampus("shortcut_reports", (query) => {
+    query = query.order("created_at");
+    return adminAuthenticated ? query : query.eq("status", "approved");
+  });
   if (request !== shortcutLoad) return;
   if (error) {
     $("#shortcut-admin-status").textContent = "지름길 제보를 불러오지 못했어요.";
@@ -1842,6 +1893,14 @@ renderSchools();
 renderReportList();
 renderAdminAlert();
 routeView();
+// main.js가 다른 학교 데이터를 받지 못해 서울과기대로 시작했으면 알려 줍니다.
+try {
+  const failed = sessionStorage.getItem("sai:campus-load-failed");
+  if (failed) {
+    sessionStorage.removeItem("sai:campus-load-failed");
+    toast(`${failed} 지도를 불러오지 못했어요. 잠시 후 다시 시도해주세요.`);
+  }
+} catch {}
 loadShortcuts();
 loadReports(); // Supabase에서 신고 목록을 비동기로 불러와 위 렌더를 다시 채웁니다.
 

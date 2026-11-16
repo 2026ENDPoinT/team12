@@ -94,6 +94,9 @@ export function attachToGraph(
       name: c.edge.name || "교내 보행로",
       source_kind: "team_input",
     };
+    // 길 양 끝에 지면 높이가 있으면 자른 점의 높이도 그 사이 값으로 둡니다(경로의 오르막 계산용).
+    if (Number.isFinite(a.y) && Number.isFinite(b.y))
+      graph.nodes[splitId].y = a.y + (b.y - a.y) * c.t;
     graph.edges.splice(
       c.index,
       1,

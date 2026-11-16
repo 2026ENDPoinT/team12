@@ -7,6 +7,7 @@ import {
   createBuildingDetails,
 } from "./procedural.mjs";
 import { createFacadeStudy } from "./facade-studies.mjs";
+import { buildingBase } from "../terrain-drape.mjs";
 import { createFutureBuilding } from "./models/future.mjs";
 import { createSangsangBuilding } from "./models/sangsang.mjs";
 import { createMemorialBuilding } from "./models/memorial.mjs";
@@ -23,6 +24,7 @@ import { createTechnoparkBuilding } from "./models/technopark.mjs";
 import { createAdminBuilding } from "./models/admin.mjs";
 import { createHyeseongBuilding } from "./models/hyeseong.mjs";
 import { createInternationalBuilding } from "./models/international.mjs";
+import { createLandmarkBuilding } from "./models/landmarks.mjs";
 
 const MODEL_FACTORIES = {
   future: createFutureBuilding,
@@ -41,6 +43,8 @@ const MODEL_FACTORIES = {
   admin: createAdminBuilding,
   hyeseong: createHyeseongBuilding,
   international: createInternationalBuilding,
+  // 다른 학교 대표 건물: catalog의 landmark 설정(외관 유형·색)으로 만듭니다.
+  landmark: createLandmarkBuilding,
 };
 
 function createRoof(building) {
@@ -64,7 +68,9 @@ function createRoof(building) {
 }
 
 // Map interaction code consumes records and pickables without knowing model types.
-export function createBuildingLayer(buildings, entrances = []) {
+// terrain이 있으면 건물마다 바닥 높이(base, 외곽선 아래 가장 낮은 지면)만큼 통째로 올립니다.
+// 건물 모델·외벽·옥상 장비는 바닥 0 기준으로 만들고 위치만 옮기므로 원본 높이(h)는 그대로입니다.
+export function createBuildingLayer(buildings, entrances = [], terrain = null) {
   const group = new THREE.Group();
   group.name = "campus-buildings";
   const records = [],
@@ -84,16 +90,18 @@ export function createBuildingLayer(buildings, entrances = []) {
       glass: appearance.glass,
     };
     const entrance = entrancesByBuilding.get(b.id);
+    const base = buildingBase(b, terrain);
     let body, entryView,
       height = b.h;
     if (design.model) {
       const factory = MODEL_FACTORIES[design.model];
       if (!factory)
         throw new Error(`Unknown building model: ${design.model} (${b.id})`);
-      const model = factory(b, profile.wall, entrance);
+      const model = factory(b, profile.wall, entrance, design.landmark);
       body = model.body;
       entryView = model.entryView;
       height = model.height ?? b.h;
+      model.group.position.y += base;
       group.add(model.group);
       pickables.push(...model.pickables);
     } else {
@@ -110,20 +118,22 @@ export function createBuildingLayer(buildings, entrances = []) {
         ),
       );
       body.rotation.x = -Math.PI / 2;
-      body.position.y = 0.9;
+      body.position.y = 0.9 + base;
       body.castShadow = body.receiveShadow = true;
       body.userData.building = b.id;
       const roof = createRoof(b);
+      roof.position.y += base;
       group.add(body, roof);
       pickables.push(body, roof);
       const study = createFacadeStudy(b, profile, entrance);
       if (study) {
+        study.group.position.y += base;
         group.add(study.group);
         pickables.push(...study.pickables);
       }
-      details.decorate(b, appearance, study ? null : entrance);
+      details.decorate(b, appearance, study ? null : entrance, base);
     }
-    records.push({ b, body, profile, height, entryView });
+    records.push({ b, body, profile, height, entryView, base });
   }
   group.add(details.finish());
   return { group, records, pickables };

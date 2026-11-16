@@ -3,6 +3,7 @@ import { rm, mkdir, copyFile, writeFile } from "node:fs/promises";
 import { CAMPUS_GEOMETRY, ENTRANCES } from "../src/campus/data.mjs";
 import { createCampusGeoJson } from "../src/campus/gis.mjs";
 import { copyIndoorAssets } from "./indoor-assets.mjs";
+import { copyCampusData } from "./campus-data.mjs";
 
 // 개발용 소스맵을 공개 배포물에 포함하지 않습니다.
 await rm("dist/app.js.map", { force: true });
@@ -12,7 +13,7 @@ await rm("dist/indoor/ar-worker.js.map", { force: true });
 const common = { bundle: true, minify: true, target: "es2020" };
 await build({
   ...common,
-  entryPoints: ["src/app.js"],
+  entryPoints: ["src/main.js"],
   format: "iife",
   outfile: "dist/app.js",
 });
@@ -41,6 +42,7 @@ await build({
 await copyIndoorAssets({ includeLocal: process.argv.includes("--local") });
 await mkdir("dist/data", { recursive: true });
 await copyFile("data/seoultech.json", "dist/data/seoultech.json");
+await copyCampusData();
 await copyFile(
   "data/team-survey-template.geojson",
   "dist/data/team-survey-template.geojson",

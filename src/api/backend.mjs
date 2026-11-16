@@ -1,5 +1,24 @@
 import { createClient } from "@supabase/supabase-js";
 import { orphanPhotos } from "../reports/reports.mjs";
+import { CAMPUS } from "../campus/data.mjs";
+import { DEFAULT_CAMPUS_ID } from "../campus/registry.mjs";
+
+// ===== 학교 구분 (campus_id) =====
+// 신고·공사·지름길은 학교별로 나눕니다(20261116120000_campus_id.sql). 그 migration을 원격 DB에
+// 적용하기 전에도 서울과기대는 지금처럼 동작해야 하므로, campus_id 칸이 없다는 오류(42703)가
+// 나면 서울과기대에서만 학교 조건 없이 다시 읽습니다. 서울과기대 행은 DB 기본값으로 저장합니다.
+const MISSING_COLUMN = "42703";
+export async function selectForCampus(table, refine = (query) => query) {
+  const result = await refine(
+    supabase.from(table).select("*").eq("campus_id", CAMPUS.id),
+  );
+  if (result.error?.code === MISSING_COLUMN && CAMPUS.id === DEFAULT_CAMPUS_ID)
+    return refine(supabase.from(table).select("*"));
+  return result;
+}
+export function withCampus(row) {
+  return CAMPUS.id === DEFAULT_CAMPUS_ID ? row : { ...row, campus_id: CAMPUS.id };
+}
 
 // Supabase 프로젝트 연결 정보. anon/publishable 키는 RLS로 보호되는 공개 키라
 // 커밋해도 괜찮습니다 (service_role 키는 절대 여기 두지 마세요).
@@ -97,7 +116,7 @@ export function getDeviceId() {
 }
 
 export async function fetchReportRows() {
-  const { data, error } = await supabase.from("road_reports").select("*");
+  const { data, error } = await selectForCampus("road_reports");
   if (error) throw error;
   return data;
 }
@@ -111,7 +130,7 @@ export async function insertReportRow({
   gps,
   takenAt,
 }) {
-  const { error } = await supabase.from("road_reports").insert({
+  const { error } = await supabase.from("road_reports").insert(withCampus({
     edge_id: edgeId,
     point_x: point.x,
     point_z: point.z,
@@ -124,7 +143,7 @@ export async function insertReportRow({
     gps_accuracy: gps?.accuracy ?? null,
     taken_at: takenAt || null,
     reporter_device_id: getDeviceId(),
-  });
+  }));
   if (error) throw error;
 }
 
@@ -252,18 +271,18 @@ export async function uploadReportPhoto(file) {
 
 // ===== 건물 공사 (관리자가 등록) =====
 export async function fetchWorkRows() {
-  const { data, error } = await supabase.from("building_works").select("*");
+  const { data, error } = await selectForCampus("building_works");
   if (error) throw error;
   return data;
 }
 
 export async function insertWorkRow({ buildingId, start, end, note }) {
-  const { error } = await supabase.from("building_works").insert({
+  const { error } = await supabase.from("building_works").insert(withCampus({
     building_id: buildingId,
     start_date: start,
     end_date: end,
     note: note || null,
-  });
+  }));
   if (error) throw error;
 }
 
