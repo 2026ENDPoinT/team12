@@ -248,16 +248,19 @@ export function createBuildingDetails() {
     entry: new THREE.MeshStandardMaterial({ color: 0xc9cec6, roughness: 0.85 }),
   };
   const dummy = new THREE.Object3D();
+  // 지금 꾸미는 건물의 바닥 높이(지형). decorate가 정합니다.
+  let lift = 0;
   function box(kind, x, y, z, w, h, d, turn = 0) {
     if (!parts.has(kind)) parts.set(kind, []);
-    dummy.position.set(x, y, z);
+    dummy.position.set(x, y + lift, z);
     dummy.rotation.set(0, turn, 0);
     dummy.scale.set(w, h, d);
     dummy.updateMatrix();
     parts.get(kind).push(dummy.matrix.clone());
   }
-  function decorate(building, appearance, entrance) {
+  function decorate(building, appearance, entrance, base = 0) {
     if (!appearance.facade) return;
+    lift = base;
     for (const ring of [building.outline, ...building.holes]) {
       for (let i = 0; i < ring.length; i++) {
         const [ax, az] = ring[i],

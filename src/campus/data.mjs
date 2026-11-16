@@ -2,6 +2,7 @@ import geometry from "../../data/seoultech.json" with { type: "json" };
 import teamSurvey from "../../data/team-survey.json" with { type: "json" };
 import { mergeSurvey } from "./survey.mjs";
 import { toScene } from "./geo.mjs";
+import { createTerrain } from "./terrain.mjs";
 import { campusById, DEFAULT_CAMPUS_ID } from "./registry.mjs";
 
 // 서울과기대 공식 캠퍼스맵 이름으로 바로잡은 건물입니다.
@@ -25,6 +26,8 @@ for (const building of geometry.buildings)
 // 브이월드(공공누리 제1유형)를 변환했습니다. 자세한 출처는 DATA-LICENSE.md 참고.
 export let CAMPUS;
 export let CAMPUS_GEOMETRY;
+// 지형 높이: TERRAIN.heightAt(x, z) → 지면 높이(m). 지형 데이터가 없으면 0(평지).
+export let TERRAIN;
 // 실내 지도 URL과 카메라가 바라볼 출입구를 건물 ID로 연결합니다.
 export let INDOOR_MAPS;
 export let BUILDINGS;
@@ -77,6 +80,16 @@ export function placeEntries(building, entrances = SURVEY.entrances) {
     : [building.entry || nearestNodeId(building)];
 }
 
+// 노드 묶음에 지면 높이(y)를 붙인 복사본. 편집기·지름길로 그래프를 다시 만들 때도 씁니다.
+export function withHeights(nodes) {
+  return Object.fromEntries(
+    Object.entries(nodes).map(([id, node]) => [
+      id,
+      { ...node, y: TERRAIN.heightAt(node.x, node.z) },
+    ]),
+  );
+}
+
 // 학교 데이터를 바꿉니다. config는 registry.mjs 항목, data는 그 학교의 지도 JSON,
 // survey는 팀 조사 GeoJSON(없으면 빈 목록)입니다.
 export function useCampus(config, data, survey = EMPTY_SURVEY) {
@@ -99,11 +112,13 @@ export function useCampus(config, data, survey = EMPTY_SURVEY) {
     ? new Map([["future", { url: "indoor/?from=futureDoor" }]])
     : new Map();
   BUILDINGS = data.buildings;
+  TERRAIN = createTerrain(data.terrain);
   const merged = mergeSurvey(data, survey, {
     origin: data.meta,
     buildings: data.buildings,
   });
-  NODES = merged.nodes;
+  // 경로 계산(오르막 시간)과 지도 표시가 쓰도록 노드마다 지면 높이 y를 붙입니다(원본 데이터는 그대로).
+  NODES = withHeights(merged.nodes);
   EDGES = merged.edges;
   SURVEY = {
     data: survey,

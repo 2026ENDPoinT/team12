@@ -9,8 +9,15 @@ import {
   MAIN_GATE,
 } from "../src/campus/data.mjs";
 import { shortestPath } from "../src/navigation/routing.mjs";
+import { walkLeg, STEEP_SLOPE } from "../src/campus/terrain.mjs";
 import { insideBuilding, projectToSegment } from "../src/campus/geo.mjs";
-function referenceDistance(start, mode) {
+// 경로 비용: 지형을 반영한 걷는 시간(분). 계단 피하기는 8% 초과 경사에 벌점 6배(routing.mjs와 같은 규칙).
+function legCost(e, from, to, mode) {
+  const leg = walkLeg(e.meters, NODES[from].y, NODES[to].y);
+  return leg.minutes * (mode === "stepfree" && Math.abs(leg.slope) > STEEP_SLOPE ? 6 : 1);
+}
+// 독립 구현(벨만-포드)으로 구한 futureDoor까지의 최소 비용
+function referenceCost(start, mode) {
   const dist = Object.fromEntries(
     Object.keys(NODES).map((id) => [id, Infinity]),
   );
@@ -22,15 +29,32 @@ function referenceDistance(start, mode) {
       for (const [a, b] of [
         [e.a, e.b],
         [e.b, e.a],
-      ])
-        if (dist[a] + e.meters < dist[b]) {
-          dist[b] = dist[a] + e.meters;
+      ]) {
+        const cost = dist[a] + legCost(e, a, b, mode);
+        if (cost < dist[b] - 1e-12) {
+          dist[b] = cost;
           changed = true;
         }
+      }
     }
     if (!changed) break;
   }
   return dist.futureDoor;
+}
+// 찾은 경로를 따라 같은 규칙으로 비용을 다시 셈(두 노드 사이 간선이 여럿이면 가장 싼 것)
+function pathCost(path, mode) {
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    const [a, b] = [path[i - 1], path[i]];
+    total += Math.min(
+      ...EDGES.filter(
+        (e) =>
+          ((e.a === a && e.b === b) || (e.a === b && e.b === a)) &&
+          !(mode === "stepfree" && e.stairs),
+      ).map((e) => legCost(e, a, b, mode)),
+    );
+  }
+  return total;
 }
 test("all campus starts have a connected shortest route to future building", () => {
   for (const start of STARTS) {
@@ -39,8 +63,10 @@ test("all campus starts have a connected shortest route to future building", () 
     assert.equal(result.path[0], start.entry);
     assert.equal(result.path.at(-1), "futureDoor");
     assert.ok(
-      Math.abs(result.meters - referenceDistance(start.entry, "shortest")) <
-        0.001,
+      Math.abs(
+        pathCost(result.path, "shortest") -
+          referenceCost(start.entry, "shortest"),
+      ) < 1e-6,
     );
     assert.equal(new Set(result.path).size, result.path.length);
   }
@@ -48,14 +74,14 @@ test("all campus starts have a connected shortest route to future building", () 
 test("step-free mode excludes registered stairs or returns no route honestly", () => {
   for (const start of STARTS) {
     const result = shortestPath(start.entry, "futureDoor", "stepfree"),
-      distance = referenceDistance(start.entry, "stepfree");
+      distance = referenceCost(start.entry, "stepfree");
     if (!Number.isFinite(distance)) {
       assert.equal(result, null);
       continue;
     }
     assert.ok(result);
     assert.equal(result.stairs, false);
-    assert.ok(Math.abs(result.meters - distance) < 0.001);
+    assert.ok(Math.abs(pathCost(result.path, "stepfree") - distance) < 1e-6);
   }
 });
 test("step-free routing chooses longer non-stair alternative on a controlled graph", () => {

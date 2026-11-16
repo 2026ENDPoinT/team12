@@ -4,13 +4,14 @@
 - 원점: 캠퍼스 경계 중심(meta.lat/lon). +x 동쪽, +z 남쪽, 단위 미터(src/campus/geo.mjs와 같은 식)
 - 건물·도로·녹지·물·나무·횡단보도를 캠퍼스 경계로 자르고, 걸을 수 있는 길로 보행 그래프를 만듭니다.
 - 이름 있는 건물마다 가장 가까운 길로 입구 연결선(<건물ID>Door)을 추정합니다. 현장 검증 전 값입니다.
-- --vworld 파일(브이월드 건물통합정보 GeoJSON, fetch-vworld-buildings.py로 받음)이 있으면
+- --vworld 파일(브이월드 건물통합정보 GeoJSON, scripts/fetch-vworld.py로 받음)이 있으면
   건물 높이·층수를 보탭니다. 없으면 OSM height/building:levels, 그것도 없으면 면적으로 추정합니다.
 
 사용 예:
   PYTHONPATH=<shapely·osmium 설치 폴더> python scripts/prepare-osm-campus.py \
       --pbf south-korea-latest.osm.pbf --campus pusan --name "^부산대학교$" --near 129.082,35.233
 
+지형 고도는 이어서 scripts/add-terrain.py로 넣습니다(이 스크립트는 JSON을 새로 쓰므로 매번 다시 실행).
 추출본: https://download.geofabrik.de/asia/south-korea.html (© OpenStreetMap contributors, ODbL 1.0)
 웹사이트는 저장된 JSON만 씁니다. 이 스크립트는 데이터를 다시 만들 때만 필요합니다.
 """

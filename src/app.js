@@ -57,6 +57,8 @@ import {
   SURVEY,
   placeEntries,
   previewPlaceId,
+  TERRAIN,
+  withHeights,
 } from "./campus/data.mjs";
 import {
   campusByName,
@@ -131,6 +133,8 @@ if (CAMPUS.id !== DEFAULT_CAMPUS_ID)
   $(".map-attribution").textContent = CAMPUS_GEOMETRY.attribution?.supplemental
     ? "© OpenStreetMap 기여자 · 국토교통부 브이월드"
     : "© OpenStreetMap 기여자";
+// 지형 고도는 Copernicus DEM(ESA)을 썼으므로 출처를 덧붙입니다(전체 문구는 DATA-LICENSE.md).
+if (TERRAIN.has) $(".map-attribution").textContent += " · Copernicus DEM";
 // 편집기(팀 조사 데이터 편집)는 서울과기대에만 있습니다.
 $("#admin-menu-editor").hidden = !CAMPUS.features.editor;
 const GIS_SUMMARY = gisSummary(CAMPUS_GEOMETRY, ENTRANCES);
@@ -340,9 +344,24 @@ function updateRoute({ announce = false } = {}) {
   $("#route-distance").textContent = Math.round(currentRoute.meters);
   $(".result-heading>div>small").textContent =
     mode === "stepfree" ? "계단 제외 시연 경로" : "시연 최단 경로";
-  $("#route-type").textContent = currentRoute.stairs ? "계단 포함" : "도보";
+  $("#route-type").textContent = currentRoute.stairs
+    ? "계단 포함"
+    : currentRoute.steep
+      ? "급경사 포함"
+      : "도보";
+  // 지형(고도)이 있는 학교는 오르막을 반영한 소요 시간으로 경로를 고릅니다(routing.mjs).
+  const climbNote =
+    currentRoute.climb >= 3 ? ` 오르막 약 ${Math.round(currentRoute.climb)}m.` : "";
+  const modeNote =
+    mode === "stepfree"
+      ? currentRoute.steep
+        ? "계단은 제외했지만 다른 길이 없어 급경사(8% 초과) 구간이 있어요."
+        : "등록된 계단과 급경사(8% 초과) 구간을 피한 경로예요."
+      : TERRAIN.has
+        ? "오르막·내리막을 반영해 가장 빨리 가는 경로예요."
+        : "등록된 시연 보행망에서 가장 짧은 경로예요.";
   $("#route-summary").textContent =
-    `${start.name} → ${destination.name} · ${mode === "stepfree" ? "등록된 계단 구간을 제외한 경로예요." : "등록된 시연 보행망에서 가장 짧은 경로예요."} 거리·시간은 시연 추정치입니다.`;
+    `${start.name} → ${destination.name} · ${modeNote}${climbNote} 거리·시간은 시연 추정치입니다.`;
   $("#route-steps").replaceChildren();
   const stride = Math.max(1, Math.ceil((currentRoute.path.length - 1) / 5));
   const visible = currentRoute.path.filter(
@@ -467,7 +486,8 @@ if (!map) {
       getGraph: () => graph,
       // 편집기가 조사 데이터를 바꿀 때마다 합친 그래프를 넘겨받아 경로를 다시 그립니다.
       applyGraph(next) {
-        graph = next;
+        // 편집기가 다시 합친 그래프에도 지면 높이를 붙여 오르막 계산을 유지합니다.
+        graph = { ...next, nodes: withHeights(next.nodes) };
         updateRoute();
       },
       // 주어진 그래프에서 지금 고른 출발지·도착지 경로를 계산만 합니다(화면은 그대로).
@@ -649,7 +669,7 @@ function updateModeOptions() {
       meta.textContent = "연결된 길이 없어요";
       time.textContent = "—";
     } else {
-      meta.textContent = `${Math.round(route.meters)} m${route.stairs ? " · 계단 포함" : ""}`;
+      meta.textContent = `${Math.round(route.meters)} m${route.stairs ? " · 계단 포함" : route.steep ? " · 급경사 포함" : ""}`;
       time.replaceChildren(String(route.minutes));
       const unit = document.createElement("small");
       unit.textContent = "분";

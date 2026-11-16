@@ -4,7 +4,8 @@ import { roadDimensions } from "./landscape/roads.mjs";
 export const windowLights = { value: 0 };
 
 // Sample the existing road geometry for illustrative lamp placement.
-export function createStreetLights(roads) {
+// heightAt: 지면 높이(지형이 없으면 0)
+export function createStreetLights(roads, heightAt = () => 0) {
   const group = new THREE.Group();
   const points = [];
   for (const road of roads) {
@@ -69,9 +70,10 @@ export function createStreetLights(roads) {
   );
   const matrix = new THREE.Matrix4();
   points.forEach(([x, z], i) => {
-    glow.setMatrixAt(i, matrix.makeTranslation(x, 0.74, z));
-    poles.setMatrixAt(i, matrix.makeTranslation(x, 2, z));
-    bulbs.setMatrixAt(i, matrix.makeTranslation(x, 4.08, z));
+    const y = heightAt(x, z);
+    glow.setMatrixAt(i, matrix.makeTranslation(x, y + 0.74, z));
+    poles.setMatrixAt(i, matrix.makeTranslation(x, y + 2, z));
+    bulbs.setMatrixAt(i, matrix.makeTranslation(x, y + 4.08, z));
   });
   group.add(glow, poles, bulbs);
   group.visible = false;
