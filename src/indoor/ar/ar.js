@@ -8,6 +8,7 @@
 //  2) 걸음은 가속도 봉우리로 세고(보행자 추측항법), 방향은 자이로로 매 프레임 이어 갑니다.
 //  3) 화면에 보이는 위치는 경로 근처면 경로 위에 붙이고 부드럽게 따라가, 경로·화살표가 흔들리지 않게 합니다.
 import * as THREE from "three";
+import { demoTiltAt } from "../imagery.mjs";
 import { sampleQuery, blurGray, blurSigma, headingOf } from "./localize.mjs";
 import {
   routeMetrics,
@@ -122,6 +123,7 @@ export async function openAR(opts) {
     onClose,
     onRoute,
   } = opts;
+  const assetUrl = (name) => `${assets}${name}${opts.assetVersion ? `?v=${opts.assetVersion}` : ""}`;
   let route = opts.route;
   const root = $("#ar"),
     video = $("#ar-video"),
@@ -219,10 +221,10 @@ export async function openAR(opts) {
     await video.play();
   }
   async function startDemo() {
-    const meta = await fetch(assets + "demo.json").then((r) => r.json());
+    const meta = await fetch(assetUrl("demo.json")).then((r) => r.json());
     demo = meta;
     video.srcObject = null;
-    video.src = assets + meta.video;
+    video.src = assetUrl(meta.video);
     video.loop = false;
     video.muted = true;
     await video.play().catch(() => {});
@@ -342,8 +344,8 @@ export async function openAR(opts) {
   const Mg = indoor.M;
   worker.postMessage({
     type: "init",
-    indexUrl: new URL(assets + "ar-index.bin", location.href).href,
-    svUrl: new URL(assets + "sv.json", location.href).href,
+    indexUrl: new URL(assetUrl("ar-index.bin"), location.href).href,
+    svUrl: new URL(assetUrl("sv.json"), location.href).href,
     portals: portalsFrom(indoor.links),
     grid: {
       gx0: Mg.gx0,
@@ -421,7 +423,7 @@ export async function openAR(opts) {
     liftStep = null,
     spoken = new Set();
   const liftDone = new Set();
-  const demoPitch = demo ? (demo.pitchDeg || -6) * D2R : 0;
+  const demoPitch = demo ? (demo.pitchDeg ?? -6) * D2R : 0;
 
   // ---- 벽 방향: 도면 방 테두리의 주된 방향(90° 주기). 미래관은 본관 0°, 옆 동 약 9.8°.
   const wallEdges = new Map();
@@ -1109,7 +1111,7 @@ export async function openAR(opts) {
       lastVT = video.currentTime;
       const c = capture();
       let R = null;
-      if (demo) R = levelR(0, demoPitch);
+      if (demo) R = demoTiltAt(demo, video.currentTime) || levelR(0, demoPitch);
       else if (ori) R = deviceR(ori);
       else R = levelR(0, -8 * D2R);
       // 화각 자동 보정(좌우로 돌릴 때마다 표본)
@@ -1213,8 +1215,11 @@ export async function openAR(opts) {
       const Rd = deviceR(ori);
       Rcb = mul(Rz((headOff ?? 0) * D2R), Rd);
       heading = (headingOf(Rcb) * 180) / Math.PI;
-    } else Rcb = levelR(shown.yaw * D2R, demoPitch);
-    const z = indoor.FL(pose.f).z + EYE;
+    } else {
+      const tilt = demo && demoTiltAt(demo, video.currentTime);
+      Rcb = tilt ? mul(Rz(shown.yaw * D2R), tilt) : levelR(shown.yaw * D2R, demoPitch);
+    }
+    const z = indoor.FL(pose.f).z + (demo?.eyeHeight ?? EYE);
     setCamera(Rcb, shown.x, shown.y, z);
     drawOverlay(now, dt, heading);
   }

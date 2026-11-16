@@ -32,7 +32,7 @@ const contexts = await Promise.all([
     outfile: "dist/indoor/ar-worker.js",
   }),
 ]);
-await copyIndoorAssets();
+await copyIndoorAssets({ includeLocal: true });
 await Promise.all(contexts.map((c) => c.watch()));
 
 const serveOpts = {

@@ -1482,6 +1482,27 @@ button.ar-status::after {
 }
 
 /* Mobile map gestures move the map; the panels stay attached to the viewport. */
+.walk-photo {
+  position: absolute;
+  z-index: 5;
+  top: calc(112px + var(--safe-t));
+  right: 16px;
+  width: min(240px, 32vw);
+  margin: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--glass-strong);
+  box-shadow: var(--panel-shadow);
+  pointer-events: none;
+}
+.walk-photo img {
+  display: block;
+  width: 100%;
+}
+.walk-photo figcaption {
+  padding: 6px 10px;
+  font-size: 12px;
+}
 @media (max-width: 819px) {
   .stage {
     height: 100dvh;
