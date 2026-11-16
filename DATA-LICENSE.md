@@ -20,12 +20,14 @@
 ## 다른 학교 지도 데이터 (`data/campuses/*.json`)
 
 - 원본: © OpenStreetMap 기여자, [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/). [Geofabrik 대한민국 추출본](https://download.geofabrik.de/asia/south-korea.html)에서 `scripts/prepare-osm-campus.py`로 변환합니다.
-- 캠퍼스 경계는 OSM `amenity=university` 영역입니다(파일의 `attribution.geometrySource`에 원본 way/relation 링크).
-  - 부산대학교 부산캠퍼스: [OpenStreetMap way 472067907](https://www.openstreetmap.org/way/472067907)
+- 캠퍼스 경계는 OSM `amenity=university` 영역입니다(파일의 `attribution.geometrySource`에 원본 way/relation 링크). 학교별 경계 이름·정문 출처는 `data/campuses/sources.json`에 있습니다.
+  - 부산대(부산캠퍼스), 서울대(관악캠퍼스), 강원대(춘천), 경북대(대구), 경상국립대(가좌), 전남대(광주), 전북대(전주), 제주대(아라), 충남대(대덕), 충북대(개신)
+- 다시 만들기: `scripts/build-campuses.py`(학교별로 prepare-osm-campus → apply-building-floors → add-terrain)
 - 변환 내용: 경계로 자르기, 걸을 수 있는 OSM 길로 검증 전 보행 그래프 생성, 이름 있는 건물마다 가장 가까운 길로 입구 인근 연결선 추정, 25m 안의 끊긴 길 조각을 짧은 선으로 연결, 숲·잔디 안에 표현용 나무 배치(실제 나무 위치 아님), 높이 정보가 없는 건물은 면적으로 층수 추정.
 - 건물 층수·건물번호: 부산대학교 시설과 [건물 현황](https://sisul.pusan.ac.kr/sisul/42285/subview.do)(2026-11-16 확인)을 `data/sources/pusan-facilities.csv`로 옮기고 `scripts/apply-building-floors.py`로 이름이 맞는 건물에 넣었습니다(지상 층수 × 4m를 표시 높이로 사용). 맞지 않은 건물은 면적 추정값입니다.
 - 브이월드 건물 높이·층수(공공누리 제1유형)를 보탤 수 있게 `scripts/fetch-vworld.py`를 두었습니다. 현재 부산대 데이터에는 아직 넣지 않았습니다.
-- 전용 건물 모델(대학본부·인문관·운죽정)은 위키미디어 공용 사진을 참고해 직접 만든 근사 형태입니다. 사진은 저장소에 넣지 않았습니다. 참고한 파일: `Administration bldg - PNU.jpg`, `부산대(본관).jpg`, `Pusan Natl Univ by Ficell 003.jpg`, `부산대 인문관.jpg`, `Woon Jook Jeong - PNU cafeteria.JPG`.
+- 대표 건물 전용 모델은 위키미디어 공용 사진을 참고해 직접 만든 근사 형태입니다. 사진은 저장소에 넣지 않았고, 참고한 파일 이름은 `src/map/buildings/landmark-designs.mjs`의 `photo`에 적었습니다.
+- 부산대 외 학교의 층수는 학교 공개 현황표를 아직 넣지 않아 OSM `building:levels` 또는 면적 추정값입니다.
 - 이 파일들과 배포 사본(`dist/data/campuses/`)도 **ODbL 1.0으로 제공합니다.**
 
 ## 지형 고도 (서울과기대·다른 학교 공통)

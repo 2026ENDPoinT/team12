@@ -235,3 +235,34 @@ test("부산대 건물 레이어: 전용 모델 3개와 공통 외벽이 지형 
     data.useCampus(campusById("seoultech"), seoultech, survey);
   }
 });
+
+test("모든 학교: 대표 건물 설정이 실제 건물에 맞물려 유효한 모델로 만들어진다", async () => {
+  const data = await import("../src/campus/data.mjs");
+  const { CAMPUSES, campusById } = await import("../src/campus/registry.mjs");
+  const { readFileSync } = await import("node:fs");
+  const { createBuildingLayer } = await import("../src/map/buildings/index.mjs");
+  const { LANDMARK_DESIGNS } = await import("../src/map/buildings/landmark-designs.mjs");
+  const seoultech = JSON.parse(readFileSync(new URL("../data/seoultech.json", import.meta.url), "utf8"));
+  const survey = JSON.parse(readFileSync(new URL("../data/team-survey.json", import.meta.url), "utf8"));
+  try {
+    for (const campus of CAMPUSES.filter((c) => c.id !== "seoultech")) {
+      const ids = Object.keys(LANDMARK_DESIGNS).filter((id) => id.startsWith(`${campus.id}-`));
+      if (!ids.length) continue;
+      data.useCampus(campus, JSON.parse(readFileSync(new URL(`../${campus.data}`, import.meta.url), "utf8")));
+      const layer = createBuildingLayer(data.BUILDINGS, data.ENTRANCES, data.TERRAIN);
+      const made = layer.records.filter((r) => ids.includes(r.b.id));
+      assert.equal(made.length, ids.length, `${campus.name} 대표 건물 수`);
+      for (const record of made) {
+        assert(record.body.isMesh && record.height > 0, record.b.id);
+        assert(LANDMARK_DESIGNS[record.b.id].photo?.length, `${record.b.id} 참고 사진 기록`);
+      }
+      layer.group.updateMatrixWorld(true);
+      layer.group.traverse((object) => {
+        assert(object.matrixWorld.elements.every(Number.isFinite));
+        if (object.isInstancedMesh) assert(object.instanceMatrix.array.every(Number.isFinite));
+      });
+    }
+  } finally {
+    data.useCampus(campusById("seoultech"), seoultech, survey);
+  }
+});

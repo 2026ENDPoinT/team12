@@ -24,11 +24,7 @@ import { createTechnoparkBuilding } from "./models/technopark.mjs";
 import { createAdminBuilding } from "./models/admin.mjs";
 import { createHyeseongBuilding } from "./models/hyeseong.mjs";
 import { createInternationalBuilding } from "./models/international.mjs";
-import {
-  createPnuAdminBuilding,
-  createPnuHumanitiesBuilding,
-  createPnuWoonjukjeongBuilding,
-} from "./models/pnu.mjs";
+import { createLandmarkBuilding } from "./models/landmarks.mjs";
 
 const MODEL_FACTORIES = {
   future: createFutureBuilding,
@@ -47,10 +43,8 @@ const MODEL_FACTORIES = {
   admin: createAdminBuilding,
   hyeseong: createHyeseongBuilding,
   international: createInternationalBuilding,
-  // 부산대학교
-  "pnu-admin": createPnuAdminBuilding,
-  "pnu-humanities": createPnuHumanitiesBuilding,
-  "pnu-woonjukjeong": createPnuWoonjukjeongBuilding,
+  // 다른 학교 대표 건물: catalog의 landmark 설정(외관 유형·색)으로 만듭니다.
+  landmark: createLandmarkBuilding,
 };
 
 function createRoof(building) {
@@ -103,7 +97,7 @@ export function createBuildingLayer(buildings, entrances = [], terrain = null) {
       const factory = MODEL_FACTORIES[design.model];
       if (!factory)
         throw new Error(`Unknown building model: ${design.model} (${b.id})`);
-      const model = factory(b, profile.wall, entrance);
+      const model = factory(b, profile.wall, entrance, design.landmark);
       body = model.body;
       entryView = model.entryView;
       height = model.height ?? b.h;

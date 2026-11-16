@@ -83,6 +83,7 @@ test("모든 학교 데이터에 캠퍼스를 덮는 지형 격자가 있다", (
       assert.ok(x <= data.terrain.x0 + (data.terrain.cols - 1) * data.terrain.step);
       assert.ok(z <= data.terrain.z0 + (data.terrain.rows - 1) * data.terrain.step);
     }
-    assert.ok(t.max < 200, "근사 지면이 비정상적으로 높지 않음");
+    // 서울대 관악캠퍼스 경계는 관악산 자락을 포함해 400m 넘게 차이 납니다.
+    assert.ok(t.max < 600, "근사 지면이 비정상적으로 높지 않음");
   }
 });

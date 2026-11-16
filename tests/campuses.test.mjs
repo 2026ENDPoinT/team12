@@ -106,3 +106,15 @@ test("부산대: 학교 공개 건물 현황표 층수와 건물번호가 들어
   assert.ok(official.length >= 60);
   for (const b of official) assert.equal(b.h, b.floors * 4);
 });
+
+test("데이터 생성 설정(data/campuses/sources.json)과 앱 학교 목록의 정문이 같다", () => {
+  const { campuses } = JSON.parse(
+    readFileSync(new URL("../data/campuses/sources.json", import.meta.url), "utf8"),
+  );
+  assert.deepEqual(
+    campuses.map((c) => c.id).sort(),
+    others.map((c) => c.id).sort(),
+  );
+  for (const source of campuses)
+    assert.deepEqual(source.gate, campusById(source.id).gate, source.id);
+});

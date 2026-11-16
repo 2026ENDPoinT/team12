@@ -29,41 +29,74 @@ export function shortestPath(
 ) {
   if (!nodes[start] || !nodes[end]) return null;
 
-  const distance = Object.fromEntries(
-    Object.keys(nodes).map((id) => [id, Infinity]),
-  );
+  // 노드별로 붙은 간선 목록(인접 목록)과 이진 힙을 씁니다. 큰 캠퍼스(노드 수천 개)에서도
+  // 경로 한 번이 수 밀리초 안에 끝납니다. 비용 규칙은 아래 relax와 같습니다.
+  const adjacent = new Map();
+  for (const edge of edges) {
+    if (mode === "stepfree" && edge.stairs) continue;
+    if (!nodes[edge.a] || !nodes[edge.b]) continue;
+    for (const id of [edge.a, edge.b]) {
+      if (!adjacent.has(id)) adjacent.set(id, []);
+      adjacent.get(id).push(edge);
+    }
+  }
+  const distance = new Map([[start, 0]]);
   const previous = {};
   // 각 노드에 실제로 들어온 간선(같은 두 노드 사이에 보행로와 계단이 함께 있을 수 있음)
   const previousEdge = {};
-  const pending = new Set(Object.keys(nodes));
-  distance[start] = 0;
+  const done = new Set();
+  const heap = [[0, start]];
+  const push = (item) => {
+    heap.push(item);
+    for (let i = heap.length - 1; i > 0; ) {
+      const parent = (i - 1) >> 1;
+      if (heap[parent][0] <= heap[i][0]) break;
+      [heap[parent], heap[i]] = [heap[i], heap[parent]];
+      i = parent;
+    }
+  };
+  const pop = () => {
+    const top = heap[0],
+      last = heap.pop();
+    if (heap.length) {
+      heap[0] = last;
+      for (let i = 0; ; ) {
+        const l = i * 2 + 1,
+          r = l + 1;
+        let m = i;
+        if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+        if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+        if (m === i) break;
+        [heap[m], heap[i]] = [heap[i], heap[m]];
+        i = m;
+      }
+    }
+    return top;
+  };
 
-  while (pending.size) {
-    const current = [...pending].reduce((a, b) =>
-      distance[a] < distance[b] ? a : b,
-    );
-    if (!Number.isFinite(distance[current])) break;
-    pending.delete(current);
+  while (heap.length) {
+    const [cost, current] = pop();
+    if (done.has(current) || cost > distance.get(current)) continue;
+    done.add(current);
     if (current === end) break;
 
-    for (const edge of edges) {
-      if (mode === "stepfree" && edge.stairs) continue;
-      const next =
-        edge.a === current ? edge.b : edge.b === current ? edge.a : null;
-      if (!next || !pending.has(next)) continue;
+    for (const edge of adjacent.get(current) || []) {
+      const next = edge.a === current ? edge.b : edge.a;
+      if (done.has(next)) continue;
       const leg = walkLeg(edge.meters, heightOf(nodes[current]), heightOf(nodes[next]));
       const steep =
         mode === "stepfree" && Math.abs(leg.slope) > STEEP_SLOPE;
-      const cost = distance[current] + leg.minutes * (steep ? STEEP_PENALTY : 1);
-      if (cost < distance[next]) {
-        distance[next] = cost;
+      const total = cost + leg.minutes * (steep ? STEEP_PENALTY : 1);
+      if (total < (distance.get(next) ?? Infinity)) {
+        distance.set(next, total);
         previous[next] = current;
         previousEdge[next] = edge;
+        push([total, next]);
       }
     }
   }
 
-  if (!Number.isFinite(distance[end])) return null;
+  if (!done.has(end)) return null;
   const path = [end];
   while (path[0] !== start) {
     if (!previous[path[0]]) return null;

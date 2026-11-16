@@ -11,11 +11,13 @@ export function createModelKit(building) {
   const material = (color, roughness = 0.88, metalness = 0) =>
     new THREE.MeshStandardMaterial({ color, roughness, metalness });
 
-  // 회전한 상자 하나(같은 재질끼리 InstancedMesh로 묶어 그림)
-  function box(mat, x, y, z, w, h, d, turn = 0) {
+  // 회전한 상자 하나(같은 재질끼리 InstancedMesh로 묶어 그림).
+  // turn: 수평 회전(폭 w가 놓이는 방향), tilt: 그 다음 폭 방향 축으로 기울임(+면 깊이 d의 + 쪽이 내려감).
+  dummy.rotation.order = "YXZ";
+  function box(mat, x, y, z, w, h, d, turn = 0, tilt = 0) {
     if (!batches.has(mat)) batches.set(mat, []);
     dummy.position.set(x, y, z);
-    dummy.rotation.set(0, turn, 0);
+    dummy.rotation.set(tilt, turn, 0);
     dummy.scale.set(w, h, d);
     dummy.updateMatrix();
     batches.get(mat).push(dummy.matrix.clone());
@@ -79,6 +81,18 @@ export function createModelKit(building) {
       edge.turn,
     );
   }
+  // 삼각형 면(박공 끝 등). points: [[x,y,z] ×3], 양면으로 그림
+  function triangle(mat, points) {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(points.flat(), 3));
+    geometry.computeVertexNormals();
+    const side = mat.clone();
+    side.side = THREE.DoubleSide;
+    const mesh = new THREE.Mesh(geometry, side);
+    mesh.castShadow = mesh.receiveShadow = true;
+    group.add(mesh);
+    return mesh;
+  }
   function finish() {
     const cube = new THREE.BoxGeometry(1, 1, 1);
     for (const [mat, parts] of batches) {
@@ -97,7 +111,7 @@ export function createModelKit(building) {
     });
     return pickables;
   }
-  return { group, material, box, extrude, edges, face, finish };
+  return { group, material, box, extrude, edges, face, triangle, finish };
 }
 
 // 외곽선에서 가장 긴 두 변의 방향(건물 주축)과 중심

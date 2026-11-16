@@ -9,8 +9,9 @@ export async function copyCampusData({
 } = {}) {
   await rm(out, { recursive: true, force: true });
   await mkdir(out, { recursive: true });
-  const files = (await readdir(src).catch(() => [])).filter((name) =>
-    name.endsWith(".json"),
+  // sources.json은 데이터를 만드는 설정이라 배포하지 않습니다.
+  const files = (await readdir(src).catch(() => [])).filter(
+    (name) => name.endsWith(".json") && name !== "sources.json",
   );
   for (const name of files) await copyFile(join(src, name), join(out, name));
   return files.length;

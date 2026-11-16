@@ -103,12 +103,19 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   sun.position.set(-450, 750, 550);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
+  // 그림자 범위: 기본 ±800m(서울과기대). 더 큰 캠퍼스는 경계가 다 들어가도록 넓힙니다.
+  const shadowHalf = Math.max(
+    800,
+    ...CAMPUS_GEOMETRY.boundary.flat().map(([x, z]) =>
+      Math.ceil(Math.max(Math.abs(x), Math.abs(z)) + 60),
+    ),
+  );
   Object.assign(sun.shadow.camera, {
-    left: -800,
-    right: 800,
-    top: 800,
-    bottom: -800,
-    far: 2500,
+    left: -shadowHalf,
+    right: shadowHalf,
+    top: shadowHalf,
+    bottom: -shadowHalf,
+    far: 2500 + (shadowHalf - 800) * 2,
   });
   sun.shadow.normalBias = 0.45;
   sun.shadow.bias = -0.0002;
