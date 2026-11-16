@@ -27,3 +27,5 @@ supabase/.temp/
 supabase/.branches/
 # 데모 녹화 결과물(영상·로그)은 Git에 올리지 않습니다.
 /demo-output/
+# 브라우저 확인용 Playwright 스크린샷·로그
+/.playwright-mcp/

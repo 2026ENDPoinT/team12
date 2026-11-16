@@ -23,6 +23,7 @@ import {
   CAMPUS_GEOMETRY,
   ENTRANCES,
   MAIN_GATE,
+  CAMPUS,
 } from "../campus/data.mjs";
 import {
   locateReportPoint,
@@ -63,7 +64,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
   renderer.domElement.tabIndex = 0;
   renderer.domElement.setAttribute(
     "aria-label",
-    "서울과기대 3D 지도. 왼쪽 드래그 지도 이동, 지도 클릭 후 W/S 확대·축소, A/D 좌우 이동, Space 상승, Shift 하강, Ctrl 가속, 휠·두 손가락 벌리기 확대, 더블클릭 확대, 오른쪽 드래그 회전·기울이기. 터치: 한 손가락 이동, 두 손가락 벌리기 확대, 함께 좌우로 밀기 회전, 위아래로 밀기 기울이기. 신고 모드에서 지도 위치 클릭. 방향키 회전, Enter로 지도 가운데 위치 신고.",
+    `${CAMPUS.short} 3D 지도. 왼쪽 드래그 지도 이동, 지도 클릭 후 W/S 확대·축소, A/D 좌우 이동, Space 상승, Shift 하강, Ctrl 가속, 휠·두 손가락 벌리기 확대, 더블클릭 확대, 오른쪽 드래그 회전·기울이기. 터치: 한 손가락 이동, 두 손가락 벌리기 확대, 함께 좌우로 밀기 회전, 위아래로 밀기 기울이기. 신고 모드에서 지도 위치 클릭. 방향키 회전, Enter로 지도 가운데 위치 신고.`,
   );
   const scene = new THREE.Scene(),
     camera = new THREE.OrthographicCamera(-600, 600, 600, -600, 1, 3500);
@@ -168,7 +169,8 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     if (land.kind === "water") {
       poly.position.y = 0.3;
       const ring = land.outline;
-      const isBungeobang = ring.every(([, z]) => z < 0);
+      const isBungeobang =
+        !!CAMPUS.features.pond && ring.every(([, z]) => z < 0);
       poly.material.dispose();
       // Distance to the actual shoreline also works for the long, narrow stream.
       // One draw call per water polygon, with no texture downloads or reflections.
@@ -263,8 +265,9 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     banks.receiveShadow = true;
     scene.add(banks);
   }
-  const pondDetails = createPondDetails();
-  scene.add(pondDetails.group);
+  // 붕어방 데크·분수는 서울과기대에만 있습니다.
+  const pondDetails = CAMPUS.features.pond ? createPondDetails() : null;
+  if (pondDetails) scene.add(pondDetails.group);
   function segment(a, b, width, color, y, group = scene, material = null) {
     const length = Math.hypot(b.x - a.x, b.z - a.z);
     if (length < 0.01) return;
@@ -278,7 +281,11 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     group.add(mesh);
     return mesh;
   }
-  const crosswalkLines = crosswalks.map(({ coordinates }) =>
+  // 서울과기대는 data/crosswalks.json, 다른 학교는 지도 데이터에 들어 있는 OSM 횡단보도를 씁니다.
+  const crosswalkSource = CAMPUS.features.crosswalks
+    ? crosswalks
+    : CAMPUS_GEOMETRY.crosswalks || [];
+  const crosswalkLines = crosswalkSource.map(({ coordinates }) =>
     coordinates.map((coordinate) => {
       const { x, z } = toScene(coordinate, CAMPUS_GEOMETRY.meta);
       return [x, z];
@@ -333,7 +340,9 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     }
     buildingGroups.set(b.id, { body, profile, label, b });
   }
-  const campusTrees = createCampusTrees(CAMPUS_GEOMETRY);
+  const campusTrees = createCampusTrees(CAMPUS_GEOMETRY, {
+    pond: !!CAMPUS.features.pond,
+  });
   scene.add(campusTrees);
   const entranceGroup = new THREE.Group(),
     entranceMaterial = new THREE.MeshBasicMaterial({
@@ -721,10 +730,31 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     renderer.setSize(w, h);
     labels.setSize(w, h);
   }
+  // 처음 시점: 서울과기대는 기존 값 그대로, 다른 학교는 경계 상자 가운데를 보고
+  // 서울과기대(대각선 약 1155m)와 같은 비율로 화면에 들어오게 확대합니다.
+  const framing = (() => {
+    if (CAMPUS.features.pond) return { x: 0, z: -5, scale: 1 };
+    const points = CAMPUS_GEOMETRY.boundary.flat();
+    const xs = points.map(([x]) => x),
+      zs = points.map(([, z]) => z);
+    const minX = Math.min(...xs),
+      maxX = Math.max(...xs),
+      minZ = Math.min(...zs),
+      maxZ = Math.max(...zs);
+    return {
+      x: (minX + maxX) / 2,
+      z: (minZ + maxZ) / 2,
+      scale: THREE.MathUtils.clamp(
+        1155 / Math.hypot(maxX - minX, maxZ - minZ),
+        0.5,
+        1.6,
+      ),
+    };
+  })();
   function reset() {
-    camera.position.set(-670, 950, 1100);
-    controls.target.set(0, 0, -5);
-    camera.zoom = homeMode ? 1 : 1.15;
+    camera.position.set(framing.x - 670, 950, framing.z + 1105);
+    controls.target.set(framing.x, 0, framing.z);
+    camera.zoom = (homeMode ? 1 : 1.15) * framing.scale;
     camera.updateProjectionMatrix();
     controls.update();
   }
@@ -752,8 +782,8 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
     camera.updateProjectionMatrix();
   }
   function top() {
-    camera.position.set(0, 1400, 5);
-    controls.target.set(0, 0, 0);
+    camera.position.set(framing.x, 1400, framing.z + 5);
+    controls.target.set(framing.x, 0, framing.z);
     controls.update();
   }
   // 편집 모드: 한 지점을 화면 가운데에 두고 위에서 내려다봅니다.
@@ -1354,7 +1384,7 @@ export function createCampusMap(host, onSelect, onRoadSelect, onCameraInteractio
         reduceMotion ? 0 : Math.min(0.1, deltaSeconds),
         !reduceMotion,
       );
-    pondDetails.update(reduceMotion ? 0 : t / 1000);
+    pondDetails?.update(reduceMotion ? 0 : t / 1000);
     renderer.render(scene, camera);
     if (navigationMode && userLocationGroup.visible && userTechnyong) {
       const background = scene.background;

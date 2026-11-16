@@ -1,4 +1,6 @@
 import { getBuildingDesign } from "./catalog.mjs";
+import { CAMPUS } from "../../campus/data.mjs";
+import { DEFAULT_CAMPUS_ID } from "../../campus/registry.mjs";
 // Schematic campus architecture, not photo-verified building classifications.
 // Keep choices explicit so a later photo correction changes one entry.
 // Illustrative waterproof-roof colors, not sampled geographic measurements.
@@ -110,10 +112,27 @@ const familiesByName = {
   학군단: "academic",
 };
 
+// 서울과기대 외 학교: 건물 이름의 단어로 표현 유형을 고릅니다(용도 추정이며 외관 검증이 아님).
+// 서울과기대는 위 familiesByName 표만 써서 기존 외관을 유지합니다. 위에서부터 먼저 맞는 규칙을 씁니다.
+const familyKeywords = [
+  [/도서관/, "curtain"],
+  [/생활관|기숙사|학사$|자유관|진리관|웅비관|효원재|재$/, "residence"],
+  [/처리장|창고|부속공장|관리실|발전|변전|기계실|온실/, "service"],
+  [/회관|학생|체육|예술|미술|음악|조형|조소|박물관|기념관|정$/, "warm"],
+  [/공학|연구동|실험|산학|클린룸|기술|기계관|테크/, "ribbon"],
+  [/본부|국제|컨벤션|센터/, "curtain"],
+];
+function familyFromName(name) {
+  return familyKeywords.find(([pattern]) => pattern.test(name))?.[1];
+}
+
 export function buildingAppearance(building) {
   const family =
     familiesByName[building.name] ??
-    (building.name === "교내 건물" ? "service" : "academic");
+    (building.name === "교내 건물"
+      ? "service"
+      : (CAMPUS.id !== DEFAULT_CAMPUS_ID && familyFromName(building.name)) ||
+        "academic");
   const height = Math.max(1, Number(building.h) || 4);
   const floors = Math.max(
     1,

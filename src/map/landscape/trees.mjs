@@ -1,7 +1,9 @@
 import { createBroadleafTrees } from "./broadleaf-trees.mjs";
 import { createPondTreeLayout } from "./pond-planting.mjs";
 
-export function createCampusTrees(geometry) {
+// pond: 서울과기대 붕어방 주변 식재(pond-planting.mjs)를 쓸지. 다른 학교는 원본 나무만 씁니다.
+export function createCampusTrees(geometry, { pond = true } = {}) {
+  if (!pond) return createBroadleafTrees(geometry.trees);
   const trees = createPondTreeLayout(geometry).trees;
   // Keep the island tree rooted at the raised island surface.
   return createBroadleafTrees([...trees, [-119, -141, 0.55, 0.9]]);

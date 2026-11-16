@@ -1,3 +1,4 @@
+import { CAMPUS } from "../campus/data.mjs";
 // 건물 정보 카드에 표시하는 층 범위입니다.
 // 출처: https://seoultech-map.pages.dev/data/campus.js (원자료: https://www.seoultech.ac.kr/intro/map/)
 // 출처에 등재됐거나 별도 공식 자료로 확인한 층을 표시합니다.
@@ -59,6 +60,8 @@ export const BUILDING_INFO = {
   "테크노큐브": { floors: "B1 · 1F–12F" },
 };
 
+// 위 안내는 서울과기대 자료라 다른 학교에서는 쓰지 않습니다.
 export function buildingInfo(name) {
+  if (!CAMPUS.features.buildingInfo) return {};
   return Object.hasOwn(BUILDING_INFO, name) ? BUILDING_INFO[name] : {};
 }
